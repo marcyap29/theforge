@@ -1,0 +1,63 @@
+# The Forge — .gitignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.cursor/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+
+# Logs
+*.log
+logs/
+log/
+
+# Temporary
+*.tmp
+*.temp
+temp/
+tmp/
+*.bak
+*.backup
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+*.pem
+secrets/
+google-services.json
+GoogleService-Info.plist
+firebase_options.dart
+
+# Flutter/Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+*.dill
+*.snapshot
+*.app
+*.ipa
+*.apk
+*.aab
+coverage/
+
+# Firebase Functions
+functions/node_modules/
+functions/lib/
+functions/.env
+
+# macOS
+*.xcuserstate
+xcuserdata/
