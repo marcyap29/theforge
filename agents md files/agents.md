@@ -16,7 +16,7 @@
 
 **Repository root:** `/Volumes/Marc Working Drive/Development/The Forge/`
 
-**Before changing Firestore schema, spec generation logic, or auth:**
+**Before changing local file structure, spec generation logic, or provider implementations:**
 - Read `bugtracker/BUG_PREVENTION.md` and skim `bugtracker/bug_tracker.md` when the area matches.
 
 ---
@@ -30,7 +30,7 @@
 | **FEATURES.md** | Feature catalog | `tracking md files/FEATURES.md` |
 | **UI_UX.md** | UI/UX patterns | `tracking md files/UI_UX.md` |
 | **CHANGELOG.md** | Version history | `tracking md files/CHANGELOG.md` |
-| **backend.md** | Firebase + SwarmSpace API | `backend.md` |
+| **backend.md** | Storage model, providers, API reference | `backend.md` |
 | **CONFIGURATION_MANAGEMENT.md** | Docs inventory and change log | `operations md files/CONFIGURATION_MANAGEMENT.md` |
 | **bugtracker/** | Bug index, prevention, records | `bugtracker/README.md` |
 | **context.md** | Session log — read first every session | `tracking md files/context.md` |
@@ -45,58 +45,81 @@
 
 **What it is:** A standalone Flutter desktop app (macOS primary). The PM layer for AI-assisted development — structured interview → locked spec → executor handoff.
 
-**Tech stack:** Flutter · Dart · Firebase (Firestore + Cloud Functions) · SwarmSpace API (spec generation, credit billing)
+**Tech stack:** Flutter · Dart · Riverpod · Local filesystem (Markdown + JSON) · SQLite via drift · Pluggable `SpecGenerationProvider` · Firebase (optional, workspace-tier sync only) · SwarmSpace API (billing, SwarmSpace routing provider only)
 
 **Repository layout:**
 ```
 The Forge/
-├── lib/                        — Flutter app source
-│   ├── core/                   — App bootstrap, routing, theme
+├── lib/
+│   ├── core/                        — App bootstrap, routing, theme, DI
 │   ├── features/
-│   │   ├── interview/          — Interview session UI + state
-│   │   ├── projects/           — Project folder browser + resume
-│   │   ├── spec_viewer/        — Read-only locked spec display
-│   │   └── worksheets/         — Setup worksheet display
+│   │   ├── interview/               — Interview session (the core product)
+│   │   │   ├── state/               — Riverpod providers + session state
+│   │   │   └── ui/                  — Interview screen, confidence meter, conflict UI
+│   │   ├── projects/                — Project folder browser + resume
+│   │   ├── spec_viewer/             — Read-only locked spec display
+│   │   ├── worksheets/              — Setup worksheet display
+│   │   └── settings/                — LLM provider configuration
 │   ├── data/
-│   │   ├── firestore/          — Firestore read/write layer
-│   │   └── swarmspace/         — SwarmSpace API client
-│   └── shared/                 — Shared widgets, models, utils
-├── functions/                  — Firebase Cloud Functions (spec generation)
+│   │   ├── filesystem/              — Local file read/write layer
+│   │   │   └── project_file_repository.dart
+│   │   ├── local_db/                — SQLite index (drift)
+│   │   │   └── forge_database.dart
+│   │   ├── spec_generation/         — Provider abstraction + implementations
+│   │   │   ├── spec_generation_provider.dart
+│   │   │   └── providers/
+│   │   │       ├── claude_provider.dart
+│   │   │       ├── openai_provider.dart
+│   │   │       ├── ollama_provider.dart
+│   │   │       ├── swarmspace_provider.dart
+│   │   │       └── custom_provider.dart
+│   │   └── swarmspace/              — SwarmSpace billing client (SwarmSpace routing only)
+│   └── shared/                      — Shared widgets, models, utils, extensions
 ├── DOCS/
-│   └── forge/                  — The Forge protocol docs (workflow, brief)
-├── tracking md files/          — context.md, planner.md, backlog.md, etc.
-├── agents md files/            — SOPs and agent guidance
-├── operations md files/        — startup.md, CONFIGURATION_MANAGEMENT.md
-├── bugtracker/                 — Bug tracker index and records
-├── backend.md                  — Firebase + SwarmSpace reference
-└── claude.md                   — Claude entry point
+│   └── forge/                       — workflow_template.md, positioning_brief.md
+├── tracking md files/               — context.md, planner.md, backlog.md, etc.
+├── agents md files/                 — SOPs and agent guidance
+├── operations md files/             — startup.md, CONFIGURATION_MANAGEMENT.md
+├── bugtracker/                      — Bug tracker index and records
+├── backend.md                       — Storage model + provider reference
+└── claude.md                        — Claude entry point
 ```
 
 **Core subsystems:**
 
-- **Interview Engine** (`lib/features/interview/`) — Conversational UI driving the 8-dimension confidence model. Holds all session state in Flutter (Riverpod). Writes to Firestore only on phase completion.
-- **Project Store** (`lib/data/firestore/`) — Firestore read/write for forge-projects collection. Append-only audit trail. Immutable spec writes.
-- **Spec Generator** (`functions/`) — Firebase Cloud Function. Receives completed interview JSON, fires 3 parallel LLM calls (conservative/balanced/experimental), returns variants. Billed via SwarmSpace credits.
-- **SwarmSpace Client** (`lib/data/swarmspace/`) — API client for spec generation calls and credit tracking.
-- **Artifact Viewers** (`lib/features/spec_viewer/`, `lib/features/worksheets/`) — Read-only display of locked specs, bullet handoffs, setup worksheets, audit log.
+- **Interview Engine** (`lib/features/interview/`) — Conversational UI driving the 8-dimension confidence model. Holds all session state in Riverpod. Nothing written to disk mid-interview — only on phase completion.
+- **Project File Repository** (`lib/data/filesystem/project_file_repository.dart`) — All local file reads and writes. Enforces write-once specs, append-only audit log, atomic writes via temp+rename.
+- **SQLite Index** (`lib/data/local_db/forge_database.dart`) — Lightweight project browser cache. Rebuilds from filesystem scan if stale or missing.
+- **SpecGenerationProvider** (`lib/data/spec_generation/`) — Abstract interface for all LLM calls. 5 implementations: Claude, OpenAI, Ollama, SwarmSpace, Custom. Monte Carlo strategy (3 parallel calls at t=0.2/0.6/1.0) lives in the interview engine, not the providers.
+- **Artifact Viewers** (`lib/features/spec_viewer/`, `lib/features/worksheets/`) — Read-only display of local files. Locked specs render with a "LOCKED" badge.
 
 **Key data flow:**
 ```
-Interview (Flutter state) → Phase complete → Firestore write
-                                          → SwarmSpace spec gen call
-                                          → Variants returned → User selects
-                                          → Locked spec written (immutable)
-                                          → Audit log appended
+Interview (Riverpod state) → Phase complete
+  → SpecGenerationProvider.generateVariants() — 3 parallel LLM calls
+  → User selects variant
+  → ProjectFileRepository writes to disk:
+      specs/{ProjectName}_LockedSpec_v1.md      (immutable — checked before write)
+      handoffs/{ProjectName}_BulletHandoff_v1_Interview.md
+      worksheets/{ProjectName}_SetupWorksheet_v1.md
+      handoff_package_v1.json
+      audit/{ProjectName}_AuditLog.md           (appended, never replaced)
+      README.md                                  (updated with new phase state)
+  → SQLite index updated
+  → If SwarmSpace provider: credits deducted via SwarmSpace API
 ```
 
-**Firestore schema:**
+**Local file structure (per project):**
 ```
-forge-projects/{projectId}/
-  ├── (doc)                    — metadata: name, mode, phase, createdAt, updatedAt
-  ├── specs/{specVersion}      — immutable locked spec documents
-  ├── handoffs/{id}            — bullet handoffs at each phase transition
-  ├── worksheets/{version}     — setup worksheets
-  └── audit/log                — append-only run log (never modified)
+~/Documents/The Forge Projects/{ProjectName}/
+  ├── README.md
+  ├── specs/
+  │   └── {ProjectName}_LockedSpec_v1.md   — immutable after creation
+  ├── handoffs/
+  ├── worksheets/
+  ├── handoff_package_v1.json
+  └── audit/
+      └── {ProjectName}_AuditLog.md        — append-only
 ```
 
 ---
@@ -105,11 +128,14 @@ forge-projects/{projectId}/
 
 | Service / Module | Path | Notes |
 |---|---|---|
-| Interview session cubit/bloc | `lib/features/interview/` | Holds all mid-interview state |
-| Firestore project layer | `lib/data/firestore/forge_project_repository.dart` | All Firestore reads/writes |
-| SwarmSpace API client | `lib/data/swarmspace/swarmspace_client.dart` | Spec gen + credit calls |
-| Spec generation function | `functions/src/generateSpec.ts` | Firebase Function, 3-parallel LLM |
+| Interview session state | `lib/features/interview/state/` | Riverpod providers, holds all mid-interview state |
+| Project file repository | `lib/data/filesystem/project_file_repository.dart` | All local file reads/writes |
+| SQLite index | `lib/data/local_db/forge_database.dart` | Project browser cache |
+| SpecGenerationProvider interface | `lib/data/spec_generation/spec_generation_provider.dart` | Abstract interface |
+| Provider implementations | `lib/data/spec_generation/providers/` | Claude, OpenAI, Ollama, SwarmSpace, Custom |
+| SwarmSpace billing client | `lib/data/swarmspace/swarmspace_client.dart` | Credits, SwarmSpace routing only |
 | Project browser | `lib/features/projects/` | List + resume projects |
+| Settings | `lib/features/settings/` | Provider config, API key entry |
 
 ---
 
@@ -120,19 +146,19 @@ forge-projects/{projectId}/
 - **Error handling:** Explicit typed exceptions; never swallow errors silently
 - **Imports:** Relative imports within a feature; absolute for cross-feature
 - **Linter command:** `dart analyze lib/`
-- **No committed secrets:** Firebase config and API keys via `.env` (gitignored)
+- **No committed secrets:** API keys go in macOS Keychain via `flutter_secure_storage`. Never `.env`, never `shared_preferences`, never logged.
 
 ---
 
 ## Key Invariants
 
-- **Locked specs are immutable.** Never modify a written spec. Amendments produce a new versioned document.
-- **Audit trail is append-only.** The `/audit/log` Firestore doc is only ever appended — never overwritten.
-- **Interview state stays in Flutter.** Do not push mid-interview state to Firestore. Write only on phase completion.
+- **Locked specs are immutable.** Never modify a written spec. Amendments produce a new versioned file. Check existence before write — abort if file exists.
+- **Audit log is append-only.** Open in append mode only. Never truncate or replace.
+- **Interview state stays in Flutter.** Do not write to disk mid-interview. Write only on phase completion.
 - **No executor starts without a complete project folder.** README, locked spec, bullet handoff, and setup worksheet must all exist.
 - **`dart analyze` must be clean.** Zero new warnings before reporting done.
 - **No committed secrets.**
 
 ---
 
-*Last revised: 2026-05-31 — Initial setup.*
+*Last revised: 2026-05-31 — v1.1.0: Updated to local-first filesystem architecture, SpecGenerationProvider interface, Firebase demoted to optional workspace-tier sync.*

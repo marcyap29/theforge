@@ -1,100 +1,107 @@
 # The Forge — Backend Reference
 
 **Last Updated:** 2026-05-31
+**Version:** 1.1.0
 
 ---
 
-## Firebase Project
+## Storage Model
 
-**Project ID:** `arc-epi` (shared with LUMARA and SwarmSpace — no separate Firebase project needed)
+The Forge is local-first. Project data lives on the user's filesystem as human-readable Markdown and JSON files. No cloud account is required for core functionality.
 
-**Services used:**
-- Firestore — project state, locked specs, handoffs, worksheets, audit trail
-- Firebase Auth — user authentication (email/password + Google OAuth)
-- Cloud Functions — spec generation (TypeScript, Node 20)
-
----
-
-## Firestore Schema
-
-### Collection: `forge-projects`
-
-```
-forge-projects/{projectId}
-  name: string
-  mode: "build" | "audit"
-  currentPhase: string          — "v1_interview" | "v1_build" | "v2_interview" | ...
-  specVersion: string           — "v1", "v2", etc.
-  setupWorksheetComplete: bool
-  createdAt: timestamp
-  updatedAt: timestamp
-  ownerId: string               — Firebase Auth uid
-  workspaceId: string           — billing workspace (SwarmSpace)
-  interviewMode: "build" | "audit"
-```
-
-### Subcollection: `specs`
-
-```
-forge-projects/{projectId}/specs/{specVersion}
-  content: string               — full spec in Markdown
-  handoffPackage: map           — JSON handoff (see schema below)
-  lockedAt: timestamp
-  interviewMode: "build" | "audit"
-  goalStatement: string
-  openFlagsCount: number
-  outOfScopeCount: number
-  v2SeedItems: string[]
-```
-
-**Invariant: specs are immutable.** No update operation is permitted on a spec document after creation.
-
-### Subcollection: `handoffs`
-
-```
-forge-projects/{projectId}/handoffs/{id}
-  phase: string                 — "interview_to_spec" | "spec_to_executor" | "agent_N_to_agent_N+1" | "v1_to_v2"
-  content: string               — bullet handoff Markdown
-  createdAt: timestamp
-  specVersion: string
-```
-
-### Subcollection: `worksheets`
-
-```
-forge-projects/{projectId}/worksheets/{version}
-  content: string               — setup worksheet Markdown
-  complete: bool
-  createdAt: timestamp
-```
-
-### Document: `audit/log`
-
-```
-forge-projects/{projectId}/audit/log
-  entries: [                    — array, append-only, never modified
-    {
-      phase: string
-      interviewMode: string
-      date: timestamp
-      runId: string
-      creditCost: number
-      durationMinutes: number
-      decisions: [{ decision: string, chosen: string, confidence: string }]
-      conflictsSurfaced: string[]
-      scopeChanges: string[]
-    }
-  ]
-```
-
-**Invariant: audit/log is append-only.** Use `arrayUnion` for all writes. Never use `set` or `update` to replace the entries array.
+**Primary storage:** Local filesystem
+**Local index:** SQLite via `drift` (project list cache — rebuilds from filesystem if deleted)
+**Cloud sync:** Firebase Firestore (optional, workspace/team tier only)
+**Server-side:** SwarmSpace credit API (only when using SwarmSpace routing)
 
 ---
 
-## Handoff Package JSON Schema
+## Local File Structure
 
-### Build Mode
+Default root: `~/Documents/The Forge Projects/`
+Can be changed in Settings. The app scans this folder for project directories on launch.
 
+```
+~/Documents/The Forge Projects/
+└── {ProjectName}/
+    ├── README.md
+    ├── specs/
+    │   ├── {ProjectName}_LockedSpec_v1.md
+    │   └── {ProjectName}_LockedSpec_v2.md        ← added on phase 2
+    ├── handoffs/
+    │   ├── {ProjectName}_BulletHandoff_v1_Interview.md
+    │   ├── {ProjectName}_BulletHandoff_v1_SpecToExecutor.md
+    │   └── {ProjectName}_BulletHandoff_v1_Agent1toAgent2.md
+    ├── worksheets/
+    │   └── {ProjectName}_SetupWorksheet_v1.md
+    ├── handoff_package_v1.json
+    └── audit/
+        └── {ProjectName}_AuditLog.md
+```
+
+### File Invariants
+
+- **Spec files are write-once.** Before writing `_LockedSpec_v1.md`, check if the file already exists. If it does, abort — do not overwrite. A locked spec is immutable.
+- **Audit log is append-only.** New entries are appended to `_AuditLog.md`. Never truncate or replace the file. Use file append mode.
+- **Writes are atomic where possible.** Write to a temp file (`.tmp` suffix), then rename to final path. Rename is atomic on macOS. This prevents partial writes leaving a corrupt spec.
+- **README.md is always current.** Updated after every phase transition to reflect current state.
+
+### README.md Format
+
+```markdown
+# {ProjectName} — Project State
+
+**Interview mode:** Build | Audit
+**Current phase:** v1_interview | v1_build | v2_interview | ...
+**Last updated:** YYYY-MM-DD
+**Spec version:** v1 | v2 | ...
+**Setup worksheet:** Complete | Incomplete
+**Executor status:** Not started | In progress | Complete
+
+## What's Done
+- [completed phases and decisions]
+
+## What's Next
+- [next action]
+
+## Open Flags
+- [unresolved items from current spec]
+```
+
+### Audit Log Format
+
+```markdown
+# {ProjectName} — Audit Log
+
+---
+
+## Phase: Interview -> v1 Spec
+**Interview mode:** Build | Audit
+**Date:** YYYY-MM-DD
+**Run ID:** [uuid]
+**Provider:** Claude (claude-opus-4-5) | GPT-4o | Ollama (llama3) | SwarmSpace | ...
+**Credit cost:** N credits (SwarmSpace routing only; 0 for direct API or local)
+**Duration:** N minutes
+
+### Decisions Made
+| Decision | Chosen | Confidence |
+|---|---|---|
+| [decision] | [choice] | High / Medium / Low |
+
+### Conflicts Surfaced
+- [description and resolution]
+
+### Scope Changes
+- [anything added or removed during this phase]
+
+---
+```
+
+### Handoff Package JSON Schema
+
+Unchanged from v1.0.0. Written to `handoff_package_v{N}.json`.
+
+**Build mode:**
 ```json
 {
   "interviewMode": "build",
@@ -103,11 +110,11 @@ forge-projects/{projectId}/audit/log
   "platform": "string",
   "framework": "string",
   "lockedAt": "ISO date",
+  "provider": "string",
   "goalStatement": "string",
   "components": ["string"],
   "infrastructure": { "service": "implementation" },
   "stateManagement": "string",
-  "navigation": "string",
   "openFlags": "number",
   "outOfScopeItems": "number",
   "setupWorksheetComplete": "bool",
@@ -115,14 +122,14 @@ forge-projects/{projectId}/audit/log
 }
 ```
 
-### Audit Mode
-
+**Audit mode:**
 ```json
 {
   "interviewMode": "audit",
   "specVersion": "string",
   "projectName": "string",
   "auditDate": "ISO date",
+  "provider": "string",
   "goalStatement": "string",
   "buildState": {
     "shipped": ["string"],
@@ -130,7 +137,6 @@ forge-projects/{projectId}/audit/log
     "notStarted": ["string"]
   },
   "activeBlockers": "number",
-  "engineersAffectedByBlockers": ["string"],
   "decisionDebtItems": "number",
   "technicalDebtItems": "number",
   "documentationGaps": "number",
@@ -151,92 +157,161 @@ forge-projects/{projectId}/audit/log
 
 ---
 
-## Firebase Cloud Functions
+## SQLite Index (drift)
 
-### `generateSpec`
+A lightweight local cache so the project browser doesn't need to scan the filesystem on every launch.
 
-**Trigger:** HTTPS callable (called from Flutter via Firebase Functions SDK)
+**Table: `projects`**
 
-**Input:**
-```json
-{
-  "projectId": "string",
-  "interviewJson": { ... },     — complete serialized interview state
-  "mode": "build" | "audit"
-}
+```sql
+CREATE TABLE projects (
+  id          TEXT PRIMARY KEY,    -- uuid
+  name        TEXT NOT NULL,
+  path        TEXT NOT NULL,       -- absolute path to project folder
+  mode        TEXT NOT NULL,       -- "build" | "audit"
+  phase       TEXT NOT NULL,       -- current phase string
+  spec_version TEXT,               -- "v1", "v2", etc.
+  last_opened INTEGER,             -- unix timestamp
+  created_at  INTEGER NOT NULL
+);
 ```
 
-**What it does:**
-1. Validates auth (only project owner can call)
-2. Fires 3 parallel LLM calls via SwarmSpace API (t=0.2, 0.6, 1.0)
-3. Waits for all three to complete
-4. Returns all three variants — no partial reveals
-5. Deducts credits via SwarmSpace billing
-
-**Output:**
-```json
-{
-  "variants": [
-    { "label": "conservative", "temperature": 0.2, "content": "string" },
-    { "label": "balanced",     "temperature": 0.6, "content": "string" },
-    { "label": "experimental", "temperature": 1.0, "content": "string" }
-  ],
-  "creditCost": "number"
-}
-```
-
-**Does NOT write to Firestore.** The Flutter app writes the selected spec after user selection.
+The index is a cache. If a project folder exists on disk but is missing from the index, it gets added on next scan. If an index entry points to a path that no longer exists, it gets removed.
 
 ---
 
-## SwarmSpace API
+## SpecGenerationProvider Interface
 
-The Forge calls SwarmSpace for:
-- LLM routing (spec generation)
-- Credit billing
+All LLM calls flow through this interface. The interview engine calls `generateVariants()` without knowing which provider is active.
 
-**Base URL:** `https://swarmspace.app/api/` (production) — confirm current endpoint in SwarmSpace repo
+```dart
+abstract class SpecGenerationProvider {
+  String get id;                   // "claude" | "openai" | "ollama" | "swarmspace" | "custom"
+  String get displayName;          // shown in Settings UI
+  bool get requiresApiKey;
+  bool get isLocal;                // true = no network call (Ollama)
 
-**Auth:** SwarmSpace API token (stored in `.env`, never hardcoded)
+  Future<List<SpecVariant>> generateVariants({
+    required InterviewResult interview,
+    required List<double> temperatures,   // [0.2, 0.6, 1.0]
+  });
+}
+
+class SpecVariant {
+  final String label;        // "conservative" | "balanced" | "experimental"
+  final double temperature;
+  final String content;      // spec markdown
+}
+```
+
+### Provider Implementations
+
+#### ClaudeProvider
+
+- **API:** Anthropic Messages API (`https://api.anthropic.com/v1/messages`)
+- **Auth:** User's Anthropic API key (stored in macOS Keychain, never in files)
+- **Model:** Configurable — default `claude-opus-4-6`, user can change in Settings
+- **Billing:** Direct to Anthropic. The Forge does not touch billing.
+- **Parallel calls:** `Future.wait([call(t:0.2), call(t:0.6), call(t:1.0)])`
+
+#### OpenAIProvider
+
+- **API:** OpenAI Chat Completions (`https://api.openai.com/v1/chat/completions`)
+- **Auth:** User's OpenAI API key (macOS Keychain)
+- **Model:** Configurable — default `gpt-4o`
+- **Billing:** Direct to OpenAI.
+- **Compatible with:** Any OpenAI-compatible API (DeepSeek, MiniMax, Kimi-K, etc.) via custom base URL
+
+#### OllamaProvider
+
+- **API:** Ollama local API (`http://localhost:11434/api/generate`)
+- **Auth:** None — local only
+- **Model:** Whatever model the user has pulled locally (`ollama pull llama3`, `ollama pull deepseek-coder`, etc.)
+- **Billing:** Free. No network call.
+- **Requirement:** Ollama must be running. The app checks `localhost:11434/api/tags` on startup and shows a warning if Ollama is unreachable when this provider is selected.
+
+#### SwarmSpaceProvider
+
+- **API:** SwarmSpace routing (`https://swarmspace.app/api/`) — confirm current endpoint in SwarmSpace repo
+- **Auth:** SwarmSpace API token (macOS Keychain)
+- **Billing:** Credits deducted per call via SwarmSpace billing system
+- **Advantage:** SwarmSpace handles model selection and routing — user doesn't need individual API keys
+- **This is the only provider that involves server-side billing.**
+
+#### CustomProvider
+
+- **API:** User-supplied base URL (OpenAI-compatible)
+- **Auth:** User-supplied API key (macOS Keychain)
+- **Model:** User-supplied model name
+- **Use cases:** DeepSeek API, MiniMax, Kimi-K2, self-hosted vLLM, company-internal LLM endpoint
+
+### API Key Storage
+
+All API keys are stored in the **macOS Keychain**, not in files or environment variables.
+
+```dart
+// Write
+await FlutterSecureStorage().write(
+  key: 'forge_provider_key_claude',
+  value: apiKey,
+);
+
+// Read
+final key = await FlutterSecureStorage().read(
+  key: 'forge_provider_key_claude',
+);
+```
+
+Never write API keys to disk, `.env` files, or log output.
+
+---
+
+## SwarmSpace API (SwarmSpace provider only)
+
+Only relevant when the user selects the SwarmSpace routing provider.
+
+**Base URL:** `https://swarmspace.app/api/` — confirm current endpoint in SwarmSpace repo
 
 **Credit costs (estimated):**
 | Action | Credits |
 |---|---|
 | Full Forge run (interview through locked spec) | 20–35 |
 | Single variant generation | 4–6 |
-| Executor agent run (per agent) | 8–15 |
+
+**The Forge never deducts credits directly.** The SwarmSpaceProvider sends the generation request and SwarmSpace handles billing server-side. The provider returns the variants and the credit cost; The Forge records the credit cost in the audit log.
 
 ---
 
-## Firestore Security Rules (to implement)
+## Firebase (Workspace Tier — Future)
 
-```javascript
-// forge-projects: owner-only read/write
-match /forge-projects/{projectId} {
-  allow read, write: if request.auth != null
-    && request.auth.uid == resource.data.ownerId;
+Firebase is not required for v1. It comes in at the workspace/team tier to enable project sharing across multiple users.
 
-  // specs: create only (no update/delete)
-  match /specs/{specVersion} {
-    allow create: if request.auth != null
-      && request.auth.uid == get(/databases/$(database)/documents/forge-projects/$(projectId)).data.ownerId;
-    allow read: if request.auth != null
-      && request.auth.uid == get(/databases/$(database)/documents/forge-projects/$(projectId)).data.ownerId;
-    allow update, delete: if false;    // immutable
-  }
+When implemented, the sync model is:
+- Local filesystem remains the source of truth
+- Firestore mirrors the local file structure (same document names, same content)
+- Conflict resolution: last-write-wins on spec content (specs are immutable so conflicts shouldn't occur; if they do, the local file wins)
+- Auth: Firebase Auth (email/password + Google OAuth)
 
-  // audit/log: read + append only (no replace)
-  match /audit/log {
-    allow read: if request.auth != null
-      && request.auth.uid == get(/databases/$(database)/documents/forge-projects/$(projectId)).data.ownerId;
-    allow update: if request.auth != null
-      && request.auth.uid == get(/databases/$(database)/documents/forge-projects/$(projectId)).data.ownerId
-      && request.resource.data.entries.size() > resource.data.entries.size(); // append only
-    allow delete: if false;
-  }
-}
-```
+The Firestore schema (when added) mirrors the local folder structure exactly. No new data model needed.
 
 ---
 
-*Update this file when schema or function signatures change.*
+## Settings Stored Locally
+
+User preferences are stored in macOS `UserDefaults` (via Flutter's `shared_preferences` package):
+
+| Key | Type | Description |
+|---|---|---|
+| `forge_projects_root` | String | Root folder path for projects |
+| `forge_active_provider` | String | Selected provider ID |
+| `forge_provider_model_claude` | String | Claude model override |
+| `forge_provider_model_openai` | String | OpenAI model override |
+| `forge_provider_model_ollama` | String | Ollama model name |
+| `forge_provider_custom_url` | String | Custom provider base URL |
+| `forge_provider_custom_model` | String | Custom provider model name |
+
+API keys are **not** stored here — they go in macOS Keychain only.
+
+---
+
+*Version 1.1.0 — Revised: local filesystem as primary storage, SpecGenerationProvider interface with 5 implementations, Firebase demoted to future workspace-tier sync, API keys in macOS Keychain.*

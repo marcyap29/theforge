@@ -136,6 +136,11 @@ PROMPT RECEIVED
 │  Update: tracking md files/planner.md → cross off tasks         │
 │  Update: tracking md files/backlog.md → mark shipped items ✅   │
 │  Update: operations md files/CONFIGURATION_MANAGEMENT.md        │
+│  Write:  DOCS/Coding Lessons/FOR_MARC_[topic].md                │
+│          → after any significant task (investigation, plan,     │
+│            fix, feature). Follow the 9-step format in           │
+│            DOCS/Coding Lessons/README.md.                       │
+│          → coffee-chat tone, no textbook voice.                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
