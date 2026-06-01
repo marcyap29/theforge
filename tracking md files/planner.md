@@ -19,12 +19,21 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 
 ---
 
-## §2 — Riverpod Project State Layer — UP NEXT
+## §2 — Riverpod Project State Layer — COMPLETE ✅
 
-**Definition of done:** `ProjectListNotifier` and `ActiveProjectNotifier` are implemented, wired to `ProjectFileRepository` and `ForgeDatabase`, `dart analyze lib/` zero issues.
+**Completed:** 2026-06-01
 
-### To do
-- [ ] `lib/features/projects/providers/project_list_notifier.dart` — scans root dir, syncs to ForgeDatabase
-- [ ] `lib/features/projects/providers/active_project_notifier.dart` — holds open project, reads README.md on load
-- [ ] Riverpod provider declarations in `lib/features/projects/providers/providers.dart`
-- [ ] `dart analyze lib/` — zero issues
+- [x] `lib/features/projects/providers/project_list_notifier.dart` — scans root dir, syncs to ForgeDatabase
+- [x] `lib/features/projects/providers/active_project_notifier.dart` — holds open project, reads README.md
+- [x] `lib/features/projects/providers/providers.dart` — 4 Riverpod provider declarations
+- [x] `dart analyze lib/` — zero issues
+- [x] `grep -ri firebase lib/` — zero matches
+
+### Notes
+- `ProjectListNotifier`: `build()` → scan paths → upsert missing → return all. `refresh()` → invalidate + await future.
+- `ActiveProjectNotifier`: vanilla `Notifier`, no async lifecycle — `open()` and `close()` are explicit public methods.
+- Circular import avoided: notifiers import `providers.dart` for `ref.watch()`, providers.dart imports notifier types — Dart handles this correctly.
+
+---
+
+## §3 — Project Folder Browser Screen — UP NEXT

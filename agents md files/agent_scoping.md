@@ -21,6 +21,7 @@ The Forge-specific agent registry will be populated here as external agents are 
 | Assignment | Test Type | Scores (Spec / Integration / Self-correct / Scope / Prompt-dep) | Overall | Notes |
 |---|---|---|---|---|
 | §1 Flutter Bootstrap + Local Data Layer — pubspec, ForgeDatabase, ProjectFileRepository, tracking doc updates | T2 | 5 / 4 / 5 / 5 / 4 | **4.6 → Rank 1** | Proactively removed flutter_lints + cupertino_icons not in spec. Correctly separated pre-codegen drift errors. Async/sync mix in writeLockedSpec (functional). writeHandoffPackage writes to project root not handoffs/ (spec didn't specify). |
+| §2 Riverpod Project State Layer — ProjectListNotifier, ActiveProjectNotifier, 4 providers | T2 | 5 / 4 / 3 / 5 / 4 | **4.2 → Rank 1** | 4 rewrites on standard Riverpod setup (riverpod_annotation, constructor injection type error, circular import, .readOnly doesn't exist). All caught without overseer. open() takes repo as param — works but awkward for callers. split('/').last vs p.basename inconsistency. |
 
 **Calibrated rank:** Rank 1 for scoped data-layer and service implementation tasks with invariants provided inline.
 

@@ -4,6 +4,70 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-06-01 — Build order strategy + agent registry updates
+
+### What was done
+- Scored Minimax M3 on /goal integration task: 5/4/4/5/4 = 4.4 → Rank 1; added to agent registry in `agents md files/agent_scoping.md`
+- Added strategic priority block to backlog.md: build order gate (Forge #1 → SwarmSpace Builder #2 → Iterix #3) — every §N on the critical path now explicitly unblocks the full product roadmap
+- Bootstrapped Iterix repo at `/Volumes/Marc Working Drive/Development/Iterix/` from Starter Repo scaffold: CLAUDE.md, backlog §1–§9, ARCHITECTURE.md, agents.md, planner.md, context.md, all SOP boilerplate, git init + initial commit
+
+### Key decisions
+- Iterix is product #3: built after The Forge (#1) and SwarmSpace Visual Builder (#2)
+- The Forge is used to dogfood the spec for SwarmSpace Builder; SwarmSpace Blocks used to build Iterix
+- Iterix stack is an explicit open flag — no code until The Forge interview produces the locked spec
+- Minimax M3 confirmed Rank 1 for doc-layer / multi-file markdown update tasks
+
+### Next
+- §3: Project folder browser screen (Flutter macOS UI, lists projects from `projectListProvider`)
+
+---
+
+## Session: 2026-06-01 — /goal integration updates
+
+### What was done
+- Applied /goal integration brief to The Forge workflow documentation
+- Added Completion Criteria section to Locked Spec format (Stage 2) in
+  both repo workflow_template.md and Obsidian source copy
+- Added Stage 4b (/goal text output) to workflow_template.md — format,
+  naming convention, and write path defined
+- Updated Stage 5 executor handoff checklist — two new required items
+- Updated Bullet Handoff format — Completion Criteria met field added
+- Updated backlog.md §6 (spec structure +1 item) and §9 (3 outputs, not 2)
+
+### Key decisions
+- The /goal text is written to /handoffs/ alongside the Bullet Handoff,
+  not as a separate artifact type — same write path, different filename
+- Completion Criteria is inserted at position 5 in the spec structure,
+  after Interface Contracts and before Static Content Specs
+- Bullet Handoff gains "Completion Criteria met" field for v2 interview
+  context — executor loop results travel forward through the audit trail
+
+### Next
+- §3: Project folder browser screen (Flutter UI)
+
+---
+
+---
+
+## Session: 2026-06-01 — §2 Riverpod Project State Layer
+
+### What was done
+- Created `lib/features/projects/providers/project_list_notifier.dart` — `ProjectListNotifier` (AsyncNotifier) scans filesystem via `ProjectFileRepository.scanProjectPaths()`, upserts missing entries into `ForgeDatabase`, returns `getAllProjects()`. `refresh()` method invalidates self and awaits future.
+- Created `lib/features/projects/providers/active_project_notifier.dart` — `ActiveProjectNotifier` (Notifier) with `ActiveProjectState` (projectPath, projectName, readmeContent, isLoading). `open()` sets isLoading → reads README.md → populates state. `close()` resets to empty.
+- Created `lib/features/projects/providers/providers.dart` — 4 providers: `projectFileRepositoryProvider`, `forgeDatabaseProvider`, `projectListProvider` (AsyncNotifierProvider), `activeProjectProvider` (NotifierProvider).
+- Verified: `dart analyze lib/` = zero issues
+- Verified: zero Firebase references in lib/
+
+### Architectural decisions
+- `ProjectListNotifier` uses `ref.watch()` to pull `projectFileRepositoryProvider` and `forgeDatabaseProvider` — idiomatic Riverpod, avoids constructor injection complexity with `.new` factory
+- `ActiveProjectNotifier` is a vanilla `Notifier` (not `AsyncNotifier`) — state transitions are explicit via the `ActiveProjectState` model
+- All 4 providers in a single `providers.dart` barrel — not scattered across files
+
+### Next
+- §3: Project folder browser screen (Flutter UI — list projects, create new project)
+
+---
+
 ## Session: 2026-06-01 — Backlog rewrite from product documentation
 
 ### What was done

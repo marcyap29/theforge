@@ -100,6 +100,7 @@ Write a bullet handoff at every phase transition:
 **Interview mode:** [Build / Audit]
 **Date:** [date]
 **Spec version:** [v1]
+**Completion Criteria met:** [list criteria that were verified complete, or "N/A — pre-execution handoff"]
 
 ## What Was Decided
 - [decision made]
@@ -248,13 +249,32 @@ Rules:
 2. Hard Constraints Table
 3. Component Map (single responsibility per component)
 4. Interface Contracts (input/output per component)
-5. Static Content Specs (if applicable)
-6. Explicit Out-of-Scope List
-7. Accepted Decisions (with reasoning + confidence)
-8. Open Flags (to be resolved before or during build)
-9. v2 Architecture Notes
-10. Handoff Package (JSON)
+5. Completion Criteria
+6. Static Content Specs (if applicable)
+7. Explicit Out-of-Scope List
+8. Accepted Decisions (with reasoning + confidence)
+9. Open Flags (to be resolved before or during build)
+10. v2 Architecture Notes
+11. Handoff Package (JSON)
 ```
+
+**Completion Criteria Format**
+
+The Completion Criteria section is what separates a spec from a /goal.
+Each criterion must be verifiable by an executor or judge agent without
+human input.
+
+```
+| Criterion | Component | How to verify |
+| [what must be true when done] | [which component] | [command, check, or observable the agent can run] |
+```
+
+Rules:
+- Every criterion must be checkable by the agent autonomously
+- Prefer `dart analyze`, test commands, and file existence checks over
+  subjective descriptions
+- If a criterion requires human judgement, it is an Open Flag, not a
+  Completion Criterion
 
 ### Audit Interview → Current State Spec
 
@@ -368,6 +388,53 @@ Generate a Setup Worksheet for every Forge run that touches at least one externa
 
 -----
 
+Stage 4b — /goal Text Output
+
+The /goal text is a fifth output generated alongside the JSON Handoff
+Package. It is derived from the locked spec — not a new document, but a
+formatted view of the spec written for an autonomous executor harness
+(Claude Code /goal, OpenAI Codex, or equivalent).
+
+The user pastes this directly into their executor harness to start the
+build loop.
+
+Format
+
+```
+# /goal — {ProjectName} v{N}
+
+## Outcome
+{Immutable Goal Statement from the locked spec}
+
+## Completion Criteria
+{Each criterion from the Completion Criteria section as a checkable item}
+
+## Constraints
+{Hard Constraints table — condensed to the non-negotiables}
+
+## Boundaries
+- Files: {component file list from the spec}
+- Tools: {allowed tools and APIs}
+- Off-limits: {explicit out-of-scope list}
+
+## Iteration Policy
+Work at low temperature. Resolve ambiguity conservatively. When uncertain
+between two valid approaches, choose the one with less surface area. Flag
+decisions you are not confident in rather than guessing.
+
+## Stop Conditions
+Stop and surface a blocker if:
+- A completion criterion cannot be met without a decision not in this spec
+- A required external service is unavailable or misconfigured
+- The Setup Worksheet variables are missing or invalid
+
+Do not stop because the work is hard. Stop only when genuinely blocked.
+```
+
+Write the /goal text to: `/handoffs/{ProjectName}_goal_v{N}.md`
+
+-----
+
 ## Stage 5 — Executor Handoff
 
 ### Build Mode Checklist
@@ -381,6 +448,9 @@ Generate a Setup Worksheet for every Forge run that touches at least one externa
 - [ ] `setupWorksheetComplete` is `true` in the handoff package
 - [ ] All open flags have recommended defaults noted
 - [ ] User has confirmed scope
+- [ ] Completion Criteria section populated — each criterion verifiable
+  by executor without human input
+- [ ] /goal text generated and written to `/handoffs/{ProjectName}_goal_v{N}.md`
 
 The executor agent runs at t=0.1. No creative deviation from the locked spec permitted.
 

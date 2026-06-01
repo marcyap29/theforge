@@ -26,10 +26,47 @@
 | analysis_options.yaml | root | 2026-05-31 | ✅ Synced |
 | forge_database.dart | lib/data/local_db/ | 2026-05-31 | ✅ Synced |
 | project_file_repository.dart | lib/data/filesystem/ | 2026-05-31 | ✅ Synced |
+| project_list_notifier.dart | lib/features/projects/providers/ | 2026-06-01 | ✅ Synced |
+| active_project_notifier.dart | lib/features/projects/providers/ | 2026-06-01 | ✅ Synced |
+| providers.dart | lib/features/projects/providers/ | 2026-06-01 | ✅ Synced |
+
 
 ---
 
+
 ## Change Log
+
+### 2026-06-01 — /goal integration: workflow template + backlog updates
+
+**Action:** Applied /goal primitive integration to The Forge workflow docs.
+
+**Files modified:**
+- `DOCS/forge/workflow_template.md` — Completion Criteria section added
+  to Stage 2 spec format; Stage 4b /goal text artifact added; Stage 5
+  checklist updated; Bullet Handoff format updated
+- Obsidian `The Forge — Agent Workflow Template v3.0.md` — same changes
+- `tracking md files/backlog.md` — §6 spec structure updated, §9 outputs
+  updated to include /goal text artifact
+- `tracking md files/context.md` — session block prepended
+
+**Reason:** The /goal primitive in Claude Code and OpenAI Codex maps
+directly to the Locked Spec. The spec now explicitly produces a /goal
+text artifact and includes verifiable Completion Criteria so judge agents
+can confirm completion autonomously.
+
+### 2026-06-01 — §2 Riverpod Project State Layer
+
+**Action:** Riverpod state layer implemented — 3 new files, 4 providers, zero issues.
+
+**Files created:**
+- `lib/features/projects/providers/project_list_notifier.dart` — `ProjectListNotifier` (AsyncNotifier): scans filesystem, syncs to SQLite, `refresh()` method
+- `lib/features/projects/providers/active_project_notifier.dart` — `ActiveProjectNotifier` (Notifier): manages open project state, reads README.md on `open()`
+- `lib/features/projects/providers/providers.dart` — 4 provider declarations: `projectFileRepositoryProvider`, `forgeDatabaseProvider`, `projectListProvider`, `activeProjectProvider`
+
+**Files modified:**
+- `tracking md files/context.md` — session block prepended
+- `tracking md files/planner.md` — §2 marked COMPLETE ✅
+- `tracking md files/backlog.md` — §2 marked ✅ Complete
 
 ### 2026-06-01 — Backlog rewrite from product documentation
 
