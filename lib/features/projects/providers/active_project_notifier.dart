@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/filesystem/project_file_repository.dart';
+import '../../../data/local_db/forge_database.dart';
 
 class ActiveProjectState {
   final String? projectPath;
@@ -36,11 +37,18 @@ class ActiveProjectNotifier extends Notifier<ActiveProjectState> {
   @override
   ActiveProjectState build() => ActiveProjectState.empty;
 
-  Future<void> open(String projectPath, ProjectFileRepository repo) async {
+  Future<void> open(
+    String projectPath,
+    ProjectFileRepository repo,
+    ForgeDatabase db,
+  ) async {
     state = const ActiveProjectState(isLoading: true);
 
-    final readme = await repo.readReadme(projectPath);
     final projectName = projectPath.split('/').last;
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    await db.updateLastOpened(projectName, now);
+    final readme = await repo.readReadme(projectPath);
 
     state = ActiveProjectState(
       projectPath: projectPath,

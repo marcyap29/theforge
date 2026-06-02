@@ -4,6 +4,69 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-06-01 — §5 Build Interview UI + State
+
+### What was done
+- Created `lib/features/interview/state/interview_state.dart` — `ConfidenceDimension` enum (8 values, with `.label` and `.question` extensions), `DimensionState` enum (unknown/partial/resolved), `InterviewTurn`, `ConflictItem`, `InterviewState` model (with `.empty()` factory and `copyWith`)
+- Created `lib/features/interview/state/interview_notifier.dart` — `FamilyAsyncNotifier<InterviewState, InterviewArgs>` + `stubInterviewStep()` top-level function (turn-based deterministic stub: 9 user messages cycle through the 8 dimensions, surface a `corePurpose ↔ identityModel` conflict on turn 3). Single call site flagged with `// §5 LLM STUB:` comment for §4 swap.
+- Created `lib/features/interview/providers/interview_providers.dart` — `InterviewArgs` class (with `==`/`hashCode` for family equality) + `interviewProvider` (`AsyncNotifierProvider.family<InterviewNotifier, InterviewState, InterviewArgs>`)
+- Created `lib/features/interview/ui/confidence_meter.dart` — `ConfidenceMeter` widget with 8 horizontal `LinearProgressIndicator` bars; bar fill = 0% unknown / 50% partial / 100% resolved; track color `#1F2937`, state colors gray/amber/green
+- Created `lib/features/interview/ui/interview_screen.dart` — `ConsumerStatefulWidget` watching `interviewProvider(args)`; layout: `AppBar` (with restart icon) → `ConfidenceMeter` → optional `_ConflictSurface` (only when `openConflicts.isNotEmpty`) → `Expanded` chat history (`_TurnBubble` per turn) → `_Composer` (text input + send button, disabled while `isLoading`) → `FilledButton.icon` "Generate Spec" (only when `specGenEnabled`, click shows §6 SnackBar)
+- Updated `lib/core/app.dart` — added `'/interview'` named route; route builder reads `ModalRoute.settings.arguments`, casts to `InterviewArgs`, falls back to `_MissingRouteArgs` helper screen if args absent
+- Verified: `dart analyze lib/` → No issues found
+- Verified: zero Firebase imports
+
+### Architectural decisions
+- Family provider with `InterviewArgs` (path + name) — one interview state per project; switching projects gets its own state for free
+- Stub LLM is a pure top-level function `stubInterviewStep(state, userMessage)` returning a record `({String interviewerText, Map confidenceUpdates, List newConflicts})`. Notifier is the only caller. §4 swap = replace one function call with `await llmProvider.complete(...)` and JSON-parse the result.
+- Stub is turn-counter driven (count user turns), not message-content driven — keeps the stub deterministic and the test path short (9 user messages = 8 resolved + 1 surfaced conflict)
+- Conflict text follows Workflow Template pattern verbatim: "Your answers on [X] and [Y] pull in opposite directions. [X] implies [consequence]. [Y] implies [consequence]. I recommend [conservative option] for v1 because [reason]. Do you accept this scope?"
+- `specGenEnabled` is a stored field on the state, recomputed on every transition (all 8 resolved + 0 open conflicts). Not a getter — explicit state machine field.
+- `isLoading` gates the text input, send button, AND conflict Accept button — prevents race conditions where user resolves a conflict during the 400ms stub latency
+- Composer is a `SafeArea(top: false)` so the iOS-style home indicator doesn't overlap the input on macOS
+- Send button shows a `CircularProgressIndicator` (not a static icon) while `isLoading` — visual feedback that the LLM call is in flight
+- Chat bubbles: user right-aligned (`#1F2937`), interviewer left-aligned (`#1C1C1E`); max width 640px; role label "YOU" / "INTERVIEWER" in 10px gray
+- Auto-scroll to bottom on new turn via `WidgetsBinding.instance.addPostFrameCallback` — guard with `hasClients` check
+- Entry point (button in project list to push `/interview`) deliberately out of scope — user can add in §6, §7, or hot-reload. Route is registered and ready.
+
+### Open items / next
+- §4 LLM Provider Layer (replaces the stub)
+- §6 Spec Generation (the "Generate Spec" button action)
+- Entry-point wiring: project list or detail stub → push `/interview` with `InterviewArgs`
+
+---
+
+## Session: 2026-06-01 — §3 Project Folder Browser
+
+### What was done
+- Rewrote `lib/main.dart` to wrap `TheForgeApp` in `ProviderScope`
+- Created `lib/core/app.dart` — `TheForgeApp` MaterialApp with dark theme + `ProjectsListScreen` as home
+- Created `lib/core/theme/app_theme.dart` — macOS dark theme, Menlo monospace, Forge amber (`#E8A04C`) primary, minimal chrome
+- Created `lib/features/projects/screens/projects_list_screen.dart` — `ConsumerWidget` with:
+  - `AsyncValue<List<Project>>` states (loading / error+retry / empty / data)
+  - List rows showing name, phase, mode, last-opened date
+  - `_ModeBadge` chip (amber for Build, slate for Audit)
+  - Pull-to-refresh + AppBar refresh icon → `projectListProvider.notifier.refresh()`
+  - Tap row → `activeProjectProvider.open(path, repo)` → push `_ProjectDetailStub` reading `activeProjectProvider`
+  - FAB → push `_NewProjectStub` placeholder
+- Verified: `dart analyze lib/` → No issues found
+- Verified: zero Firebase imports
+
+### Architectural decisions
+- Inline `_ProjectDetailStub` and `_NewProjectStub` in the list screen file — keeps the §3 file count to 4 per the task scope
+- Detail stub reads `activeProjectProvider` and renders the README.md content as monospace text
+- `ActiveProjectState` exposes `readmeContent` only — no `error` field — detail stub simply shows `(no README.md found)` when null
+- Navigator captured to local before `await` to avoid `use_build_context_synchronously` lint
+- Theme: `ColorScheme.dark` with explicit `primary`/`surface`/`onSurface`/`error`; `Card` + `Divider` + `ListTile` themes set for flat dark macOS feel
+- `floatingActionButtonTheme` uses primary as background, background as foreground (inverse) for contrast
+
+### Open items / next
+- §4 LLM Provider Layer (BYOK + SwarmSpace)
+- §10 Settings screen (provider config UI; back-end to read it lives in §4)
+- Detail screen will need real resume logic (read README + most recent bullet handoff + locked spec) once §9 lands
+
+---
+
 ## Session: 2026-06-01 — Build order strategy + agent registry updates
 
 ### What was done

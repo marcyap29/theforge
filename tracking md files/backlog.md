@@ -32,10 +32,10 @@ Every §N that brings The Forge closer to a working interview-to-spec run unbloc
 
 ```
 §1 Local data layer ✅
-  → §2 Riverpod project state layer
-  → §3 Project folder browser
+  → §2 Riverpod project state layer ✅
+  → §3 Project folder browser ✅
   → §4 LLM provider layer (BYOK + SwarmSpace)
-  → §5 Build Interview UI (Stage 1A)
+  → §5 Build Interview UI (Stage 1A) ✅
   → §6 Spec generation + artifact writing (Stage 2)
   → §7 Artifact viewers
   → §8 Setup Worksheet generation (Stage 3)
@@ -100,7 +100,7 @@ Every §N that brings The Forge closer to a working interview-to-spec run unbloc
 
 **Dependencies:** §2
 
-**Status:** Not started
+**Status:** ✅ Complete 2026-06-01 — 4 new files (`main.dart` rewrite, `core/app.dart`, `core/theme/app_theme.dart`, `features/projects/screens/projects_list_screen.dart`); `dart analyze lib/` zero issues; inline detail + new-project stubs
 
 ---
 
@@ -160,7 +160,7 @@ LlmProvider.complete({
 
 **Dependencies:** §2 (project must be open), §4 (LLM calls for interview turns)
 
-**Status:** Not started
+**Status:** ✅ Complete 2026-06-01 — 5 new files in `lib/features/interview/`, 1 update to `lib/core/app.dart` (interview route); `dart analyze lib/` zero issues; stub LLM at single call site ready for §4 swap
 
 ---
 
@@ -438,6 +438,15 @@ LlmProvider.complete({
 
 ### §1 — Flutter Bootstrap + Local Data Layer
 ✅ Complete 2026-05-31 — `dart analyze lib/` zero issues; `forge_database.g.dart` generated via `dart run build_runner build --force-jit`
+
+### §2 — Riverpod Project State Layer
+✅ Complete 2026-06-01 — 3 provider files (`project_list_notifier`, `active_project_notifier`, `providers`); 4 providers declared; `dart analyze lib/` zero issues; zero Firebase
+
+### §3 — Project Folder Browser
+✅ Complete 2026-06-01 — 4 files (`main.dart` rewrite, `core/app.dart`, `core/theme/app_theme.dart`, `features/projects/screens/projects_list_screen.dart`); `dart analyze lib/` zero issues; macOS dark monospace theme; inline detail + new-project stubs
+
+### §5 — Build Interview UI + State (Stage 1A)
+✅ Complete 2026-06-01 — 5 new files in `lib/features/interview/` (`state/interview_state.dart`, `state/interview_notifier.dart`, `providers/interview_providers.dart`, `ui/confidence_meter.dart`, `ui/interview_screen.dart`) + 1 update to `lib/core/app.dart` (added `/interview` named route); `dart analyze lib/` zero issues; stub LLM in single call site (turn-based: 9 user messages cover 8 dimensions, surfaces 1 conflict on turn 3); conflict surface follows Workflow Template pattern verbatim
 
 ---
 
