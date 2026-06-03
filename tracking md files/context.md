@@ -4,6 +4,128 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-06-02 — §5 Extension: Dual Interview Mode UI (Build + Audit) (worktree wt/llm-provider-layer)
+
+### What was done
+- **Architectural pivot**: replaced the typed `ConfidenceDimension` enum with a generic `DimensionDef` data class (`id`, `label`, `question`). The central change that unlocks both Build and Audit modes. `Map<ConfidenceDimension, DimensionState>` → `Map<String, DimensionState>`, keyed by `DimensionDef.id`. `InterviewState` now carries `List<DimensionDef> dimensions` so every consumer (meter, notifier, system-prompt builder) looks up labels/questions from the active list.
+- Created `lib/features/interview/state/interview_dimension.dart` — `DimensionDef` immutable class + `buildDimensions` (8 Build dims) + `auditDimensions` (8 Audit dims) + `dimensionsFor(ProjectMode)` helper
+- Rewrote `lib/features/interview/state/interview_state.dart` — removed `ConfidenceDimension` enum and its label/question extension; `ConflictItem` now uses `String dimensionALabel` / `String dimensionBLabel`; `InterviewState` carries `dimensions` list
+- Updated `lib/features/interview/providers/interview_providers.dart` — `InterviewArgs` gains `ProjectMode mode`; `==` and `hashCode` updated
+- Rewrote `lib/features/interview/state/interview_notifier.dart` — stub now uses `state.dimensions[N-1]` / `state.dimensions[N-2]` (preserves original conflict-offset behavior so turn 4 re-resolves `dim[2]` from partial back to resolved; uniform `N-1` would have left `dim[2]` stuck partial and `specGenEnabled` permanently false — this was the subtle bug I caught and fixed before merge). `build()` uses `dimensionsFor(args.mode)`. `_interviewSystemPrompt` uses dimension lookups from `state.dimensions` and computes the mode label by `state.dimensions == buildDimensions` (works because both lists are const-equal)
+- Updated `lib/features/interview/ui/confidence_meter.dart` — new signature `List<DimensionDef>` + `Map<String, DimensionState>`; iterates `dimensions` (not a hardcoded enum); label width bumped 120→140px to fit longer Audit labels (e.g. "Blocker blast radius", "AI & token usage")
+- Updated `lib/features/interview/ui/interview_screen.dart` — `InterviewScreen` now takes `InterviewArgs args` directly (was `projectPath` + `projectName`); AppBar shows "Build Interview — {name}" or "Audit Interview — {name}"; `_EmptyChat` uses the live `state.dimensions.length`; `_ConflictSurface` reads `dimensionALabel` / `dimensionBLabel`
+- Created `lib/features/projects/screens/new_project_screen.dart` — `ConsumerStatefulWidget`; name input + two `_ModeCard`s (Build / Audit) with amber border + 0x1A amber background when selected, slate border when unselected; "Create" button disabled until name is non-empty; on tap: `repo.createProject(name, mode)` → `db.upsertProject(ProjectsCompanion.insert(...))` → `projectListProvider.notifier.refresh()` → `Navigator.pop()`. `ProjectAlreadyExistsException` surfaces a red SnackBar "A project named '$name' already exists." General exceptions surface "Failed to create project: $e"
+- Created `lib/features/projects/screens/project_detail_screen.dart` — `ConsumerWidget` taking `Project project`; mode badge (amber for Build, slate for Audit) + "Phase: v1_interview" line + parsed README sections ("What's Done", "What's Next", "Open Flags") in a bordered card + "Start Build/Audit Interview" FilledButton (amber, full width) → `Navigator.pushNamed('/interview', arguments: InterviewArgs(...))`; artifacts list scans `specs/`, `handoffs/`, `worksheets/` via `Directory.listSync()` in a `FutureBuilder`; Close button calls `activeProjectProvider.notifier.close()` then pops
+- Updated `lib/features/projects/screens/projects_list_screen.dart` — removed inline `_ProjectDetailStub` and `_NewProjectStub`; navigation now uses `MaterialPageRoute` to `NewProjectScreen()` and `ProjectDetailScreen(project: ...)`; empty-state copy updated to mention both interview modes
+- Updated `lib/core/app.dart` — `/interview` route now passes full `InterviewArgs` to `InterviewScreen(args: args)` (was unpacking into `projectPath`/`projectName`)
+- Verified: `dart analyze lib/` → No issues found
+- Verified: `grep -rn "ConfidenceDimension" lib/` → zero matches
+- Verified: `grep -rn "_ProjectDetailStub\|_NewProjectStub" lib/` → zero matches
+- Verified: zero Firebase imports
+
+### Architectural decisions
+- **String-keyed map is the central refactor** — once `Map<String, DimensionState>` keyed by dimension ID, every other change (meter iteration, notifier lookups, system prompt, conflict labels) follows naturally. `InterviewState.dimensions` is the single source of truth for what's in the map.
+- **`_stubConflictFor(state)` is mode-agnostic** — it reads `state.dimensions[0].label` and `state.dimensions[2].label`, so Build mode gets `corePurpose ↔ identityModel` and Audit mode gets `projectGoal ↔ currentBuildState` from the same function. Description text is generic ("X implies one direction. Y implies another. I recommend the conservative reading for v1…") but follows the Workflow Template pattern verbatim. The original Build-specific "user-account system adds friction" wording is gone — it didn't generalize to Audit.
+- **Stub preserves the conflict-offset pattern**: turn 3 surfaces the conflict and marks `dim[2]` partial; turn 4 re-resolves `dim[2]` (because the user just accepted the conflict via the Accept button) and prompts `dim[3]`. Turns 5..9 continue with `dim[N-2]`. This is the same logic as the original §5 stub — the uniform `dim[N-1]` rule in the prompt's spec was too simplistic and would have broken Generate Spec enablement.
+- **`InterviewScreen` takes `InterviewArgs` directly** — not just `projectPath` + `projectName`. Adding `mode` to the args signature made the constructor change necessary. Cleaner than three separate fields that have to stay in sync.
+- **No LLM-parsed mode label needed** — `state.dimensions == buildDimensions` does a const-equality check on the dimension list, which is O(n) but n=8, so it's effectively free. Cleaner than threading the mode through to the notifier for a single string comparison.
+- **Artifacts list includes worksheets too** — the prompt said "specs/, handoffs/ contents" but the project folder structure also creates `worksheets/`, and listing all three gives a more honest view of "what's been generated." Tappable rows are intentionally non-tappable (no viewer yet — that's §7).
+- **`ProjectDetailScreen` is a `ConsumerWidget`, not stateful** — it reads `activeProjectProvider` (which is the existing source of truth for README content, loaded by `_ProjectRow.onTap` before navigation). No need to re-load the README on the detail screen.
+- **README parsing is local to the detail screen** — `_ReadmeContent._extractSection(content, header)` does a simple `indexOf` + `indexOf('\n## ', ...)` to slice out H2 sections. No markdown parser dependency added; this is sufficient for the README shape that `ProjectFileRepository.createProject` writes.
+- **Two `_ModeCard`s, not a dropdown** — the spec called for "two side-by-side (or stacked) cards" and cards give a more honest preview of the mode (you can read the 4 sample dimensions and decide). Side-by-side on wide screens, stacked on narrow — the layout flows naturally with `ListView`.
+- **Drift's `insert()` for nullable columns is `Value.absent()` by default** — `ProjectsCompanion.insert(...)` doesn't need explicit `lastOpened: const Value(null)` etc. (I added them initially, then removed; drift handles it.) The existing `project_list_notifier.dart` confirmed this pattern.
+
+### Out of scope (verified — matches prompt's "What is NOT in scope")
+- Doc ingestion UI
+- Model configuration (Settings §10) — already done
+- Resuming a project mid-interview
+- Rendering spec/handoff artifacts in a viewer (§7)
+- Audit-specific stub conflict text — generic conflict works for both modes
+
+### Open items / next
+- §6 Spec Generation (the Generate Spec button — currently SnackBar)
+- §7 Artifact Viewers (the project_detail_screen artifacts list is read-only display only)
+- §11 Audit Interview Mode — the dimension lists are wired but the `Current State Spec` structure (different from Locked Spec) is a §6/§11 dependency
+- End-to-end test: open app → FAB → name "AuditTest" → Audit card → Create → tap row → Start Audit Interview → meter shows 8 Audit dimensions (Project goal, Active blockers, etc.)
+
+---
+
+## Session: 2026-06-02 — §4 Change: Gemini 3.5 Flash as default (worktree wt/llm-provider-layer)
+
+### What was done
+- **Bug fix**: `GeminiProvider` was sending `system_instruction` (snake_case) to the Gemini REST API v1beta. The API silently ignores unknown field names, so the system prompt was being dropped. Changed to `systemInstruction` (camelCase) — the field name the API actually reads. Also added explicit `'role': 'user'` to the `contents` entry.
+- **Default flip**: `LlmSettings.defaults` now points both Architect and Executor roles to `LlmProviderType.gemini` with modelId `gemini-3.5-flash-preview`.
+- **First-run logic**: `SettingsNotifier.build()` no longer falls back to `LlmProviderType.ollama` when no role assignment is saved. New code distinguishes first-run (`providerStr == null`) and uses Gemini as the fallback provider and `gemini-3.5-flash-preview` as the fallback modelId. The `orElse:` in the `firstWhere` also falls back to Gemini (was Ollama).
+- **Model catalog**: Added `gemini-3.5-flash-preview` as the first entry in `geminiModels`. Display name: `Gemini 3.5 Flash`.
+- **Settings UI reorder**: Provider cards now go Gemini → Claude → OpenAI → Ollama. Gemini card has `isDefault: true`, which appends ` (default)` to the title.
+- **Role card always-shows-all**: `availableProviders` changed from a filtered list (only Ollama + providers with saved keys) to `LlmProviderType.values` (all four). Missing keys surface as runtime errors via `LlmService.complete()` — the user sees `Gemini API key not configured. Open Settings.` in the chat bubble rather than the option being hidden.
+- Verified: `dart analyze lib/` → No issues found
+- Verified: `grep -n "system_instruction"` → no matches (bug fix confirmed)
+- Verified: `LlmSettings.defaults` uses `gemini-3.5-flash-preview` for both roles
+
+### Model ID note
+Used `gemini-3.5-flash-preview` as the model ID. **Did not verify against https://aistudio.google.com/** — LUMARA Desktop uses `gemini-3-flash-preview` (no `.5`), and the user specified "3.5 Flash". The `.5-flash-preview` string is a best-guess following Google's preview-versioning pattern. If Google rejects the ID at call time, the error will surface in the chat bubble as `Gemini error 404: ...` and the user can pick a working model from the dropdown.
+
+### Ollama is still supported
+Ollama card stays in the UI (just last, not first). `OllamaProvider` is untouched. The user can still pick Ollama from any role's provider dropdown; the connection check still runs on mount and on URL save; models still fetch live from `/api/tags`. The only thing that changed is the default.
+
+### Why this matters
+- More reliable default: Ollama needs the user to have a local server running; Gemini just needs one API key.
+- Out-of-the-box UX: the user pastes one Gemini key and the app works for all 8 interview dimensions + future spec/worksheet generation.
+- Bug fix is invisible until the user actually invokes Gemini — but it would have caused every interview response to lose the system prompt (the interviewer would be un-primed, asking generic questions, missing the dimension-tracking scaffolding in the prompt).
+
+### Next
+- End-to-end test: open the app, add a Gemini key, run an interview turn, verify the response uses the system prompt (e.g., mentions the project's 8 confidence dimensions).
+- §6 Spec Generation (Generate Spec button action)
+- Merge worktree → main
+
+---
+
+## Session: 2026-06-02 — §4 LLM Provider Layer + §10 Settings (worktree wt/llm-provider-layer)
+
+### What was done
+- Added deps: `http: ^1.2.2`, `flutter_secure_storage: ^9.2.4`, `shared_preferences: ^2.3.3` (resolved to 1.6.0, 9.2.4, 2.5.5)
+- Created `lib/services/llm/` — 8 files (provider abstract, model config, service, service provider, 4 provider implementations)
+- Created `lib/features/settings/` — 3 files (notifier, providers, screen)
+- Modified `lib/features/interview/state/interview_notifier.dart` — replaced stub with `llmService.complete(role: LlmRole.executor, ...)`; kept stub for confidence-map updates (per §5.1 split); added `_interviewSystemPrompt` helper
+- Modified `lib/core/app.dart` — added `/settings` named route; renamed `_MissingRouteArgs` → `_MissingInterviewArgs`
+- Modified `lib/features/projects/screens/projects_list_screen.dart` — added settings gear icon to AppBar
+- Verified: `dart analyze lib/` → No issues found
+- Verified: zero Firebase imports (all 4 LLM providers are direct HTTP)
+
+### Architecture decisions
+- Two-layer design: `LlmService` resolves `LlmRole → ModelAssignment → LlmProvider`. The notifier (and future spec generator, worksheet generator) never knows which provider is active.
+- API keys in `flutter_secure_storage` (macOS Keychain) ONLY. Base URL, role assignments, model IDs in `SharedPreferences`. No key ever written to a `prefs` key.
+- `llmServiceProvider` watches `settingsProvider` (via derived `llmSettingsProvider`) — service rebuilds on every settings change. No manual invalidation needed.
+- Interview wire-in: real LLM call drives `interviewerTurn.content`; stub still drives `confidenceMap` updates and `newConflicts` until §5.1 prompt engineering parses LLM output. This is the plan's explicit "stub stays for dimension tracking" carve-out.
+- Error path: `try/catch` around `llmService.complete` surfaces a clear "Connection error: ... Open Settings" message in the chat bubble. No crash, no silent failure.
+- Ollama always available in provider list (no key required). `OllamaProvider.fetchModels` is a static method — `SettingsNotifier.refreshOllama` calls it on `setOllamaBaseUrl` and on demand from the UI.
+- Provider constructors are non-`const` (LlmProvider is an abstract class with no const default constructor, so subclasses can't be const).
+- Role card is a `ConsumerWidget` (not stateful) — the provider is the source of truth, dropdown changes apply immediately via `setRoleAssignment`. No "Save" button.
+
+### Out of scope (verified)
+- No SwarmSpace provider (§13 billing tier)
+- No OpenAI-compatible custom base URL in UI
+- No model list validation
+- No streaming responses (Ollama `stream: false`)
+- No LLM-parsed dimension updates (stub counter stays)
+
+### Critical invariants upheld
+- API keys never logged or displayed in full — masked as `••••••{last4}` in hintText
+- LlmService rebuilt on settings change (Riverpod watch chain)
+- Clear error if no model for role (don't crash)
+- Ollama always in provider list
+- `dart analyze lib/` zero issues
+- No build_runner needed (no drift changes)
+
+### Next
+- §6 Spec Generation (the "Generate Spec" button action — currently SnackBar)
+- §7 Artifact Viewers
+- Merge worktree `wt/llm-provider-layer` → `main` after review
+- End-to-end test: Settings → add Ollama (or other) → Interview → real LLM response in chat
+
+---
+
 ## Session: 2026-06-01 — §5 Build Interview UI + State
 
 ### What was done

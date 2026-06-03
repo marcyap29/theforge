@@ -1,130 +1,133 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../services/llm/llm_provider.dart';
+import '../../../services/llm/llm_service_provider.dart';
 import '../providers/interview_providers.dart';
+import 'interview_dimension.dart';
 import 'interview_state.dart';
 
 typedef StubLlmResult = ({
   String interviewerText,
-  Map<ConfidenceDimension, DimensionState> confidenceUpdates,
+  Map<String, DimensionState> confidenceUpdates,
   List<ConflictItem> newConflicts,
 });
+
+ConflictItem _stubConflictFor(InterviewState state) {
+  final a = state.dimensions[0].label;
+  final b = state.dimensions[2].label;
+  return ConflictItem(
+    id: '${state.dimensions[0].id}_${state.dimensions[2].id}',
+    dimensionALabel: a,
+    dimensionBLabel: b,
+    description:
+        'Your answers on $a and $b pull in opposite directions. '
+        '$a implies one direction. $b implies another. '
+        'I recommend the conservative reading for v1 because it keeps '
+        'the spec internally consistent. Do you accept this scope?',
+    recommendation: 'Conservative $a for v1',
+  );
+}
 
 StubLlmResult stubInterviewStep(InterviewState state, String userMessage) {
   final userTurnCount = state.turns.where((t) => t.isUser).length;
   final hasOpenConflict = state.openConflicts.isNotEmpty;
+  final dims = state.dimensions;
+  final total = dims.length;
 
-  switch (userTurnCount) {
-    case 1:
+  if (userTurnCount == 3 && total >= 3) {
+    final conflict = _stubConflictFor(state);
+    return (
+      interviewerText: 'I want to flag a tension here.\n\n${conflict.description}',
+      confidenceUpdates: {dims[2].id: DimensionState.partial},
+      newConflicts: [conflict],
+    );
+  }
+
+  if (userTurnCount >= 1 && userTurnCount <= 2 && total >= userTurnCount) {
+    final resolvedIndex = userTurnCount - 1;
+    final nextIndex = userTurnCount;
+    return (
+      interviewerText: 'Understood. ${dims[nextIndex].question}',
+      confidenceUpdates: {dims[resolvedIndex].id: DimensionState.resolved},
+      newConflicts: const [],
+    );
+  }
+
+  if (userTurnCount >= 4 && userTurnCount <= total + 1 && total >= 3) {
+    final resolvedIndex = userTurnCount - 2;
+    if (userTurnCount == total + 1) {
       return (
         interviewerText:
-            'Got it. ${ConfidenceDimension.primaryUser.question}',
-        confidenceUpdates: const {
-          ConfidenceDimension.corePurpose: DimensionState.resolved,
-        },
+            'All $total dimensions resolved. Click Generate Spec when you are ready.',
+        confidenceUpdates: {dims[resolvedIndex].id: DimensionState.resolved},
         newConflicts: const [],
       );
-    case 2:
+    }
+    final nextIndex = userTurnCount - 1;
+    return (
+      interviewerText: 'Understood. ${dims[nextIndex].question}',
+      confidenceUpdates: {dims[resolvedIndex].id: DimensionState.resolved},
+      newConflicts: const [],
+    );
+  }
+
+  if (userTurnCount > total + 1 || (total < 3 && userTurnCount > total)) {
+    if (hasOpenConflict) {
       return (
-        interviewerText:
-            'Understood. ${ConfidenceDimension.identityModel.question}',
-        confidenceUpdates: const {
-          ConfidenceDimension.primaryUser: DimensionState.resolved,
-        },
-        newConflicts: const [],
-      );
-    case 3:
-      return (
-        interviewerText: 'I want to flag a tension here.\n\n${_stubConflict.description}',
-        confidenceUpdates: const {
-          ConfidenceDimension.identityModel: DimensionState.partial,
-        },
-        newConflicts: const [_stubConflict],
-      );
-    case 4:
-      return (
-        interviewerText: 'Acknowledged. ${ConfidenceDimension.inputModel.question}',
-        confidenceUpdates: {
-          ConfidenceDimension.identityModel: DimensionState.resolved,
-        },
-        newConflicts: const [],
-      );
-    case 5:
-      return (
-        interviewerText:
-            'Understood. ${ConfidenceDimension.outputModel.question}',
-        confidenceUpdates: const {
-          ConfidenceDimension.inputModel: DimensionState.resolved,
-        },
-        newConflicts: const [],
-      );
-    case 6:
-      return (
-        interviewerText: 'Got it. ${ConfidenceDimension.platform.question}',
-        confidenceUpdates: const {
-          ConfidenceDimension.outputModel: DimensionState.resolved,
-        },
-        newConflicts: const [],
-      );
-    case 7:
-      return (
-        interviewerText:
-            'Understood. ${ConfidenceDimension.scopeBoundary.question}',
-        confidenceUpdates: const {
-          ConfidenceDimension.platform: DimensionState.resolved,
-        },
-        newConflicts: const [],
-      );
-    case 8:
-      return (
-        interviewerText:
-            'Got it. ${ConfidenceDimension.externalServices.question}',
-        confidenceUpdates: const {
-          ConfidenceDimension.scopeBoundary: DimensionState.resolved,
-        },
-        newConflicts: const [],
-      );
-    case 9:
-      return (
-        interviewerText:
-            'All 8 dimensions resolved. Click Generate Spec when you are ready.',
-        confidenceUpdates: const {
-          ConfidenceDimension.externalServices: DimensionState.resolved,
-        },
-        newConflicts: const [],
-      );
-    default:
-      if (hasOpenConflict) {
-        return (
-          interviewerText: _stubConflict.description,
-          confidenceUpdates: const {},
-          newConflicts: const [],
-        );
-      }
-      return (
-        interviewerText: 'Interview complete. Nothing left to ask.',
+        interviewerText: _stubConflictFor(state).description,
         confidenceUpdates: const {},
         newConflicts: const [],
       );
+    }
+    return (
+      interviewerText: 'Interview complete. Nothing left to ask.',
+      confidenceUpdates: const {},
+      newConflicts: const [],
+    );
   }
+
+  return (
+    interviewerText: dims[0].question,
+    confidenceUpdates: const {},
+    newConflicts: const [],
+  );
 }
 
-const _stubConflict = ConflictItem(
-  id: 'corePurpose_identityModel',
-  dimensionA: ConfidenceDimension.corePurpose,
-  dimensionB: ConfidenceDimension.identityModel,
-  description:
-      'Your answers on Core purpose and Identity model pull in opposite '
-      'directions. A simple core job typically needs no identity. A '
-      'user-account system adds friction and complexity. I recommend '
-      '"no accounts" for v1 because it keeps the core job single-purpose '
-      'and shipping fast. Do you accept this scope?',
-  recommendation: 'No accounts for v1',
-);
+String _interviewSystemPrompt(InterviewState state) {
+  final modeLabel =
+      state.dimensions == buildDimensions ? 'Build Interview' : 'Audit Interview';
+
+  final resolved = state.dimensions
+      .where((d) => state.confidenceMap[d.id] == DimensionState.resolved)
+      .map((d) => d.label)
+      .join(', ');
+  final remaining = state.dimensions
+      .where((d) => state.confidenceMap[d.id] != DimensionState.resolved)
+      .map((d) => '${d.label}: ${d.question}')
+      .join('\n');
+
+  return '''You are The Forge interviewer — a sharp, direct product architect
+running a $modeLabel for a project called "${state.projectName}".
+
+Your goal: resolve ${state.dimensions.length} confidence dimensions through conversation.
+Ask ONE question per turn. Be concise. Acknowledge the user's answer first.
+
+Resolved so far: ${resolved.isEmpty ? 'none yet' : resolved}
+Still needed:
+$remaining
+
+If a conflict exists between answers, surface it with:
+"Your answers on [X] and [Y] pull in opposite directions. [X] implies [A]. [Y] implies [B].
+I recommend [conservative option] for v1 because [reason]. Do you accept this scope?"
+
+Do not ask about resolved dimensions. If all are resolved, confirm and stop.''';
+}
 
 class InterviewNotifier extends FamilyAsyncNotifier<InterviewState, InterviewArgs> {
   @override
   Future<InterviewState> build(InterviewArgs args) async {
-    return InterviewState.empty(args.path, args.name);
+    final dims = dimensionsFor(args.mode);
+    return InterviewState.empty(args.path, args.name, dims);
   }
 
   Future<void> addUserMessage(String text) async {
@@ -143,15 +146,23 @@ class InterviewNotifier extends FamilyAsyncNotifier<InterviewState, InterviewArg
     );
     state = AsyncData(withUser);
 
-    await Future<void>.delayed(const Duration(milliseconds: 400));
+    final llmService = ref.read(llmServiceProvider);
+    String llmText;
+    try {
+      llmText = await llmService.complete(
+        systemPrompt: _interviewSystemPrompt(withUser),
+        userPrompt: text.trim(),
+        temperature: 0.1,
+        role: LlmRole.executor,
+      );
+    } catch (e) {
+      llmText =
+          'Connection error: $e\n\nCheck Settings to configure a provider.';
+    }
 
-    // §5 LLM STUB: replace with `await llmProvider.complete(...)` when §4 lands.
-    // Single call site — search for `stubInterviewStep` to find it.
     final stub = stubInterviewStep(withUser, text);
 
-    final newMap = Map<ConfidenceDimension, DimensionState>.from(
-      withUser.confidenceMap,
-    );
+    final newMap = Map<String, DimensionState>.from(withUser.confidenceMap);
     stub.confidenceUpdates.forEach((k, v) => newMap[k] = v);
     final allResolved =
         newMap.values.every((s) => s == DimensionState.resolved);
@@ -160,7 +171,7 @@ class InterviewNotifier extends FamilyAsyncNotifier<InterviewState, InterviewArg
 
     final interviewerTurn = InterviewTurn(
       role: 'interviewer',
-      content: stub.interviewerText,
+      content: llmText,
       timestamp: DateTime.now(),
     );
 
@@ -195,7 +206,11 @@ class InterviewNotifier extends FamilyAsyncNotifier<InterviewState, InterviewArg
     final current = state.valueOrNull;
     if (current == null) return;
     state = AsyncData(
-      InterviewState.empty(current.projectPath, current.projectName),
+      InterviewState.empty(
+        current.projectPath,
+        current.projectName,
+        current.dimensions,
+      ),
     );
   }
 }

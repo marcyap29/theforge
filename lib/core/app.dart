@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../features/interview/providers/interview_providers.dart';
 import '../features/interview/ui/interview_screen.dart';
 import '../features/projects/screens/projects_list_screen.dart';
+import '../features/settings/settings_screen.dart';
 import 'theme/app_theme.dart';
 
 class TheForgeApp extends StatelessWidget {
@@ -22,20 +23,18 @@ class TheForgeApp extends StatelessWidget {
         '/interview': (context) {
           final args = ModalRoute.of(context)?.settings.arguments;
           if (args is InterviewArgs) {
-            return InterviewScreen(
-              projectPath: args.path,
-              projectName: args.name,
-            );
+            return InterviewScreen(args: args);
           }
-          return const _MissingRouteArgs();
+          return const _MissingInterviewArgs();
         },
+        '/settings': (context) => const SettingsScreen(),
       },
     );
   }
 }
 
-class _MissingRouteArgs extends StatelessWidget {
-  const _MissingRouteArgs();
+class _MissingInterviewArgs extends StatelessWidget {
+  const _MissingInterviewArgs();
 
   @override
   Widget build(BuildContext context) {

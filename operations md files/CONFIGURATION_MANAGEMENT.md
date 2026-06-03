@@ -34,16 +34,83 @@
 | app_theme.dart | lib/core/theme/ | 2026-06-01 | ✅ Synced |
 | projects_list_screen.dart | lib/features/projects/screens/ | 2026-06-01 | ✅ Synced |
 | interview_state.dart | lib/features/interview/state/ | 2026-06-01 | ✅ Synced |
-| interview_notifier.dart | lib/features/interview/state/ | 2026-06-01 | ✅ Synced |
+| interview_notifier.dart | lib/features/interview/state/ | 2026-06-02 | ✅ Synced |
 | interview_providers.dart | lib/features/interview/providers/ | 2026-06-01 | ✅ Synced |
 | confidence_meter.dart | lib/features/interview/ui/ | 2026-06-01 | ✅ Synced |
 | interview_screen.dart | lib/features/interview/ui/ | 2026-06-01 | ✅ Synced |
+| llm_provider.dart | lib/services/llm/ | 2026-06-02 | ✅ Synced |
+| llm_model_config.dart | lib/services/llm/ | 2026-06-02 | ✅ Synced |
+| llm_service.dart | lib/services/llm/ | 2026-06-02 | ✅ Synced |
+| llm_service_provider.dart | lib/services/llm/ | 2026-06-02 | ✅ Synced |
+| ollama_provider.dart | lib/services/llm/providers/ | 2026-06-02 | ✅ Synced |
+| claude_provider.dart | lib/services/llm/providers/ | 2026-06-02 | ✅ Synced |
+| openai_provider.dart | lib/services/llm/providers/ | 2026-06-02 | ✅ Synced |
+| gemini_provider.dart | lib/services/llm/providers/ | 2026-06-02 | ✅ Synced |
+| settings_notifier.dart | lib/features/settings/ | 2026-06-02 | ✅ Synced |
+| settings_providers.dart | lib/features/settings/ | 2026-06-02 | ✅ Synced |
+| settings_screen.dart | lib/features/settings/ | 2026-06-02 | ✅ Synced |
 
 
 ---
 
 
 ## Change Log
+
+### 2026-06-02 — §4 Change: Gemini 3.5 Flash as default provider (worktree wt/llm-provider-layer)
+
+**Action:** Default provider flip + bug fix. 4 files modified, 0 new.
+
+**Files modified:**
+- `lib/services/llm/llm_model_config.dart` — added `gemini-3.5-flash-preview` as first geminiModels entry; `LlmSettings.defaults` now uses Gemini for both roles
+- `lib/services/llm/providers/gemini_provider.dart` — **bug fix**: `system_instruction` → `systemInstruction` (Gemini REST API v1beta uses camelCase; snake_case was silently ignored); added explicit `'role': 'user'` to `contents`
+- `lib/features/settings/settings_notifier.dart` — `build()` first-run logic now defaults to Gemini (was Ollama); `orElse:` in `firstWhere` also falls back to Gemini
+- `lib/features/settings/settings_screen.dart` — provider cards reordered Gemini → Claude → OpenAI → Ollama; Gemini card has `isDefault: true` with ` (default)` label appended; `_RoleCard.availableProviders` changed from filtered list to `LlmProviderType.values` (always show all four)
+- `tracking md files/context.md` — session block prepended
+
+**Reason:** Ollama needs a running local server; Gemini just needs one API key. Out-of-the-box UX is dramatically better. The bug fix is critical — `system_instruction` was being silently dropped, meaning every interview response would lose the system prompt scaffolding.
+
+**Model ID note:** Used `gemini-3.5-flash-preview`. LUMARA Desktop uses `gemini-3-flash-preview` (no `.5`); user said "3.5 Flash". The `.5-flash-preview` string is a best-guess following Google's preview-versioning pattern. If Google rejects it, the error surfaces in the chat bubble and the user picks a working model from the dropdown.
+
+**Verification:**
+- `dart analyze lib/` → No issues found
+- `grep -n "system_instruction"` → no matches (bug fix confirmed)
+- `LlmSettings.defaults` uses `gemini-3.5-flash-preview` for both Architect and Executor
+
+**Ollama is still supported:** card stays in UI (last, not first); `OllamaProvider` is untouched; live `/api/tags` model fetch still works; user can pick Ollama from any role's provider dropdown.
+
+### 2026-06-02 — §4 LLM Provider Layer + §10 Settings (worktree wt/llm-provider-layer)
+
+**Action:** Provider-agnostic LLM service + Settings screen + interview wire-in. 11 new files, 3 modified, 1 worktree. Zero analyzer issues.
+
+**Files created:**
+- `lib/services/llm/llm_provider.dart` — `LlmRole` enum + `LlmProvider` abstract class
+- `lib/services/llm/llm_model_config.dart` — `LlmProviderType`, `ModelInfo`, hardcoded catalogs (Claude/OpenAI/Gemini), `ModelAssignment`, `LlmSettings` with `defaults` and `copyWith`
+- `lib/services/llm/llm_service.dart` — `LlmService.complete(role:)` resolves assignment → provider, throws clear errors on missing config
+- `lib/services/llm/llm_service_provider.dart` — `llmSettingsProvider` + `llmServiceProvider` derived from `settingsProvider`
+- `lib/services/llm/providers/ollama_provider.dart` — HTTP to `/api/chat`; static `fetchModels` to `/api/tags`
+- `lib/services/llm/providers/claude_provider.dart` — Anthropic Messages API
+- `lib/services/llm/providers/openai_provider.dart` — OpenAI Chat Completions
+- `lib/services/llm/providers/gemini_provider.dart` — Google Generative Language API
+- `lib/features/settings/settings_notifier.dart` — `AsyncNotifier<LlmSettingsState>`; SharedPreferences (base URL, role assignments) + Keychain (API keys); `setRoleAssignment` / `setOllamaBaseUrl` / `setApiKey` / `clearApiKey` / `refreshOllama`
+- `lib/features/settings/settings_providers.dart` — `settingsProvider` declaration
+- `lib/features/settings/settings_screen.dart` — 4 provider cards + 2 role cards; live Ollama check; masked key entry; provider dropdown filtered to configured providers
+
+**Files modified:**
+- `pubspec.yaml` — added `http: ^1.2.2`, `flutter_secure_storage: ^9.2.4`, `shared_preferences: ^2.3.3`
+- `lib/features/interview/state/interview_notifier.dart` — replaced stub with `llmService.complete(role: LlmRole.executor, ...)`; kept stub for confidence-map updates; added `_interviewSystemPrompt` helper
+- `lib/core/app.dart` — added `/settings` named route; renamed `_MissingRouteArgs` → `_MissingInterviewArgs`
+- `lib/features/projects/screens/projects_list_screen.dart` — added settings gear icon to AppBar
+- `tracking md files/context.md` — session block prepended
+- `tracking md files/planner.md` — §4 + §10 marked COMPLETE ✅
+- `tracking md files/backlog.md` — §4 + §10 marked ✅ Complete; added to Completed section; Critical Path shows ✅ on §4 + §10
+
+**Key design choices:**
+- Two-layer architecture: `LlmService` resolves `LlmRole → ModelAssignment → LlmProvider`. The notifier (and future spec generator, worksheet generator) never knows which provider is active.
+- API keys in `flutter_secure_storage` (macOS Keychain) ONLY. Base URL, role assignments, model IDs in `SharedPreferences`. No key ever written to a `prefs` key.
+- `llmServiceProvider` watches `settingsProvider` (via derived `llmSettingsProvider`) — service rebuilds on every settings change.
+- Interview wire-in: real LLM call drives `interviewerTurn.content`; stub still drives `confidenceMap` updates and `newConflicts` until §5.1 prompt engineering parses LLM output.
+- `try/catch` around `llmService.complete` surfaces a clear "Connection error: ... Open Settings" message in the chat bubble.
+- Role card is a `ConsumerWidget` (not stateful) — provider is the source of truth, dropdown changes apply immediately.
 
 ### 2026-06-01 — §5 Build Interview UI + State
 

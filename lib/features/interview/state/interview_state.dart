@@ -1,61 +1,8 @@
 import 'package:flutter/foundation.dart';
 
-enum ConfidenceDimension {
-  corePurpose,
-  primaryUser,
-  identityModel,
-  inputModel,
-  outputModel,
-  platform,
-  scopeBoundary,
-  externalServices,
-}
+import 'interview_dimension.dart';
 
 enum DimensionState { unknown, partial, resolved }
-
-extension ConfidenceDimensionLabel on ConfidenceDimension {
-  String get label {
-    switch (this) {
-      case ConfidenceDimension.corePurpose:
-        return 'Core purpose';
-      case ConfidenceDimension.primaryUser:
-        return 'Primary user';
-      case ConfidenceDimension.identityModel:
-        return 'Identity model';
-      case ConfidenceDimension.inputModel:
-        return 'Input model';
-      case ConfidenceDimension.outputModel:
-        return 'Output model';
-      case ConfidenceDimension.platform:
-        return 'Platform';
-      case ConfidenceDimension.scopeBoundary:
-        return 'Scope boundary';
-      case ConfidenceDimension.externalServices:
-        return 'External services';
-    }
-  }
-
-  String get question {
-    switch (this) {
-      case ConfidenceDimension.corePurpose:
-        return 'What is the single primary job this product does?';
-      case ConfidenceDimension.primaryUser:
-        return 'Who is this built for first?';
-      case ConfidenceDimension.identityModel:
-        return 'Are accounts required, optional, or none?';
-      case ConfidenceDimension.inputModel:
-        return 'What does the user interact with?';
-      case ConfidenceDimension.outputModel:
-        return 'What does the product produce?';
-      case ConfidenceDimension.platform:
-        return 'What does it run on?';
-      case ConfidenceDimension.scopeBoundary:
-        return 'What is explicitly out of scope for v1?';
-      case ConfidenceDimension.externalServices:
-        return 'What third-party APIs or services does it touch?';
-    }
-  }
-}
 
 @immutable
 class InterviewTurn {
@@ -76,15 +23,15 @@ class InterviewTurn {
 @immutable
 class ConflictItem {
   final String id;
-  final ConfidenceDimension dimensionA;
-  final ConfidenceDimension dimensionB;
+  final String dimensionALabel;
+  final String dimensionBLabel;
   final String description;
   final String recommendation;
 
   const ConflictItem({
     required this.id,
-    required this.dimensionA,
-    required this.dimensionB,
+    required this.dimensionALabel,
+    required this.dimensionBLabel,
     required this.description,
     required this.recommendation,
   });
@@ -94,7 +41,8 @@ class ConflictItem {
 class InterviewState {
   final String projectPath;
   final String projectName;
-  final Map<ConfidenceDimension, DimensionState> confidenceMap;
+  final List<DimensionDef> dimensions;
+  final Map<String, DimensionState> confidenceMap;
   final List<InterviewTurn> turns;
   final List<ConflictItem> openConflicts;
   final bool specGenEnabled;
@@ -103,6 +51,7 @@ class InterviewState {
   const InterviewState({
     required this.projectPath,
     required this.projectName,
+    required this.dimensions,
     required this.confidenceMap,
     required this.turns,
     required this.openConflicts,
@@ -110,14 +59,18 @@ class InterviewState {
     required this.isLoading,
   });
 
-  factory InterviewState.empty(String projectPath, String projectName) {
-    final map = <ConfidenceDimension, DimensionState>{
-      for (final d in ConfidenceDimension.values) d: DimensionState.unknown,
-    };
+  factory InterviewState.empty(
+    String projectPath,
+    String projectName,
+    List<DimensionDef> dimensions,
+  ) {
     return InterviewState(
       projectPath: projectPath,
       projectName: projectName,
-      confidenceMap: map,
+      dimensions: dimensions,
+      confidenceMap: {
+        for (final d in dimensions) d.id: DimensionState.unknown,
+      },
       turns: const [],
       openConflicts: const [],
       specGenEnabled: false,
@@ -128,7 +81,8 @@ class InterviewState {
   InterviewState copyWith({
     String? projectPath,
     String? projectName,
-    Map<ConfidenceDimension, DimensionState>? confidenceMap,
+    List<DimensionDef>? dimensions,
+    Map<String, DimensionState>? confidenceMap,
     List<InterviewTurn>? turns,
     List<ConflictItem>? openConflicts,
     bool? specGenEnabled,
@@ -137,6 +91,7 @@ class InterviewState {
     return InterviewState(
       projectPath: projectPath ?? this.projectPath,
       projectName: projectName ?? this.projectName,
+      dimensions: dimensions ?? this.dimensions,
       confidenceMap: confidenceMap ?? this.confidenceMap,
       turns: turns ?? this.turns,
       openConflicts: openConflicts ?? this.openConflicts,
