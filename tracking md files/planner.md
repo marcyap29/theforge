@@ -54,7 +54,52 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 
 ---
 
-## §4 — LLM Provider Layer (BYOK + SwarmSpace) — UP NEXT
+## §4 — LLM Provider Layer (BYOK + SwarmSpace) — COMPLETE ✅
+
+**Completed:** 2026-06-02 (worktree wt/llm-provider-layer)
+
+- [x] `lib/services/llm/llm_provider.dart` — `LlmRole` enum + `LlmProvider` abstract class
+- [x] `lib/services/llm/llm_model_config.dart` — `LlmProviderType`, `ModelInfo`, hardcoded catalogs (Claude/OpenAI/Gemini), `ModelAssignment`, `LlmSettings` with `defaults` and `copyWith`
+- [x] `lib/services/llm/llm_service.dart` — `LlmService.complete(role:)` resolves assignment → provider, throws clear errors on missing config
+- [x] `lib/services/llm/llm_service_provider.dart` — `llmSettingsProvider` + `llmServiceProvider` derived from `settingsProvider`
+- [x] `lib/services/llm/providers/ollama_provider.dart` — HTTP to `/api/chat`; static `fetchModels` to `/api/tags`
+- [x] `lib/services/llm/providers/claude_provider.dart` — Anthropic Messages API
+- [x] `lib/services/llm/providers/openai_provider.dart` — OpenAI Chat Completions
+- [x] `lib/services/llm/providers/gemini_provider.dart` — Google Generative Language API
+- [x] `dart analyze lib/` — No issues found
+- [x] `grep -ri firebase lib/` — zero matches
+
+### Notes
+- 4 provider implementations are direct HTTP via `package:http` — no SDK dependencies
+- All API contracts match the §4 plan verbatim (request bodies, headers, response parsing)
+- `OllamaProvider.fetchModels` is a `static` method called by the settings notifier for live model list
+
+---
+
+## §10 — Settings Screen + BYOK Key Storage — COMPLETE ✅
+
+**Completed:** 2026-06-02 (worktree wt/llm-provider-layer)
+
+- [x] `lib/features/settings/settings_notifier.dart` — `AsyncNotifier<LlmSettingsState>`; loads from SharedPreferences (base URL, role assignments) + Keychain (API keys); methods: `setRoleAssignment`, `setOllamaBaseUrl`, `setApiKey`, `clearApiKey`, `refreshOllama`
+- [x] `lib/features/settings/settings_providers.dart` — `settingsProvider` declaration
+- [x] `lib/features/settings/settings_screen.dart` — 4 provider cards (Ollama + 3 BYOK) + 2 role cards (Architect/Executor); live Ollama connection check; masked key entry (`••••••{last4}`); provider dropdown filtered to configured providers
+- [x] `lib/core/app.dart` — added `/settings` route; renamed `_MissingRouteArgs` → `_MissingInterviewArgs`
+- [x] `lib/features/projects/screens/projects_list_screen.dart` — added settings gear icon to AppBar
+- [x] `dart analyze lib/` — No issues found
+
+### Notes
+- API keys → `flutter_secure_storage` (macOS Keychain via the `flutter_secure_storage_macos` platform plugin)
+- Base URL, role assignments, model IDs → `SharedPreferences`
+- No key ever logged or displayed in full — masked as `••••••{last4}` in hintText
+- Ollama card auto-runs `refreshOllama` on mount and after every base-URL save
+- `setApiKey` + `clearApiKey` use FlutterSecureStorage directly (no SharedPreferences for secrets)
+- Role cards are stateless `ConsumerWidget`s — provider is the source of truth, dropdown changes apply immediately
+
+### §4+§10 interview wire-in
+- `interview_notifier.dart` calls `llmService.complete(role: LlmRole.executor, ...)` instead of the stub
+- Stub still drives `confidenceMap` updates and conflict surfacing (per §5.1 carve-out)
+- `try/catch` surfaces a clear "Connection error: ... Open Settings" message in the chat bubble
+- New `_interviewSystemPrompt(state)` helper builds the role-specific system prompt for each turn
 
 ---
 
@@ -77,3 +122,31 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 - `isLoading` gates text input, send button, AND conflict Accept button — prevents races during the 400ms stub latency.
 - `InterviewArgs` (path + name) is the family arg; each project gets its own interview state. Switching projects → fresh state, no manual reset.
 - Entry-point wiring (button in project list → push `/interview`) is out of scope per the plan. Route is registered and ready.
+
+---
+
+## §5 Extension — Dual Interview Mode UI (Build + Audit) — COMPLETE ✅
+
+**Completed:** 2026-06-02 (worktree wt/llm-provider-layer)
+
+- [x] `lib/features/interview/state/interview_dimension.dart` (NEW) — `DimensionDef` data class + `buildDimensions` (8 Build dims) + `auditDimensions` (8 Audit dims) + `dimensionsFor(ProjectMode)` helper
+- [x] `lib/features/interview/state/interview_state.dart` (REWRITE) — dropped `ConfidenceDimension` enum; `ConflictItem` uses `String dimensionALabel` / `String dimensionBLabel`; `InterviewState` carries `List<DimensionDef> dimensions`; `confidenceMap` is `Map<String, DimensionState>`
+- [x] `lib/features/interview/providers/interview_providers.dart` (MODIFIED) — `InterviewArgs` gains `ProjectMode mode`
+- [x] `lib/features/interview/state/interview_notifier.dart` (REWRITE) — stub resolves labels/IDs from `state.dimensions`; `build()` calls `dimensionsFor(args.mode)`; `_interviewSystemPrompt` uses dimension lookups; preserves original conflict-offset pattern (turn 4 re-resolves `dim[2]` from partial, not uniform `dim[N-1]`)
+- [x] `lib/features/interview/ui/confidence_meter.dart` (MODIFIED) — new signature `List<DimensionDef>` + `Map<String, DimensionState>`; iterates `dimensions`; label width 120→140px to fit Audit labels
+- [x] `lib/features/interview/ui/interview_screen.dart` (MODIFIED) — `InterviewScreen` takes `InterviewArgs args`; AppBar shows mode name; conflict surface uses string labels
+- [x] `lib/features/projects/screens/new_project_screen.dart` (NEW) — name input + Build/Audit cards; create via repo + db upsert + refresh; `ProjectAlreadyExistsException` → red SnackBar
+- [x] `lib/features/projects/screens/project_detail_screen.dart` (NEW) — mode badge + phase + parsed README sections + Start Interview FilledButton + artifacts list (read-only)
+- [x] `lib/features/projects/screens/projects_list_screen.dart` (MODIFIED) — removed inline `_ProjectDetailStub` and `_NewProjectStub`; navigation to real screens via `MaterialPageRoute`
+- [x] `lib/core/app.dart` (MODIFIED) — `/interview` route passes full `InterviewArgs`
+- [x] `dart analyze lib/` — No issues found
+- [x] `grep -rn "ConfidenceDimension" lib/` — zero matches
+- [x] `grep -rn "_ProjectDetailStub\|_NewProjectStub" lib/` — zero matches
+- [x] `grep -ri firebase lib/` — zero matches
+
+### Notes
+- The string-keyed dimension map (`Map<String, DimensionState>` keyed by `DimensionDef.id`) is the central refactor that unlocks both modes. `InterviewState.dimensions` is the single source of truth for the map's keys.
+- Stub `_stubConflictFor(state)` is mode-agnostic — reads `state.dimensions[0].label` and `state.dimensions[2].label`. Build gets `corePurpose ↔ identityModel`, Audit gets `projectGoal ↔ currentBuildState`. Same function, both modes.
+- Stub preserves the original conflict-offset pattern (turn 4 re-resolves the conflict dimension, not `dim[N-1]` uniformly). The prompt's stated `dim[N-1]` rule was oversimplified — uniform would leave `dim[2]` stuck partial and break Generate Spec enablement. Caught and fixed before merge.
+- Drift's `ProjectsCompanion.insert(...)` doesn't need explicit `Value(null)` for nullable columns — drift handles them as absent by default.
+- `state.dimensions == buildDimensions` does a const-equality check that picks the mode label — no need to thread the mode through to the notifier for a single string comparison.

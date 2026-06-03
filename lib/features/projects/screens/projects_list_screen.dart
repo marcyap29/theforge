@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/local_db/forge_database.dart';
 import '../providers/providers.dart';
+import 'new_project_screen.dart';
+import 'project_detail_screen.dart';
 
 class ProjectsListScreen extends ConsumerWidget {
   const ProjectsListScreen({super.key});
@@ -16,6 +18,13 @@ class ProjectsListScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('The Forge — Projects'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Settings',
+            onPressed: () {
+              Navigator.of(context).pushNamed('/settings');
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
@@ -50,9 +59,8 @@ class ProjectsListScreen extends ConsumerWidget {
                 padding: EdgeInsets.all(24),
                 child: Text(
                   'No projects yet.\n\n'
-                  'Choose a folder under\n'
-                  '~/Documents/The Forge Projects\n'
-                  'and tap + to create a new project.',
+                  'Tap + to create a new project\n'
+                  '(Build interview or Audit interview).',
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -73,7 +81,7 @@ class ProjectsListScreen extends ConsumerWidget {
         onPressed: () {
           Navigator.of(context).push(
             MaterialPageRoute<void>(
-              builder: (_) => const _NewProjectStub(),
+              builder: (_) => const NewProjectScreen(),
             ),
           );
         },
@@ -108,7 +116,7 @@ class _ProjectRow extends ConsumerWidget {
         if (context.mounted) {
           navigator.push(
             MaterialPageRoute<void>(
-              builder: (_) => const _ProjectDetailStub(),
+              builder: (_) => ProjectDetailScreen(project: project),
             ),
           );
         }
@@ -149,66 +157,6 @@ class _ModeBadge extends StatelessWidget {
           color: isBuild
               ? const Color(0xFFE8A04C)
               : const Color(0xFF94A3B8),
-        ),
-      ),
-    );
-  }
-}
-
-class _ProjectDetailStub extends ConsumerWidget {
-  const _ProjectDetailStub();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final active = ref.watch(activeProjectProvider);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(active.projectName ?? 'Project'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.close),
-            tooltip: 'Close project',
-            onPressed: () {
-              ref.read(activeProjectProvider.notifier).close();
-              Navigator.of(context).pop();
-            },
-          ),
-        ],
-      ),
-      body: active.isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16),
-              child: SingleChildScrollView(
-                child: Text(
-                  active.readmeContent ?? '(no README.md found)',
-                  style: const TextStyle(
-                    fontFamily: 'Menlo',
-                    fontSize: 13,
-                    height: 1.4,
-                  ),
-                ),
-              ),
-            ),
-    );
-  }
-}
-
-class _NewProjectStub extends StatelessWidget {
-  const _NewProjectStub();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('New Project')),
-      body: const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text(
-            'Interview flow — coming in §5.',
-            textAlign: TextAlign.center,
-          ),
         ),
       ),
     );

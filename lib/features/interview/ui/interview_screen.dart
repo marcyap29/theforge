@@ -1,19 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../data/filesystem/project_file_repository.dart';
 import '../providers/interview_providers.dart';
 import '../state/interview_state.dart';
 import 'confidence_meter.dart';
 
 class InterviewScreen extends ConsumerStatefulWidget {
-  const InterviewScreen({
-    super.key,
-    required this.projectPath,
-    required this.projectName,
-  });
+  const InterviewScreen({super.key, required this.args});
 
-  final String projectPath;
-  final String projectName;
+  final InterviewArgs args;
 
   @override
   ConsumerState<InterviewScreen> createState() => _InterviewScreenState();
@@ -43,13 +39,14 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final args = InterviewArgs(path: widget.projectPath, name: widget.projectName);
+    final args = widget.args;
     final stateAsync = ref.watch(interviewProvider(args));
     final notifier = ref.read(interviewProvider(args).notifier);
+    final modeLabel = args.mode == ProjectMode.build ? 'Build' : 'Audit';
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Interview — ${widget.projectName}'),
+        title: Text('$modeLabel Interview — ${args.name}'),
         actions: [
           IconButton(
             icon: const Icon(Icons.restart_alt),
@@ -69,7 +66,10 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen> {
         data: (state) {
           return Column(
             children: [
-              ConfidenceMeter(confidenceMap: state.confidenceMap),
+              ConfidenceMeter(
+                dimensions: state.dimensions,
+                confidenceMap: state.confidenceMap,
+              ),
               if (state.openConflicts.isNotEmpty)
                 _ConflictSurface(
                   conflicts: state.openConflicts,
@@ -78,7 +78,7 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen> {
                 ),
               Expanded(
                 child: state.turns.isEmpty
-                    ? const _EmptyChat()
+                    ? _EmptyChat(dimensionCount: state.dimensions.length)
                     : ListView.builder(
                         controller: _scrollController,
                         padding: const EdgeInsets.all(16),
@@ -124,19 +124,21 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen> {
 }
 
 class _EmptyChat extends StatelessWidget {
-  const _EmptyChat();
+  const _EmptyChat({required this.dimensionCount});
+
+  final int dimensionCount;
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Padding(
-        padding: EdgeInsets.all(24),
+        padding: const EdgeInsets.all(24),
         child: Text(
           'Type a greeting to start the interview.\n\n'
-          'You will be walked through 8 confidence dimensions.\n'
+          'You will be walked through $dimensionCount confidence dimensions.\n'
           'Conflicts between answers will be surfaced before spec generation.',
           textAlign: TextAlign.center,
-          style: TextStyle(
+          style: const TextStyle(
             color: Color(0xFF9CA3AF),
             height: 1.5,
           ),
@@ -233,7 +235,7 @@ class _ConflictSurface extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  'CONFLICT — ${conflicts[i].dimensionA.label} ↔ ${conflicts[i].dimensionB.label}',
+                  'CONFLICT — ${conflicts[i].dimensionALabel} ↔ ${conflicts[i].dimensionBLabel}',
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,

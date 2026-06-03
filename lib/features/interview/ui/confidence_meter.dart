@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 
+import '../state/interview_dimension.dart';
 import '../state/interview_state.dart';
 
 class ConfidenceMeter extends StatelessWidget {
-  const ConfidenceMeter({super.key, required this.confidenceMap});
+  const ConfidenceMeter({
+    super.key,
+    required this.dimensions,
+    required this.confidenceMap,
+  });
 
-  final Map<ConfidenceDimension, DimensionState> confidenceMap;
+  final List<DimensionDef> dimensions;
+  final Map<String, DimensionState> confidenceMap;
 
   static const _trackColor = Color(0xFF1F2937);
   static const _stateColors = <DimensionState, Color>{
@@ -21,8 +27,9 @@ class ConfidenceMeter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final resolvedCount = confidenceMap.values
-        .where((s) => s == DimensionState.resolved)
+    final total = dimensions.length;
+    final resolvedCount = dimensions
+        .where((d) => confidenceMap[d.id] == DimensionState.resolved)
         .length;
 
     return Container(
@@ -50,7 +57,7 @@ class ConfidenceMeter extends StatelessWidget {
                 ),
               ),
               Text(
-                '$resolvedCount / 8 resolved',
+                '$resolvedCount / $total resolved',
                 style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
@@ -61,12 +68,12 @@ class ConfidenceMeter extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          for (final dim in ConfidenceDimension.values)
+          for (final d in dimensions)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 3),
               child: _DimensionBar(
-                dimension: dim,
-                state: confidenceMap[dim] ?? DimensionState.unknown,
+                dimension: d,
+                state: confidenceMap[d.id] ?? DimensionState.unknown,
               ),
             ),
         ],
@@ -78,7 +85,7 @@ class ConfidenceMeter extends StatelessWidget {
 class _DimensionBar extends StatelessWidget {
   const _DimensionBar({required this.dimension, required this.state});
 
-  final ConfidenceDimension dimension;
+  final DimensionDef dimension;
   final DimensionState state;
 
   @override
@@ -94,7 +101,7 @@ class _DimensionBar extends StatelessWidget {
     return Row(
       children: [
         SizedBox(
-          width: 120,
+          width: 140,
           child: Text(
             dimension.label,
             style: const TextStyle(

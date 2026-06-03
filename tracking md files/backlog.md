@@ -1,8 +1,26 @@
 # The Forge — Feature Backlog
 
-**Last Updated:** 2026-06-01
+**Last Updated:** 2026-06-02
 
 Long-term feature pool. Active sprint work lives in `planner.md`.
+
+---
+
+## Critical Path
+
+```
+§1 Local data layer ✅
+  → §2 Riverpod project state layer ✅
+  → §3 Project folder browser ✅
+  → §4 LLM provider layer (BYOK + SwarmSpace) ✅
+  → §5 Build Interview UI (Stage 1A) ✅
+  → §6 Spec generation + artifact writing (Stage 2)
+  → §7 Artifact viewers
+  → §8 Setup Worksheet generation (Stage 3)
+  → §9 Handoff Package + Bullet Handoff (Stage 4)
+  → §10 Settings screen ✅
+  → First end-to-end Forge run
+```
 
 ---
 
@@ -25,24 +43,6 @@ Every §N that brings The Forge closer to a working interview-to-spec run unbloc
 - **Add to** when the user agrees a future feature should be done but is not the current focus
 - **Mark shipped items** with `✅` and the date; do not delete
 - **Do not remove items** without user approval
-
----
-
-## Critical Path
-
-```
-§1 Local data layer ✅
-  → §2 Riverpod project state layer ✅
-  → §3 Project folder browser ✅
-  → §4 LLM provider layer (BYOK + SwarmSpace)
-  → §5 Build Interview UI (Stage 1A) ✅
-  → §6 Spec generation + artifact writing (Stage 2)
-  → §7 Artifact viewers
-  → §8 Setup Worksheet generation (Stage 3)
-  → §9 Handoff Package + Bullet Handoff (Stage 4)
-  → §10 Settings screen
-  → First end-to-end Forge run
-```
 
 ---
 
@@ -126,7 +126,7 @@ LlmProvider.complete({
 
 **Dependencies:** §1 (keychain storage via secrets layer), §10 (settings screen reads provider config) — but can stub provider selection for interview development
 
-**Status:** Not started
+**Status:** ✅ Complete 2026-06-02 (worktree wt/llm-provider-layer) — 8 new files in `lib/services/llm/` (provider abstract, model config, service, service provider, 4 provider impls: Ollama / Claude / OpenAI / Gemini); `dart analyze lib/` zero issues; direct HTTP via `package:http` (no SDK deps)
 
 ---
 
@@ -301,7 +301,7 @@ LlmProvider.complete({
 
 **Dependencies:** §4 (provider layer reads from settings)
 
-**Status:** Not started
+**Status:** ✅ Complete 2026-06-02 (worktree wt/llm-provider-layer) — 3 new files in `lib/features/settings/` (notifier, providers, screen); 1 update to `lib/core/app.dart` (added `/settings` route); 1 update to `lib/features/projects/screens/projects_list_screen.dart` (gear icon); `dart analyze lib/` zero issues; API keys → macOS Keychain via `flutter_secure_storage`; base URL + role assignments + model IDs → `SharedPreferences`; Ollama auto-refresh on mount and on URL save
 
 ---
 
@@ -447,6 +447,12 @@ LlmProvider.complete({
 
 ### §5 — Build Interview UI + State (Stage 1A)
 ✅ Complete 2026-06-01 — 5 new files in `lib/features/interview/` (`state/interview_state.dart`, `state/interview_notifier.dart`, `providers/interview_providers.dart`, `ui/confidence_meter.dart`, `ui/interview_screen.dart`) + 1 update to `lib/core/app.dart` (added `/interview` named route); `dart analyze lib/` zero issues; stub LLM in single call site (turn-based: 9 user messages cover 8 dimensions, surfaces 1 conflict on turn 3); conflict surface follows Workflow Template pattern verbatim
+
+### §4 — LLM Provider Layer (BYOK + SwarmSpace)
+✅ Complete 2026-06-02 (worktree wt/llm-provider-layer) — 8 new files in `lib/services/llm/`; `dart analyze lib/` zero issues; 4 provider implementations (Ollama / Claude / OpenAI / Gemini) with hardcoded catalogs; Ollama model list fetched live via `static OllamaProvider.fetchModels`; `LlmService` resolves `role → ModelAssignment → provider`; API contracts match plan verbatim
+
+### §10 — Settings Screen + BYOK Key Storage
+✅ Complete 2026-06-02 (worktree wt/llm-provider-layer) — 3 new files in `lib/features/settings/`; API keys → macOS Keychain; base URL + role assignments + model IDs → `SharedPreferences`; live Ollama connection check; masked key entry (`••••••{last4}`); provider dropdown filtered to configured providers; role cards apply changes immediately via `setRoleAssignment`
 
 ---
 
