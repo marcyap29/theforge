@@ -34,7 +34,7 @@ Long-term feature pool. Active sprint work lives in `planner.md`.
   → Configuration C pilot (Qualcomm) — Watch + Reverse on existing codebase
 ```
 
-**Platform note (open flag — resolve before §W1):** SuperSpec draft listed Watch/Reverse as web. The Forge is Flutter macOS. Recommended: Flutter desktop for all three modes. Confirm before Watch Mode build begins. See `audit/The_Forge_AuditLog.md` entry 002.
+**Platform — RESOLVED (2026-06-04):** Flutter desktop macOS for all three modes. Confirmed. See `audit/The_Forge_AuditLog.md` entry 002.
 
 ---
 

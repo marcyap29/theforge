@@ -14,7 +14,7 @@ Append only. Newest entry at top. Do not modify existing entries.
 
 **Rationale:** Two products serving the same customer (engineering managers running agentic teams) with overlapping infrastructure (SwarmSpace MCP, locked spec format, Flutter desktop, flutter_secure_storage). The Forge is the stronger brand — implies construction and permanence. Vigilint implied surveillance. Combined platform has a flywheel: Plan specs become Watch benchmarks. Watch outcomes inform Amendment interviews. Reverse specs bring legacy repos into compliance.
 
-**Platform note — open flag:** The SuperSpec Handoff Package originally stated `"platform": "Web (Watch/Reverse) + macOS app (Plan)"`. This conflicts with the existing Flutter macOS implementation of The Forge (§1–§5 complete, passing `dart analyze`). Recommended resolution: Flutter desktop for all three modes. This avoids a split stack and Electron-style web wrapper complexity. The Watch/Reverse data surfaces are management dashboards — they require the same screen real estate as Plan mode and lose nothing by being native macOS. **This flag must be resolved before Watch Mode build begins.**
+**Platform — RESOLVED (2026-06-04):** Flutter desktop macOS for all three modes (Plan, Watch, Reverse). Confirmed by user. The SuperSpec draft's "Web (Watch/Reverse)" language is superseded. No split stack. Watch and Reverse mode screens are native macOS, same infrastructure as Plan Mode.
 
 **Affected files:**
 - `DOCS/forge/The_Forge_SuperSpec_v1.md` — new; defines the merged platform
