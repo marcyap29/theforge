@@ -4,6 +4,35 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-06-04 — DeepSeek V4 Pro [§6 SpecParser + §7 Artifact Viewers complete]
+
+### Done
+- `spec_parser.dart` created — strips code fences, trims whitespace from LLM output before writing spec
+- Wired `SpecParser.clean()` into `spec_notifier.dart` → LLM raw output is cleaned before `writeLockedSpec()`
+- `flutter_markdown` added to `pubspec.yaml`; `flutter pub get` completed
+- `artifact_viewer_screen.dart` created — single reusable viewer with `ArtifactViewMode` enum (spec/handoff/worksheet/audit)
+- `project_detail_screen.dart` updated — all artifact rows now tappable with folder-aware routing to viewer
+- `dart analyze lib/` — zero issues
+- `grep -ri firebase lib/` — zero matches
+
+### Next
+1. §8 — Setup Worksheet Generation (Stage 3): generate a worksheet from the spec's external services list
+2. §9 — Handoff Package + Bullet Handoff + /goal text (Stage 4)
+3. After §8+§9 → first end-to-end Plan Mode run → gate opens for Watch Mode
+
+### Modified
+- `lib/features/spec_generation/spec_parser.dart` — NEW: SpecParser.clean() strips code fences
+- `lib/features/spec_generation/spec_notifier.dart` — wired SpecParser.clean() into generate()
+- `lib/features/artifacts/artifact_viewer_screen.dart` — NEW: single reusable artifact viewer
+- `lib/features/projects/screens/project_detail_screen.dart` — artifact rows now tappable
+- `pubspec.yaml` — added flutter_markdown
+
+### Warnings
+- Routes used via `MaterialPageRoute` directly (Navigator.push) rather than named routes — matches existing codebase pattern (project_detail_screen uses same approach for /interview)
+- All 4 artifact types (spec/handoff/worksheet/audit) share one `ArtifactViewerScreen` — mode is determined by `_ArtifactEntry.folder`
+
+---
+
 ## Session: 2026-06-03 — Platform merge: Vigilint absorbed; SuperSpec v1 filed; Watch + Reverse Mode backlog added
 
 ### What was done

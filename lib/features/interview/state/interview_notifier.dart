@@ -146,7 +146,10 @@ class InterviewNotifier extends FamilyAsyncNotifier<InterviewState, InterviewArg
     );
     state = AsyncData(withUser);
 
+    final stub = stubInterviewStep(withUser, text);
+
     final llmService = ref.read(llmServiceProvider);
+    bool llmFailed = false;
     String llmText;
     try {
       llmText = await llmService.complete(
@@ -155,12 +158,10 @@ class InterviewNotifier extends FamilyAsyncNotifier<InterviewState, InterviewArg
         temperature: 0.1,
         role: LlmRole.executor,
       );
-    } catch (e) {
-      llmText =
-          'Connection error: $e\n\nCheck Settings to configure a provider.';
+    } catch (_) {
+      llmText = stub.interviewerText;
+      llmFailed = true;
     }
-
-    final stub = stubInterviewStep(withUser, text);
 
     final newMap = Map<String, DimensionState>.from(withUser.confidenceMap);
     stub.confidenceUpdates.forEach((k, v) => newMap[k] = v);
@@ -182,6 +183,7 @@ class InterviewNotifier extends FamilyAsyncNotifier<InterviewState, InterviewArg
         openConflicts: newConflicts,
         specGenEnabled: specGenEnabled,
         isLoading: false,
+        llmUnavailable: withUser.llmUnavailable || llmFailed,
       ),
     );
   }

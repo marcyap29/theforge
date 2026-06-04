@@ -38,4 +38,13 @@ class ForgeDatabase extends _$ForgeDatabase {
   Future<void> updateLastOpened(String id, int lastOpened) =>
       (update(projects)..where((t) => t.id.equals(id)))
           .write(ProjectsCompanion(lastOpened: Value(lastOpened)));
+
+  Future<void> updateProjectPhase(
+          String id, String phase, String specVersion) =>
+      (update(projects)..where((t) => t.id.equals(id))).write(
+        ProjectsCompanion(
+          phase: Value(phase),
+          specVersion: Value(specVersion),
+        ),
+      );
 }

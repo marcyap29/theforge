@@ -150,3 +150,35 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 - Stub preserves the original conflict-offset pattern (turn 4 re-resolves the conflict dimension, not `dim[N-1]` uniformly). The prompt's stated `dim[N-1]` rule was oversimplified — uniform would leave `dim[2]` stuck partial and break Generate Spec enablement. Caught and fixed before merge.
 - Drift's `ProjectsCompanion.insert(...)` doesn't need explicit `Value(null)` for nullable columns — drift handles them as absent by default.
 - `state.dimensions == buildDimensions` does a const-equality check that picks the mode label — no need to thread the mode through to the notifier for a single string comparison.
+
+---
+
+## §6 — Spec Generation + Artifact Writing (Stage 2) — COMPLETE ✅
+
+**Completed:** 2026-06-04
+
+- [x] `spec_parser.dart` — strips code fences, trims whitespace
+- [x] Wired `SpecParser.clean()` into `spec_notifier.dart` before `writeLockedSpec()`
+- [x] `dart analyze lib/` — zero issues
+- [x] `grep -ri firebase lib/` — zero matches
+
+### Notes
+- `spec_generation_screen.dart`, `spec_notifier.dart`, `spec_generator.dart`, `spec_providers.dart` were already built in a prior session — this session added the parser and connected it
+- `SpecGenerationScreen` is a full-screen progress UI with idle/generating/done/error states
+- `spec_generator.dart` builds mode-aware prompts (Build vs Audit) with the correct spec structure from `workflow_template.md`
+
+---
+
+## §7 — Artifact Viewers — COMPLETE ✅
+
+**Completed:** 2026-06-04
+
+- [x] `flutter_markdown` added to `pubspec.yaml`; `flutter pub get`
+- [x] `artifact_viewer_screen.dart` — single reusable viewer with `ArtifactViewMode` enum
+- [x] `project_detail_screen.dart` — artifact rows tappable; folder-aware routing
+- [x] `dart analyze lib/` — zero issues
+
+### Notes
+- Single `ArtifactViewerScreen` instead of 4 separate screens — cleaner, same code path, mode determined by artifact folder
+- Navigation uses `MaterialPageRoute` directly (matching existing codebase pattern — project_detail_screen already uses this for /interview route)
+- `flutter_markdown` 0.7.7+1 installed (discontinued upstream, will need migration to `flutter_markdown_plus` later — non-blocking)

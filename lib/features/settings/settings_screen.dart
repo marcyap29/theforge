@@ -306,11 +306,28 @@ class _ByokCard extends ConsumerStatefulWidget {
 class _ByokCardState extends ConsumerState<_ByokCard> {
   final _controller = TextEditingController();
   bool _obscure = true;
+  bool _testing = false;
+  bool? _testPassed;   // null = not tested, true = pass, false = fail
+  String _testError = '';
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _runTest() async {
+    if (_testing) return;
+    setState(() { _testing = true; _testPassed = null; });
+    final error = await ref
+        .read(settingsProvider.notifier)
+        .testProvider(widget.providerType);
+    if (!mounted) return;
+    setState(() {
+      _testing = false;
+      _testPassed = error == null;
+      _testError = error ?? '';
+    });
   }
 
   String _maskKey(String key) {
@@ -368,6 +385,7 @@ class _ByokCardState extends ConsumerState<_ByokCard> {
                   await ref
                       .read(settingsProvider.notifier)
                       .clearApiKey(widget.providerType);
+                  setState(() { _testPassed = null; _testError = ''; });
                 },
                 child: const Text('Clear'),
               ),
@@ -381,11 +399,67 @@ class _ByokCardState extends ConsumerState<_ByokCard> {
                             _controller.text,
                           );
                       _controller.clear();
+                      setState(() { _testPassed = null; _testError = ''; });
                     },
               child: const Text('Save'),
             ),
           ],
         ),
+        if (hasKey) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              OutlinedButton.icon(
+                onPressed: _testing ? null : _runTest,
+                icon: _testing
+                    ? const SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.bolt, size: 14),
+                label: Text(_testing ? 'Testing…' : 'Test'),
+              ),
+              const SizedBox(width: 12),
+              if (_testPassed == true)
+                const Row(
+                  children: [
+                    Icon(Icons.check_circle, size: 14, color: Color(0xFF22C55E)),
+                    SizedBox(width: 4),
+                    Text(
+                      'Connected',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontFamily: 'Menlo',
+                        color: Color(0xFF22C55E),
+                      ),
+                    ),
+                  ],
+                )
+              else if (_testPassed == false)
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Icon(Icons.cancel, size: 14, color: Color(0xFFEF4444)),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          _testError,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontFamily: 'Menlo',
+                            color: Color(0xFFEF4444),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ],
       ],
     );
   }

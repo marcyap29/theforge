@@ -5,7 +5,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/llm/llm_model_config.dart';
 import '../../services/llm/llm_provider.dart';
+import '../../services/llm/providers/claude_provider.dart';
+import '../../services/llm/providers/gemini_provider.dart';
 import '../../services/llm/providers/ollama_provider.dart';
+import '../../services/llm/providers/openai_provider.dart';
 
 enum OllamaStatus { unknown, connected, notRunning }
 
@@ -169,6 +172,49 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
         settings: current.settings.copyWith(apiKeys: newKeys),
       ),
     );
+  }
+
+  /// Returns null on success, error string on failure.
+  Future<String?> testProvider(LlmProviderType type) async {
+    final current = state.valueOrNull;
+    if (current == null) return 'Settings not loaded.';
+
+    final key = current.settings.apiKeys[type];
+    final baseUrl = current.settings.ollamaBaseUrl;
+
+    LlmProvider provider;
+    String modelId;
+
+    switch (type) {
+      case LlmProviderType.gemini:
+        if (key == null || key.isEmpty) return 'No API key configured.';
+        provider = GeminiProvider(apiKey: key);
+        modelId = 'gemini-2.0-flash';
+      case LlmProviderType.claude:
+        if (key == null || key.isEmpty) return 'No API key configured.';
+        provider = ClaudeProvider(apiKey: key);
+        modelId = 'claude-haiku-4-5-20251001';
+      case LlmProviderType.openai:
+        if (key == null || key.isEmpty) return 'No API key configured.';
+        provider = OpenAiProvider(apiKey: key);
+        modelId = 'gpt-4o-mini';
+      case LlmProviderType.ollama:
+        provider = OllamaProvider(baseUrl: baseUrl);
+        modelId = current.ollamaModels.firstOrNull?.id ?? 'llama3';
+    }
+
+    try {
+      await provider.complete(
+        systemPrompt: 'You are a test assistant.',
+        userPrompt: 'Reply with exactly one word: OK',
+        temperature: 0.0,
+        modelId: modelId,
+        maxTokens: 10,
+      );
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
   }
 
   Future<void> refreshOllama() async {

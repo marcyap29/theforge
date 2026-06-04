@@ -205,7 +205,7 @@ LlmProvider.complete({
 
 **Dependencies:** §4 (LLM provider), §5 (completed interview to send)
 
-**Status:** Not started
+**Status:** ✅ Complete 2026-06-04 — `spec_parser.dart` strips code fences; wired into `spec_notifier.dart`; `dart analyze lib/` zero issues
 
 ---
 
@@ -221,7 +221,7 @@ LlmProvider.complete({
 
 **Dependencies:** §3 (project must be open), §6 (spec must exist to view it)
 
-**Status:** Not started
+**Status:** ✅ Complete 2026-06-04 — single `artifact_viewer_screen.dart` with `ArtifactViewMode` enum; artifact rows tappable; `flutter_markdown` added; `dart analyze lib/` zero issues
 
 ---
 
@@ -615,6 +615,12 @@ Output: {
 
 ### §10 — Settings Screen + BYOK Key Storage
 ✅ Complete 2026-06-02 (worktree wt/llm-provider-layer) — 3 new files in `lib/features/settings/`; API keys → macOS Keychain; base URL + role assignments + model IDs → `SharedPreferences`; live Ollama connection check; masked key entry (`••••••{last4}`); provider dropdown filtered to configured providers; role cards apply changes immediately via `setRoleAssignment`
+
+### §6 — Spec Generation + Artifact Writing (Stage 2)
+✅ Complete 2026-06-04 — `spec_parser.dart` strips code fences from LLM output; wired into `spec_notifier.dart` before `writeLockedSpec()`; `dart analyze lib/` zero issues
+
+### §7 — Artifact Viewers
+✅ Complete 2026-06-04 — single `artifact_viewer_screen.dart` with `ArtifactViewMode` enum; artifact rows in project detail screen now tappable; `flutter_markdown` added to pubspec.yaml; `dart analyze lib/` zero issues
 
 ---
 

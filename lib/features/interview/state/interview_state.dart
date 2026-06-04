@@ -47,6 +47,7 @@ class InterviewState {
   final List<ConflictItem> openConflicts;
   final bool specGenEnabled;
   final bool isLoading;
+  final bool llmUnavailable;
 
   const InterviewState({
     required this.projectPath,
@@ -57,6 +58,7 @@ class InterviewState {
     required this.openConflicts,
     required this.specGenEnabled,
     required this.isLoading,
+    this.llmUnavailable = false,
   });
 
   factory InterviewState.empty(
@@ -87,6 +89,7 @@ class InterviewState {
     List<ConflictItem>? openConflicts,
     bool? specGenEnabled,
     bool? isLoading,
+    bool? llmUnavailable,
   }) {
     return InterviewState(
       projectPath: projectPath ?? this.projectPath,
@@ -97,6 +100,7 @@ class InterviewState {
       openConflicts: openConflicts ?? this.openConflicts,
       specGenEnabled: specGenEnabled ?? this.specGenEnabled,
       isLoading: isLoading ?? this.isLoading,
+      llmUnavailable: llmUnavailable ?? this.llmUnavailable,
     );
   }
 }

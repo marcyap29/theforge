@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 
 import '../../../data/filesystem/project_file_repository.dart';
 import '../../../data/local_db/forge_database.dart';
+import '../../artifacts/artifact_viewer_screen.dart';
 import '../../interview/providers/interview_providers.dart';
 import '../providers/providers.dart';
 
@@ -292,7 +293,10 @@ class _ArtifactsList extends StatelessWidget {
           child: Column(
             children: [
               for (var i = 0; i < data.entries.length; i++) ...[
-                _ArtifactRow(entry: data.entries[i]),
+                _ArtifactRow(
+                  entry: data.entries[i],
+                  onTap: () => _onArtifactTap(context, data.entries[i]),
+                ),
                 if (i < data.entries.length - 1)
                   const Divider(height: 1, color: Color(0xFF2C2C2E)),
               ],
@@ -303,9 +307,32 @@ class _ArtifactsList extends StatelessWidget {
     );
   }
 
+  void _onArtifactTap(BuildContext context, _ArtifactEntry entry) {
+    final mode = switch (entry.folder) {
+      'specs' => ArtifactViewMode.spec,
+      'handoffs' => ArtifactViewMode.handoff,
+      'worksheets' => ArtifactViewMode.worksheet,
+      _ => ArtifactViewMode.audit,
+    };
+    final projectName =
+        p.basename(projectPath);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ArtifactViewerScreen(
+          args: ArtifactViewArgs(
+            projectPath: projectPath,
+            projectName: projectName,
+            filename: entry.filename,
+            mode: mode,
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<_ArtifactsSnapshot> _scan(String projectPath) async {
     final entries = <_ArtifactEntry>[];
-    for (final folder in const ['specs', 'handoffs', 'worksheets']) {
+    for (final folder in const ['specs', 'handoffs', 'worksheets', 'audit']) {
       final dir = Directory(p.join(projectPath, folder));
       if (!dir.existsSync()) continue;
       for (final entity in dir.listSync()) {
@@ -334,41 +361,45 @@ class _ArtifactEntry {
 }
 
 class _ArtifactRow extends StatelessWidget {
-  const _ArtifactRow({required this.entry});
+  const _ArtifactRow({required this.entry, this.onTap});
   final _ArtifactEntry entry;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.description_outlined,
-            size: 14,
-            color: Color(0xFF6B7280),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              entry.filename,
-              style: const TextStyle(
-                fontFamily: 'Menlo',
-                fontSize: 12,
-                color: Color(0xFFE5E5E7),
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          Text(
-            entry.folder,
-            style: const TextStyle(
-              fontFamily: 'Menlo',
-              fontSize: 10,
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.description_outlined,
+              size: 14,
               color: Color(0xFF6B7280),
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                entry.filename,
+                style: const TextStyle(
+                  fontFamily: 'Menlo',
+                  fontSize: 12,
+                  color: Color(0xFFE5E5E7),
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Text(
+              entry.folder,
+              style: const TextStyle(
+                fontFamily: 'Menlo',
+                fontSize: 10,
+                color: Color(0xFF6B7280),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

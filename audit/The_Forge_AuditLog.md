@@ -4,6 +4,27 @@ Append only. Newest entry at top. Do not modify existing entries.
 
 ---
 
+## Entry 003 — §6+§7 complete: SpecParser + Artifact Viewers
+
+**Date:** 2026-06-04
+**Type:** Feature completion
+**Filed by:** DeepSeek V4 Pro (implementing)
+
+**What was done:** §6 SpecParser (`spec_parser.dart`) strips code fences from LLM output before `writeLockedSpec()`. §7 Artifact Viewers — single reusable `artifact_viewer_screen.dart` with `ArtifactViewMode` enum; artifact rows in `project_detail_screen.dart` made tappable; `flutter_markdown` added to pubspec.yaml.
+
+**Verification:** `dart analyze lib/` — zero issues. `grep -ri firebase lib/` — zero matches.
+
+**Affected files:**
+- `lib/features/spec_generation/spec_parser.dart` — NEW
+- `lib/features/spec_generation/spec_notifier.dart` — wired SpecParser.clean()
+- `lib/features/artifacts/artifact_viewer_screen.dart` — NEW
+- `lib/features/projects/screens/project_detail_screen.dart` — artifact rows tappable
+- `pubspec.yaml` — added flutter_markdown
+
+**Next:** §8 Setup Worksheet Generation → §9 Handoff Package + /goal → first end-to-end Plan Mode run → Watch Mode gate
+
+---
+
 ## Entry 002 — Platform merge: Vigilint absorbed into The Forge as Watch Mode
 
 **Date:** 2026-06-03

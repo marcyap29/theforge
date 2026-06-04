@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/filesystem/project_file_repository.dart';
+import '../../../features/spec_generation/spec_generation_screen.dart';
 import '../providers/interview_providers.dart';
 import '../state/interview_state.dart';
 import 'confidence_meter.dart';
@@ -76,6 +77,27 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen> {
                   isLoading: state.isLoading,
                   onResolve: notifier.resolveConflict,
                 ),
+              if (state.llmUnavailable)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  color: const Color(0xFF1C1C1E),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.wifi_off, size: 12, color: Color(0xFF6B7280)),
+                      const SizedBox(width: 6),
+                      const Expanded(
+                        child: Text(
+                          'No LLM configured — running in offline mode. Add a key in Settings.',
+                          style: TextStyle(fontSize: 11, color: Color(0xFF6B7280), fontFamily: 'Menlo'),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pushNamed(context, '/settings'),
+                        child: const Text('Settings', style: TextStyle(fontSize: 11, color: Color(0xFFE8A04C))),
+                      ),
+                    ],
+                  ),
+                ),
               Expanded(
                 child: state.turns.isEmpty
                     ? _EmptyChat(dimensionCount: state.dimensions.length)
@@ -105,10 +127,13 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen> {
                       icon: const Icon(Icons.auto_awesome),
                       label: const Text('Generate Spec'),
                       onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Spec generation — coming in §6.'),
-                            duration: Duration(seconds: 2),
+                        final interviewState =
+                            ref.read(interviewProvider(args)).valueOrNull;
+                        if (interviewState == null) return;
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => SpecGenerationScreen(
+                                interviewState: interviewState),
                           ),
                         );
                       },
