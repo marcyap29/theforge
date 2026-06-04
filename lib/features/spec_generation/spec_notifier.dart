@@ -13,10 +13,12 @@ enum SpecGenStatus { idle, generating, done, error }
 class SpecGenState {
   final SpecGenStatus status;
   final String? specFilename;
+  final String? specVersion;
   final String? errorMessage;
   const SpecGenState({
     this.status = SpecGenStatus.idle,
     this.specFilename,
+    this.specVersion,
     this.errorMessage,
   });
 }
@@ -58,6 +60,17 @@ class SpecNotifier extends AutoDisposeNotifier<SpecGenState> {
         handoffContent,
       );
 
+      final goalText = buildGoalText(interviewState, specVersion, specContent);
+      await repo.writeHandoff(
+        projectPath,
+        '${projectName}_goal_$specVersion.md',
+        goalText,
+      );
+
+      final handoffPackage =
+          buildHandoffPackage(interviewState, specVersion, specContent);
+      await repo.writeHandoffPackage(projectPath, specVersion, handoffPackage);
+
       final settings = ref.read(llmSettingsProvider);
       final providerName = settings
               .roleAssignments[LlmRole.architect]
@@ -80,7 +93,10 @@ class SpecNotifier extends AutoDisposeNotifier<SpecGenState> {
       await ref.read(projectListProvider.notifier).refresh();
 
       state = SpecGenState(
-          status: SpecGenStatus.done, specFilename: specFilename);
+          status: SpecGenStatus.done,
+          specFilename: specFilename,
+          specVersion: specVersion,
+      );
     } on SpecAlreadyExistsException {
       state = const SpecGenState(
         status: SpecGenStatus.done,

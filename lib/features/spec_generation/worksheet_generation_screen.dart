@@ -1,51 +1,61 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../interview/state/interview_state.dart';
-import 'spec_notifier.dart';
-import 'spec_providers.dart';
-import 'worksheet_generation_screen.dart';
+import 'worksheet_notifier.dart';
 
-class SpecGenerationScreen extends ConsumerStatefulWidget {
-  const SpecGenerationScreen({super.key, required this.interviewState});
-  final InterviewState interviewState;
+class WorksheetGenerationScreen extends ConsumerStatefulWidget {
+  const WorksheetGenerationScreen({
+    super.key,
+    required this.projectPath,
+    required this.projectName,
+    required this.specVersion,
+  });
+
+  final String projectPath;
+  final String projectName;
+  final String specVersion;
 
   @override
-  ConsumerState<SpecGenerationScreen> createState() =>
-      _SpecGenerationScreenState();
+  ConsumerState<WorksheetGenerationScreen> createState() =>
+      _WorksheetGenerationScreenState();
 }
 
-class _SpecGenerationScreenState
-    extends ConsumerState<SpecGenerationScreen> {
+class _WorksheetGenerationScreenState
+    extends ConsumerState<WorksheetGenerationScreen> {
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(specNotifierProvider.notifier).generate(widget.interviewState);
+      ref.read(worksheetNotifierProvider.notifier).generate(
+            projectPath: widget.projectPath,
+            projectName: widget.projectName,
+            specVersion: widget.specVersion,
+          );
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(specNotifierProvider);
+    final state = ref.watch(worksheetNotifierProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title:
-            Text('Generating Spec — ${widget.interviewState.projectName}'),
+        title: Text('Setup Worksheet — ${widget.projectName}'),
         automaticallyImplyLeading: false,
       ),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: switch (state.status) {
-            SpecGenStatus.idle || SpecGenStatus.generating => const Column(
+            WorksheetGenStatus.idle ||
+            WorksheetGenStatus.generating =>
+              const Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   CircularProgressIndicator(color: Color(0xFFE8A04C)),
                   SizedBox(height: 24),
                   Text(
-                    'Generating locked spec…\nThis takes 15–30 seconds.',
+                    'Generating setup worksheet…\nThis takes 10–20 seconds.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontFamily: 'Menlo',
@@ -56,14 +66,14 @@ class _SpecGenerationScreenState
                   ),
                 ],
               ),
-            SpecGenStatus.done => Column(
+            WorksheetGenStatus.done => Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(Icons.check_circle,
                       color: Color(0xFF22C55E), size: 48),
                   const SizedBox(height: 16),
                   Text(
-                    'Spec locked — ${state.specFilename}',
+                    'Worksheet ready — ${state.worksheetFilename}',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -72,54 +82,29 @@ class _SpecGenerationScreenState
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Bullet Handoff, /goal text, and Handoff Package written.',
-                    style:
-                        TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+                    'Complete the worksheet before starting the executor.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
                   ),
                   const SizedBox(height: 32),
-                  SizedBox(
-                    width: 260,
-                    child: FilledButton(
-                      onPressed: () {
-                        final specVersion = state.specVersion ?? 'v1';
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => WorksheetGenerationScreen(
-                              projectPath:
-                                  widget.interviewState.projectPath,
-                              projectName:
-                                  widget.interviewState.projectName,
-                              specVersion: specVersion,
-                            ),
-                          ),
-                        );
-                      },
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFFE8A04C),
-                        foregroundColor: const Color(0xFF0F0F10),
-                      ),
-                      child: const Text('Generate Setup Worksheet →'),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextButton(
+                  FilledButton(
                     onPressed: () =>
                         Navigator.of(context).popUntil((r) => r.isFirst),
-                    child: const Text(
-                      'Back to Projects',
-                      style: TextStyle(color: Color(0xFF6B7280)),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFE8A04C),
+                      foregroundColor: const Color(0xFF0F0F10),
                     ),
+                    child: const Text('Back to Projects'),
                   ),
                 ],
               ),
-            SpecGenStatus.error => Column(
+            WorksheetGenStatus.error => Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(Icons.error_outline,
                       color: Color(0xFFEF4444), size: 48),
                   const SizedBox(height: 16),
                   const Text(
-                    'Spec generation failed',
+                    'Worksheet generation failed',
                     style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -140,9 +125,13 @@ class _SpecGenerationScreenState
                   ),
                   const SizedBox(height: 24),
                   OutlinedButton(
-                    onPressed: () =>
-                        ref.read(specNotifierProvider.notifier)
-                            .generate(widget.interviewState),
+                    onPressed: () => ref
+                        .read(worksheetNotifierProvider.notifier)
+                        .generate(
+                          projectPath: widget.projectPath,
+                          projectName: widget.projectName,
+                          specVersion: widget.specVersion,
+                        ),
                     child: const Text('Try Again'),
                   ),
                 ],

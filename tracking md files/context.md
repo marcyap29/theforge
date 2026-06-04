@@ -4,7 +4,41 @@ Newest session first. Each block is prepended.
 
 ---
 
-## Session: 2026-06-04 — DeepSeek V4 Pro [§6 SpecParser + §7 Artifact Viewers complete]
+## Session: 2026-06-04 — DeepSeek V4 Pro [Session 2 — §8 Setup Worksheet + §9 Handoff Package + /goal text]
+
+### Done
+- `spec_generator.dart` extended — `buildGoalText()`, `buildHandoffPackage()`, `_extractSection()`, `_countTableRows()`, `_countListItems()`
+- `spec_notifier.dart` extended — calls `buildGoalText()` + `buildHandoffPackage()` after `writeLockedSpec()`; `specVersion` added to `SpecGenState`
+- `project_file_repository.dart` — added `readLockedSpec()` for reading spec from disk
+- `worksheet_generator.dart` created — `buildWorksheetPrompt()`, `buildWorksheetAuditEntry()`
+- `worksheet_notifier.dart` created — `WorksheetNotifier`, `WorksheetGenState`, `worksheetNotifierProvider`
+- `worksheet_generation_screen.dart` created — full UI with idle/generating/done/error states (mirrors SpecGenerationScreen)
+- `spec_generation_screen.dart` — done state updated: "Generate Worksheet →" primary button + "Back to Projects" secondary
+- `dart analyze lib/` — zero issues
+- `grep -ri firebase lib/` — zero matches
+
+### Next
+1. First end-to-end Plan Mode run: Project → Interview → Spec → Worksheet → Artifacts
+2. Gate opens for Watch Mode (§W1 Token Ingestion Engine)
+3. Then: §W2–§W6 → Reverse Mode → Configuration C pilot (Qualcomm)
+
+### Modified
+- `lib/features/spec_generation/spec_generator.dart` — added §9 builders
+- `lib/features/spec_generation/spec_notifier.dart` — wired §9 calls + specVersion
+- `lib/data/filesystem/project_file_repository.dart` — added readLockedSpec()
+- `lib/features/spec_generation/worksheet_generator.dart` — NEW
+- `lib/features/spec_generation/worksheet_notifier.dart` — NEW
+- `lib/features/spec_generation/worksheet_generation_screen.dart` — NEW
+- `lib/features/spec_generation/spec_generation_screen.dart` — worksheet button
+
+### Warnings
+- `_countTableRows` filter checks for `---` and `--` (without dashes) — handles both `|---|` and `---|---|---|` patterns
+- Worksheet temperature is 0.3 (procedural) vs spec generation 0.6 (creative)
+- `readLockedSpec()` throws if file doesn't exist — WorksheetNotifier catches it via try/catch
+
+---
+
+## Session: 2026-06-04 — DeepSeek V4 Pro [Session 1 — §6 SpecParser + §7 Artifact Viewers complete]
 
 ### Done
 - `spec_parser.dart` created — strips code fences, trims whitespace from LLM output before writing spec

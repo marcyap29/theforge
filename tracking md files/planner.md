@@ -182,3 +182,41 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 - Single `ArtifactViewerScreen` instead of 4 separate screens — cleaner, same code path, mode determined by artifact folder
 - Navigation uses `MaterialPageRoute` directly (matching existing codebase pattern — project_detail_screen already uses this for /interview route)
 - `flutter_markdown` 0.7.7+1 installed (discontinued upstream, will need migration to `flutter_markdown_plus` later — non-blocking)
+
+---
+
+## §8 — Setup Worksheet Generation (Stage 3) — COMPLETE ✅
+
+**Completed:** 2026-06-04
+
+- [x] `worksheet_generator.dart` — `buildWorksheetPrompt()` + `buildWorksheetAuditEntry()`
+- [x] `worksheet_notifier.dart` — `WorksheetNotifier` with `generate()`, full idle/generating/done/error pipeline
+- [x] `worksheet_generation_screen.dart` — full UI (mirrors SpecGenerationScreen pattern)
+- [x] `project_file_repository.dart` — added `readLockedSpec()` for disk read
+- [x] `spec_generation_screen.dart` — done state updated with "Generate Worksheet →" primary button
+- [x] README.md `**Setup worksheet:**` flips to `Complete` after worksheet generation
+- [x] `dart analyze lib/` — zero issues
+
+### Notes
+- Worksheet temperature: 0.3 (procedural) vs spec generation 0.6 (creative)
+- Worksheet reads the locked spec from disk via `readLockedSpec()` — no need to hold specContent in memory across screens
+- `writeWorksheet()` is a normal write (not write-once) — worksheets can be regenerated
+- Navigation via `MaterialPageRoute` directly (matches existing codebase pattern)
+
+---
+
+## §9 — Handoff Package + /goal text — COMPLETE ✅
+
+**Completed:** 2026-06-04
+
+- [x] `spec_generator.dart` — `buildGoalText()`, `buildHandoffPackage()`, `_extractSection()`, `_countTableRows()`, `_countListItems()`
+- [x] `spec_notifier.dart` — calls /goal + handoff builders after `writeLockedSpec()`; `specVersion` added to `SpecGenState`
+- [x] `handoffs/{ProjectName}_goal_v1.md` written during spec generation pipeline
+- [x] `handoff_package_v1.json` written during spec generation pipeline
+- [x] `dart analyze lib/` — zero issues
+
+### Notes
+- §9 outputs are derived from interview state + spec content — no new LLM call, no new screen
+- `/goal` text follows `workflow_template.md` Stage 4b format exactly
+- Handoff package supports both Build and Audit schemas
+- `_countTableRows` subtracts 1 for the header row; filter handles `|---|` and `---|---|---|` patterns

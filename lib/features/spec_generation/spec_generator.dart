@@ -163,3 +163,116 @@ String buildAuditEntry(
       '- Status: locked\n'
       '---\n';
 }
+
+String buildGoalText(
+    InterviewState state, String specVersion, String specContent) {
+  final isBuild = state.dimensions == buildDimensions;
+  final goalStatement =
+      _extractSection(specContent, '## 1. Immutable Goal Statement') ??
+          _extractSection(specContent, '## 1. Project Goal Statement') ??
+          '(see locked spec)';
+  final completionCriteria = isBuild
+      ? (_extractSection(specContent, '## 5. Completion Criteria') ??
+          '(see locked spec)')
+      : '(Audit mode — see locked spec for next phase seeds)';
+
+  return '''# /goal — ${state.projectName} $specVersion
+
+## Outcome
+$goalStatement
+
+## Completion Criteria
+$completionCriteria
+
+## Constraints
+(see Hard Constraints table in the locked spec)
+
+## Boundaries
+- Component ownership: see Component Map in the locked spec
+- Out-of-scope: see Explicit Out-of-Scope List in the locked spec
+
+## Iteration Policy
+Work at low temperature. Resolve ambiguity conservatively. When uncertain
+between two valid approaches, choose the one with less surface area. Flag
+decisions you are not confident in rather than guessing.
+
+## Stop Conditions
+Stop and surface a blocker if:
+- A completion criterion cannot be met without a decision not in this spec
+- A required external service is unavailable or misconfigured
+- The Setup Worksheet variables are missing or invalid
+
+Do not stop because the work is hard. Stop only when genuinely blocked.
+''';
+}
+
+Map<String, dynamic> buildHandoffPackage(
+    InterviewState state, String specVersion, String specContent) {
+  final isBuild = state.dimensions == buildDimensions;
+  final goalStatement =
+      _extractSection(specContent, '## 1. Immutable Goal Statement') ??
+          _extractSection(specContent, '## 1. Project Goal Statement') ??
+          '';
+  final now = DateTime.now().toIso8601String().split('T').first;
+
+  if (isBuild) {
+    return {
+      'interviewMode': 'build',
+      'specVersion': specVersion,
+      'appName': state.projectName,
+      'lockedAt': now,
+      'goalStatement': goalStatement.trim(),
+      'openFlags': _countTableRows(specContent, '## 9. Open Flags'),
+      'outOfScopeItems':
+          _countListItems(specContent, '## 7. Explicit Out-of-Scope List'),
+      'setupWorksheetComplete': false,
+      'v2SeedItems': <String>[],
+    };
+  } else {
+    return {
+      'interviewMode': 'audit',
+      'specVersion': specVersion,
+      'projectName': state.projectName,
+      'auditDate': now,
+      'goalStatement': goalStatement.trim(),
+      'activeBlockers':
+          _countTableRows(specContent, '## 4. Active Blocker Registry'),
+      'decisionDebtItems':
+          _countTableRows(specContent, '## 5. Decision Debt Log'),
+      'technicalDebtItems':
+          _countTableRows(specContent, '## 6. Technical Debt Log'),
+      'documentationGaps':
+          _countListItems(specContent, '## 8. Documentation Gaps'),
+      'v2SeedItems': <String>[],
+    };
+  }
+}
+
+String? _extractSection(String content, String header) {
+  final start = content.indexOf(header);
+  if (start < 0) return null;
+  final bodyStart = start + header.length;
+  final nextHeader = content.indexOf('\n## ', bodyStart);
+  final end = nextHeader < 0 ? content.length : nextHeader;
+  return content.substring(bodyStart, end).trim();
+}
+
+int _countTableRows(String content, String sectionHeader) {
+  final section = _extractSection(content, sectionHeader);
+  if (section == null) return 0;
+  final rows = section
+      .split('\n')
+      .where((l) => l.startsWith('|') && !RegExp(r'^\|[-| ]+\|$').hasMatch(l.trim()))
+      .length;
+  return (rows - 1).clamp(0, rows); // subtract header row, floor at 0
+}
+
+int _countListItems(String content, String sectionHeader) {
+  final section = _extractSection(content, sectionHeader);
+  if (section == null) return 0;
+  return section
+      .split('\n')
+      .where(
+          (l) => l.trimLeft().startsWith('- ') || l.trimLeft().startsWith('* '))
+      .length;
+}

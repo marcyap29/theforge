@@ -151,6 +151,13 @@ class ProjectFileRepository {
     await packageFile.writeAsString(const JsonEncoder.withIndent('  ').convert(data));
   }
 
+  Future<String> readLockedSpec(
+      String projectPath, String projectName, String specVersion) async {
+    final specPath = p.join(
+        projectPath, 'specs', '${projectName}_LockedSpec_$specVersion.md');
+    return File(specPath).readAsString();
+  }
+
   Future<List<String>> scanProjectPaths() async {
     final root = await _rootDirProvider();
     if (!root.existsSync()) {

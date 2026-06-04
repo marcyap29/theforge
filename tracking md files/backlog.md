@@ -622,6 +622,12 @@ Output: {
 ### §7 — Artifact Viewers
 ✅ Complete 2026-06-04 — single `artifact_viewer_screen.dart` with `ArtifactViewMode` enum; artifact rows in project detail screen now tappable; `flutter_markdown` added to pubspec.yaml; `dart analyze lib/` zero issues
 
+### §8 — Setup Worksheet Generation (Stage 3)
+✅ Complete 2026-06-04 — `worksheet_generator.dart` (prompt builder + audit entry); `worksheet_notifier.dart` (idle/generating/done/error pipeline); `worksheet_generation_screen.dart` (full UI); `readLockedSpec()` added to repo; `spec_generation_screen.dart` done state updated with "Generate Worksheet →"; `dart analyze lib/` zero issues
+
+### §9 — Handoff Package + Bullet Handoff + /goal text (Stage 4)
+✅ Complete 2026-06-04 — `buildGoalText()`, `buildHandoffPackage()`, `_extractSection()`, `_countTableRows()`, `_countListItems()` added to `spec_generator.dart`; wired into `spec_notifier.dart` pipeline after `writeLockedSpec()`; `specVersion` added to `SpecGenState`; `dart analyze lib/` zero issues
+
 ---
 
 *Sequence items so each tier unblocks the next. §2 → §3 → §4 → §5 → §6 is the critical path to a first working interview-to-spec run.*
