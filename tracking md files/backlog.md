@@ -19,8 +19,22 @@ Long-term feature pool. Active sprint work lives in `planner.md`.
   → §8 Setup Worksheet generation (Stage 3)
   → §9 Handoff Package + Bullet Handoff (Stage 4)
   → §10 Settings screen ✅
-  → First end-to-end Forge run
+  → First end-to-end Plan Mode run (gate for Watch + Reverse work)
+       ↓
+  → §W1 Watch Mode: Token Ingestion Engine
+  → §W2 Watch Mode: Git Activity Engine + CI Outcome Correlator
+  → §W3 Watch Mode: Failure Signal Engine + Alert Engine
+  → §W4 Watch Mode: Dashboard UI Shell
+  → §W5 Watch Mode: SwarmSpace Briefing + Decision Simulation
+  → §W6 Watch Mode: Spec Compliance Monitor + Drift Detector (requires spec)
+       ↓
+  → §R1 Reverse Mode: Codebase Ingestion Engine
+  → §R2 Reverse Mode: Reverse Interview Engine + As-Built Spec Generator
+       ↓
+  → Configuration C pilot (Qualcomm) — Watch + Reverse on existing codebase
 ```
+
+**Platform note (open flag — resolve before §W1):** SuperSpec draft listed Watch/Reverse as web. The Forge is Flutter macOS. Recommended: Flutter desktop for all three modes. Confirm before Watch Mode build begins. See `audit/The_Forge_AuditLog.md` entry 002.
 
 ---
 
@@ -431,6 +445,154 @@ LlmProvider.complete({
 **Dependencies:** §7 (artifact viewers), §9 (handoff package)
 
 **Status:** Future / not started
+
+---
+
+---
+
+## Watch Mode (formerly Vigilint) — gated on first end-to-end Plan Mode run
+
+> **Architecture note:** All Watch Mode work should be Flutter macOS (matching Plan Mode), unless the open flag in `audit/The_Forge_AuditLog.md` entry 002 is resolved differently. Watch Mode ingests data via direct HTTP (no server layer) and persists to local SQLite via drift. `observedOutcomes` table must be included in the schema from day one — see Backlog Appendation item 001.
+
+### §W1 — Token Ingestion Engine
+
+**What it is:** Polls the Anthropic API hourly for per-engineer token spend, normalizes into daily and 30-day aggregates, and calculates cost at current model pricing. The foundation data source for all Watch Mode signals.
+
+**Owns:** Anthropic API polling (per-engineer key from Workspace Config), usage normalization, daily/30-day aggregation, cost-in-USD calculation, session-level granularity.
+
+**Demo data bridge:** Ship with the 4 synthetic engineer profiles from the Vigilint spec (The Runaway 9x baseline, The Ghost 0.1x, The High Performer 1.5x, Self 1.0x = $15/day) using fixed-seed RNG (Random(42)) so demos work before any real team is configured.
+
+**Interface contract:**
+```
+Input:  { engineerHandle: string, apiKey: string, lookbackDays: number }
+Output: {
+  engineerHandle: string,
+  dailyBreakdown: { date: ISO, tokensUsed: number, costUSD: number }[],
+  totalCostUSD30d: number,
+  sessionCount: number,
+  alertFlags: ('spend_threshold' | 'runaway_session')[]
+}
+```
+
+**Dependencies:** §W0 — Workspace Config extension (add team roster, per-engineer API keys, alert thresholds to existing WorkspaceConfig schema from §10)
+
+**Status:** Not started — gated on Plan Mode end-to-end run
+
+---
+
+### §W2 — Git Activity Engine + CI Outcome Correlator
+
+**What it is:** Pulls commit/PR activity from GitHub GraphQL and correlates token sessions to CI run outcomes (pass/fail/timeout). The correlation is the core differentiator: token spend per successful outcome vs. token spend per failed outcome, per engineer.
+
+**Git Activity owns:** GitHub GraphQL calls, commit attribution per engineer, PR lifecycle tracking, agent-vs-human attribution heuristics (commit message signature scanning).
+
+**CI Correlator owns:** GitHub Actions run outcome ingestion, timestamp-based correlation to token sessions within configurable window (default 4h), correlation confidence scoring (0–1), rolling 7d and 30d token-to-failure ratios.
+
+**Key signal:** Token-to-fail ratio over 30d. High performer = high spend + high CI pass rate. Management decision = high spend + low CI pass rate.
+
+**Interface contracts:** See SuperSpec v1 `DOCS/forge/The_Forge_SuperSpec_v1.md` — CI Outcome Correlator section.
+
+**Dependencies:** §W1 (token sessions required for correlation)
+
+**Status:** Not started
+
+---
+
+### §W3 — Failure Signal Engine + Alert Engine
+
+**What it is:** Derives management-layer signals from correlated data and routes them to an alert log. Loop detection, churn correlation, bug introduction rate, spend threshold alerts, stalled project detection.
+
+**Failure Signal owns:** Token-to-failed-run ratio, loop detection (high-token sessions on same files without commit), code churn correlation (commits substantially reverted within 2–3 pushes), bug introduction rate (issues tagged as bugs traced to authoring commit).
+
+**Alert Engine owns:** Spend threshold evaluation (per-engineer and workspace), runaway session detection, stalled project detection, spec drift alerts (if spec is loaded), alert log.
+
+**Dependencies:** §W2 (correlated data required)
+
+**Status:** Not started
+
+---
+
+### §W4 — Watch Mode Dashboard UI Shell
+
+**What it is:** The management dashboard — screens for per-engineer spend overview, git activity, CI correlation signals, project health summaries, and alert log. All data display, no business logic.
+
+**Scope (v1):** Engineer roster view with spend + CI pass rate, per-engineer drill-down, project health table (stall detection, velocity trending), alert log. Read-only — no action buttons beyond dismissing alerts.
+
+**Architecture:** New `lib/features/watch/` directory · `WatchDashboardScreen` · `EngineerDetailScreen` · `ProjectHealthScreen` · `AlertLogScreen` · all read from Watch Mode providers (Riverpod) · charts via `fl_chart`
+
+**Demo mode:** If no real team configured, show the 4 synthetic profiles automatically. Identical code path — DemoData implements same interface contracts as live data.
+
+**Dependencies:** §W3 (signals and alerts), §W1/§W2 data providers
+
+**Status:** Not started
+
+---
+
+### §W5 — SwarmSpace Briefing + Decision Simulation
+
+**What it is:** Weekly intelligence synthesis via SwarmSpace MCP, and a 50-iteration Monte Carlo decision simulation for management decisions. Both call SwarmSpace's Cloudflare Workers endpoint via direct HTTP.
+
+**Briefing owns:** Assembles Watch Mode data package (token trends, git signals, CI outcomes, alert summary), calls SwarmSpace `deep_research`, renders plain-language weekly narrative.
+
+**Decision Simulation owns:** Decision framing interface (what is the decision? what's the context?), attaches engineering telemetry from Watch Mode, calls SwarmSpace `deep_research` with 50-iteration simulation prompt, renders recommended path + confidence score + regret risk + time-horizon projections.
+
+**SwarmSpace endpoint:** `https://swarmspace-mcp-server.orbitalai.workers.dev/mcp` (live, no additional infrastructure)
+
+**Note on naming:** The Plan Mode variant generator (t=0.2/0.6/1.0) is also called "Monte Carlo" by method. Backlog Appendation item 002 addresses this naming conflict — resolve when both are live in the same surface.
+
+**Dependencies:** §W4 (dashboard data layer), SwarmSpace MCP endpoint (already live)
+
+**Status:** Not started
+
+---
+
+### §W6 — Spec Compliance Monitor + Drift Detector
+
+**What it is:** Evaluates incoming commits against the locked spec component map. Requires a locked spec (from Plan Mode or Reverse Mode) to activate. Surfaces out-of-scope file changes, component boundary violations, and cumulative drift score per repository.
+
+**Spec Compliance Monitor owns:** Commit-to-component-map evaluation, out-of-scope file detection, boundary violation detection, drift score (0–100, cumulative per repo).
+
+**Drift Detector owns:** Trend analysis on drift score over time, threshold-based alerting (wired into Alert Engine), visual drift timeline in dashboard.
+
+**Interface contract:** See SuperSpec v1 `DOCS/forge/The_Forge_SuperSpec_v1.md` — Spec Compliance Monitor section.
+
+**Dependencies:** §W3 (alert routing), §W4 (display), a locked spec (from §6 Plan Mode or §R2 Reverse Mode)
+
+**Status:** Not started — this is Configuration C's unlock (Qualcomm pilot use case)
+
+---
+
+## Reverse Mode — gated on Watch Mode §W1-§W4
+
+### §R1 — Codebase Ingestion Engine
+
+**What it is:** Reads a repository and extracts component structure, interface contracts as implemented, infrastructure choices, and dependency patterns. Identifies gaps — what cannot be determined from code alone — for the Reverse Interview to fill.
+
+**Owns:** Repository read (local filesystem), component structure extraction, interface contract inference from implementation, infrastructure pattern detection, dependency mapping, gap identification.
+
+**Output:** Structured ingestion summary → input to §R2 Reverse Interview Engine.
+
+**Dependencies:** §12 Document Ingestion (Audit Mode doc ingestion shares the same extraction pattern — R1 extends it for whole-repo analysis)
+
+**Status:** Not started
+
+---
+
+### §R2 — Reverse Interview Engine + As-Built Spec Generator
+
+**What it is:** Takes the codebase ingestion summary and runs a targeted interview to fill gaps. Produces an as-built spec in the identical format as a Plan Mode spec — Watch Mode can immediately use it as a reference document.
+
+**Owns:** Targeted question generation from ingestion gaps (only questions about what code doesn't answer), as-built spec production in v1.1 locked spec format, decision rationale capture.
+
+**Key design constraint:** As-built specs are thinner on "alternatives considered" and "drawbacks accepted" sections — code shows what was chosen, not what was rejected. This is documented in the spec's Accepted Decisions table and is expected.
+
+**Output:** `{ProjectName}_LockedSpec_v1_AsBuilt.md` in standard locked spec format. Fully compatible with §W6 Spec Compliance Monitor.
+
+**Configuration C entry point (Qualcomm pilot):** Run §R1+§R2 on existing repos → activate §W6 compliance monitoring against the as-built specs. Full drift detection without any prior Forge usage.
+
+**Dependencies:** §R1 (ingestion required), §6 (spec writing engine shared with Plan Mode)
+
+**Status:** Not started
 
 ---
 

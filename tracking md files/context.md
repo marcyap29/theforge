@@ -4,6 +4,39 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-06-03 — Platform merge: Vigilint absorbed; SuperSpec v1 filed; Watch + Reverse Mode backlog added
+
+### What was done
+- **Product merger decision:** Vigilint retired as standalone product name. Its capabilities become Watch Mode within The Forge. Brand rationale in `audit/The_Forge_AuditLog.md` entry 002.
+- **SuperSpec filed:** `DOCS/forge/The_Forge_SuperSpec_v1.md` — defines the merged three-mode platform (Plan / Watch / Reverse), 19 modules, 4 activation configurations (A=Plan only, B=Watch only, C=Watch+Reverse, D=Full)
+- **Backlog appendation filed:** `DOCS/forge/The_Forge_SuperSpec_Backlog_v1.md` — two backlog items: first-party decision simulation engine (long-term moat), Monte Carlo naming disambiguation
+- **Audit log created:** `audit/The_Forge_AuditLog.md` — entry 002 documents merger decision and the open platform flag
+- **Backlog updated:** Critical path now shows Plan Mode → Watch Mode (§W1–§W6) → Reverse Mode (§R1–§R2) → Qualcomm pilot gate; all 8 new phase specs added
+- **Handoff created:** `DOCS/forge/The_Forge_BulletHandoff_v1_PlatformMerge.md` — ready for DeepSeek Flash (next: §6 Spec Generation)
+
+### What does NOT change
+- §1–§5 codebase is unchanged. `dart analyze lib/` passing. The existing Interview Engine, LLM Provider Layer, Settings, and Project screens are Plan Mode and continue as-is.
+- Next coding work remains §6 Spec Generation — unchanged from before the merge.
+
+### Open flag — resolve before Watch Mode build
+SuperSpec draft said Watch/Reverse = web-based. The Forge = Flutter macOS. Recommended: Flutter desktop for all three modes. **Must be confirmed before §W1 starts.** See audit log entry 002.
+
+### Next
+1. Resolve the Flutter-vs-web platform flag (user decision)
+2. §6 — Spec Generation + Artifact Writing (Plan Mode critical path continues)
+3. §7 — Artifact Viewers
+4. After §6+§7+§8+§9 complete → first end-to-end Plan Mode run → gate opens for Watch Mode
+
+### Modified
+- `DOCS/forge/The_Forge_SuperSpec_v1.md` — new
+- `DOCS/forge/The_Forge_SuperSpec_Backlog_v1.md` — new
+- `DOCS/forge/The_Forge_BulletHandoff_v1_PlatformMerge.md` — new
+- `audit/The_Forge_AuditLog.md` — new (entry 002)
+- `tracking md files/backlog.md` — critical path updated, §W1–§W6 and §R1–§R2 added
+- `tracking md files/context.md` — this entry
+
+---
+
 ## Session: 2026-06-02 — §5 Extension: Dual Interview Mode UI (Build + Audit) (worktree wt/llm-provider-layer)
 
 ### What was done
