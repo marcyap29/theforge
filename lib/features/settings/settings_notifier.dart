@@ -1,6 +1,10 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/llm/llm_model_config.dart';
@@ -42,11 +46,40 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
   static const _prefsKeyRoleProvider = 'forge_role_provider_';
   static const _prefsKeyRoleModel = 'forge_role_model_';
   static const _keychainKeyPrefix = 'forge_api_key_';
+  static const _configFileName = 'forge_config.json';
+
+  // ── Config file helpers ───────────────────────────────────────────────────
+
+  static Future<File> _configFile() async {
+    final dir = await getApplicationSupportDirectory();
+    return File(p.join(dir.path, _configFileName));
+  }
+
+  static Future<Map<String, dynamic>> _readConfigFile() async {
+    try {
+      final file = await _configFile();
+      if (!file.existsSync()) return {};
+      return jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<void> _writeConfigFile(Map<String, dynamic> data) async {
+    try {
+      final file = await _configFile();
+      await file.writeAsString(const JsonEncoder.withIndent('  ').convert(data));
+    } catch (_) {}
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Future<LlmSettingsState> build() async {
     final prefs = await SharedPreferences.getInstance();
-    const storage = FlutterSecureStorage();
+    final config = await _readConfigFile();
+    final savedKeys =
+        (config['api_keys'] as Map<String, dynamic>? ?? {});
 
     final baseUrl =
         prefs.getString(_prefsKeyBaseUrl) ?? 'http://localhost:11434';
@@ -65,21 +98,42 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
               orElse: () => LlmProviderType.gemini,
             );
       final modelId = savedModelId ??
-          (isFirstRun ? 'gemini-3.5-flash-preview' : '');
+          (isFirstRun ? 'gemini-3.5-flash' : '');
       assignments[role] = ModelAssignment(
         providerType: providerType,
         modelId: modelId,
       );
     }
 
+    // Load API keys: config file is authoritative, SharedPreferences is fallback
     final apiKeys = <LlmProviderType, String?>{};
+    final migratedKeys = <String, dynamic>{};
+    bool needsMigration = false;
+
     for (final type in LlmProviderType.values) {
       if (type == LlmProviderType.ollama) {
         apiKeys[type] = null;
       } else {
-        apiKeys[type] =
-            await storage.read(key: '$_keychainKeyPrefix${type.name}');
+        final fromFile = savedKeys[type.name] as String?;
+        final fromPrefs = prefs.getString('$_keychainKeyPrefix${type.name}');
+        final resolved =
+            (fromFile?.isNotEmpty == true) ? fromFile : fromPrefs;
+        apiKeys[type] = resolved;
+
+        // Migrate key found only in prefs to config file
+        if (fromFile == null && fromPrefs != null && fromPrefs.isNotEmpty) {
+          migratedKeys[type.name] = fromPrefs;
+          needsMigration = true;
+        } else {
+          migratedKeys[type.name] = fromFile;
+        }
       }
+    }
+
+    if (needsMigration) {
+      final updatedConfig = Map<String, dynamic>.from(config);
+      updatedConfig['api_keys'] = migratedKeys;
+      await _writeConfigFile(updatedConfig);
     }
 
     return LlmSettingsState(
@@ -90,6 +144,8 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
       ),
     );
   }
+
+  // ── Mutators ──────────────────────────────────────────────────────────────
 
   Future<void> setRoleAssignment(
     LlmRole role,
@@ -137,11 +193,17 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
     if (type == LlmProviderType.ollama) return;
     final trimmed = key.trim();
     if (trimmed.isEmpty) return;
-    const storage = FlutterSecureStorage();
-    await storage.write(
-      key: '$_keychainKeyPrefix${type.name}',
-      value: trimmed,
-    );
+
+    // Write to SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('$_keychainKeyPrefix${type.name}', trimmed);
+
+    // Write to config file (authoritative on next launch)
+    final config = await _readConfigFile();
+    final keys = Map<String, dynamic>.from(
+        config['api_keys'] as Map<String, dynamic>? ?? {});
+    keys[type.name] = trimmed;
+    await _writeConfigFile({...config, 'api_keys': keys});
 
     final current = state.valueOrNull;
     if (current == null) return;
@@ -158,8 +220,16 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
 
   Future<void> clearApiKey(LlmProviderType type) async {
     if (type == LlmProviderType.ollama) return;
-    const storage = FlutterSecureStorage();
-    await storage.delete(key: '$_keychainKeyPrefix${type.name}');
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('$_keychainKeyPrefix${type.name}');
+
+    // Remove from config file
+    final config = await _readConfigFile();
+    final keys = Map<String, dynamic>.from(
+        config['api_keys'] as Map<String, dynamic>? ?? {});
+    keys.remove(type.name);
+    await _writeConfigFile({...config, 'api_keys': keys});
 
     final current = state.valueOrNull;
     if (current == null) return;
@@ -189,7 +259,7 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
       case LlmProviderType.gemini:
         if (key == null || key.isEmpty) return 'No API key configured.';
         provider = GeminiProvider(apiKey: key);
-        modelId = 'gemini-2.0-flash';
+        modelId = 'gemini-3.5-flash';
       case LlmProviderType.claude:
         if (key == null || key.isEmpty) return 'No API key configured.';
         provider = ClaudeProvider(apiKey: key);

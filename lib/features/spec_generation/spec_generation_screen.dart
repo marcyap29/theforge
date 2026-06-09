@@ -145,6 +145,15 @@ class _SpecGenerationScreenState
                             .generate(widget.interviewState),
                     child: const Text('Try Again'),
                   ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () =>
+                        Navigator.of(context).popUntil((r) => r.isFirst),
+                    child: const Text(
+                      'Back to Projects',
+                      style: TextStyle(color: Color(0xFF6B7280)),
+                    ),
+                  ),
                 ],
               ),
           },

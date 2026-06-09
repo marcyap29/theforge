@@ -4,6 +4,27 @@ Append only. Newest entry at top. Do not modify existing entries.
 
 ---
 
+## Entry 004 — §8+§9 complete: Setup Worksheet + Handoff Package + /goal text
+
+**Date:** 2026-06-04
+**Type:** Feature completion
+**Filed by:** DeepSeek V4 Pro (implementing)
+
+**What was done:** §9 Handoff Package JSON + /goal text written as part of spec generation pipeline (no new LLM call). §8 Setup Worksheet generation — new screen, notifier, and prompt builder that reads the spec from disk and calls LLM at t=0.3. Worksheet flips README.md setup worksheet field to Complete.
+
+**Verification:** `dart analyze lib/` — zero issues. `grep -ri firebase lib/` — zero matches.
+
+**Affected files:**
+- `lib/features/spec_generation/spec_generator.dart` — added buildGoalText(), buildHandoffPackage(), helpers
+- `lib/features/spec_generation/spec_notifier.dart` — wired §9 calls + specVersion
+- `lib/features/spec_generation/spec_generation_screen.dart` — "Generate Worksheet →" button
+- `lib/data/filesystem/project_file_repository.dart` — added readLockedSpec()
+- `lib/features/spec_generation/worksheet_generator.dart` — NEW
+- `lib/features/spec_generation/worksheet_notifier.dart` — NEW
+- `lib/features/spec_generation/worksheet_generation_screen.dart` — NEW
+
+**Next:** First end-to-end Plan Mode run → Watch Mode gate opens
+
 ## Entry 003 — §6+§7 complete: SpecParser + Artifact Viewers
 
 **Date:** 2026-06-04

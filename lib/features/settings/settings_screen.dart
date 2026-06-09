@@ -307,8 +307,14 @@ class _ByokCardState extends ConsumerState<_ByokCard> {
   final _controller = TextEditingController();
   bool _obscure = true;
   bool _testing = false;
-  bool? _testPassed;   // null = not tested, true = pass, false = fail
+  bool? _testPassed;
   String _testError = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(() => setState(() {}));
+  }
 
   @override
   void dispose() {

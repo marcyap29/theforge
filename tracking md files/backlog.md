@@ -1,6 +1,6 @@
 # The Forge — Feature Backlog
 
-**Last Updated:** 2026-06-02
+**Last Updated:** 2026-06-09
 
 Long-term feature pool. Active sprint work lives in `planner.md`.
 
@@ -14,12 +14,17 @@ Long-term feature pool. Active sprint work lives in `planner.md`.
   → §3 Project folder browser ✅
   → §4 LLM provider layer (BYOK + SwarmSpace) ✅
   → §5 Build Interview UI (Stage 1A) ✅
-  → §6 Spec generation + artifact writing (Stage 2)
-  → §7 Artifact viewers
-  → §8 Setup Worksheet generation (Stage 3)
-  → §9 Handoff Package + Bullet Handoff (Stage 4)
+  → §6 Spec generation + artifact writing (Stage 2) ✅
+  → §7 Artifact viewers ✅
+  → §8 Setup Worksheet generation (Stage 3) ✅
+  → §9 Handoff Package + Bullet Handoff (Stage 4) ✅
   → §10 Settings screen ✅
-  → First end-to-end Plan Mode run (gate for Watch + Reverse work)
+  → §MCP Forge MCP Server (TypeScript — parallel to end-to-end run) ✅
+  → §9.5 Flutter 5-file system amendment + UX polish ✅
+  → §DOC Reference Doc Ingestion Engine (text-only v1) ✅ (on worktree, pending merge)
+  → First end-to-end Plan Mode run ✅ (2026-06-05 — Testapp)
+       ↓
+  → §EX1 Executor Timeline (parse spec §3 Component Map → LLM-narrated build sequence)
        ↓
   → §W1 Watch Mode: Token Ingestion Engine
   → §W2 Watch Mode: Git Activity Engine + CI Outcome Correlator
@@ -61,6 +66,39 @@ Every §N that brings The Forge closer to a working interview-to-spec run unbloc
 ---
 
 ## High Priority
+
+### §EX1 — Executor Timeline (Project-Specific Build Sequence)
+
+**What it is:** When `phase == v1_worksheet_complete`, parse the locked spec's `§3 Component Map` table and call the LLM once to generate a narrated build sequence — one milestone per component, ordered by dependency. Displayed in `ProjectDetailScreen` below the phase timeline under a new "BUILD SEQUENCE" section. Each step has a label, a one-line description, and a status (pending).
+
+**Why it matters:** The generic "Ready for executor" state gives no guidance on what to build first. A spec-derived timeline makes the hand-off actionable and is unique per project — no two projects have the same sequence.
+
+**Architecture:**
+- `spec_generator.dart` — `parseComponentNames()` already exists; add `buildExecutorTimelinePrompt(projectName, specContent)`
+- New `executor_timeline_notifier.dart` — `ExecutorTimelineNotifier(AutoDisposeNotifier)` with `generate(projectPath, projectName, specVersion)` 
+- New `executor_timeline_screen.dart` (or inline widget in ProjectDetailScreen) — idle/generating/done states
+- `ProjectDetailScreen` — add "Build Sequence" section visible only when `phase == v1_worksheet_complete`
+- Store result in `handoffs/{ProjectName}_BuildSequence_v1.md` so it persists across sessions
+
+**Dependencies:** §9.5 ✅ (spec is locked and parseable)
+
+**Status:** Not started — next up after this commit
+
+---
+
+### §PERSIST — Interview State Persistence (Survive Spec Gen Failure)
+
+**What it is:** If spec generation fails and the user presses "Back to Projects", the interview state (`AutoDisposeNotifier`) is disposed and all responses are lost. Persist the raw interview turns to disk (JSON in `audit/`) at each phase completion so they can be reloaded.
+
+**Why it matters:** Users lose 15–30 minutes of interview work if spec generation fails. This is the most painful UX failure in the current flow.
+
+**Architecture:** Write `{ProjectName}_InterviewState_v1.json` to the `audit/` folder at the end of the interview (before navigating to spec gen). If spec gen screen is mounted and interview state is already disposed (user returned from error), read from disk.
+
+**Dependencies:** §9.5 ✅
+
+**Status:** Not started — Medium priority (workaround: redo interview; spec gen rarely fails once API key is correct)
+
+---
 
 ### §1 — Flutter Bootstrap + Local Data Layer
 
@@ -627,6 +665,9 @@ Output: {
 
 ### §9 — Handoff Package + Bullet Handoff + /goal text (Stage 4)
 ✅ Complete 2026-06-04 — `buildGoalText()`, `buildHandoffPackage()`, `_extractSection()`, `_countTableRows()`, `_countListItems()` added to `spec_generator.dart`; wired into `spec_notifier.dart` pipeline after `writeLockedSpec()`; `specVersion` added to `SpecGenState`; `dart analyze lib/` zero issues
+
+### §DOC — Reference Doc Ingestion Engine (v1)
+✅ Complete 2026-06-09 (worktree wt/reference-doc-ingestion, pending merge) — text-only ingestion for .md/.txt files; LLM extracts definitions/equations/constraints; cached to `ingested/reference_context.md` on disk; injected into both interview and spec prompts; 4 new files in `lib/features/projects/ingestion/`; macOS entitlements updated; `dart analyze lib/` zero issues
 
 ---
 

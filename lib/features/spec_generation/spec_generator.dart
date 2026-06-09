@@ -206,6 +206,48 @@ Do not stop because the work is hard. Stop only when genuinely blocked.
 ''';
 }
 
+List<String> parseComponentNames(String specContent) {
+  final section = _extractSection(specContent, '## 3. Component Map');
+  if (section == null) return [];
+  return section
+      .split('\n')
+      .where((l) => l.startsWith('|') && !RegExp(r'^\|[-| ]+\|$').hasMatch(l.trim()))
+      .skip(1)
+      .map((l) {
+        final cols = l.split('|');
+        return cols.length > 1 ? cols[1].trim() : '';
+      })
+      .where((s) => s.isNotEmpty)
+      .toList();
+}
+
+Map<String, String> buildContextFiles(String projectName, String specVersion) {
+  return {
+    'file1': '${projectName}_LockedSpec_$specVersion.md',
+    'file2': '${projectName}_DecisionContext_$specVersion.md',
+    'file3': '${projectName}_ActiveState_$specVersion.md',
+    'file4': '${projectName}_HandoffTrail_$specVersion.md',
+    'file5': '${projectName}_OpenFlags_$specVersion.md',
+  };
+}
+
+String buildDecisionContext(String projectName, String specVersion, String specContent) {
+  final section = _extractSection(specContent, '## 8. Accepted Decisions') ?? '(none)';
+  return '# $projectName — Decision Context $specVersion\n\n'
+      '## Accepted Decisions\n$section\n';
+}
+
+String buildOpenFlags(String projectName, String specVersion, String specContent) {
+  final openFlagsSection = _extractSection(specContent, '## 9. Open Flags') ?? '(none)';
+  final outOfScopeSection =
+      _extractSection(specContent, '## 7. Explicit Out-of-Scope List') ?? '(none)';
+  final v2Section = _extractSection(specContent, '## 10. v2 Architecture Notes') ?? '(none)';
+  return '# $projectName — Open Flags $specVersion\n\n'
+      '## Open Flags\n$openFlagsSection\n\n'
+      '## Explicit Out-of-Scope\n$outOfScopeSection\n\n'
+      '## V2 Architecture Seeds\n$v2Section\n';
+}
+
 Map<String, dynamic> buildHandoffPackage(
     InterviewState state, String specVersion, String specContent) {
   final isBuild = state.dimensions == buildDimensions;
@@ -219,6 +261,7 @@ Map<String, dynamic> buildHandoffPackage(
     return {
       'interviewMode': 'build',
       'specVersion': specVersion,
+      'projectName': state.projectName,
       'appName': state.projectName,
       'lockedAt': now,
       'goalStatement': goalStatement.trim(),
@@ -226,6 +269,8 @@ Map<String, dynamic> buildHandoffPackage(
       'outOfScopeItems':
           _countListItems(specContent, '## 7. Explicit Out-of-Scope List'),
       'setupWorksheetComplete': false,
+      'components': parseComponentNames(specContent),
+      'contextFiles': buildContextFiles(state.projectName, specVersion),
       'v2SeedItems': <String>[],
     };
   } else {

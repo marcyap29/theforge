@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
+import '../../../core/app.dart';
 import '../../../data/filesystem/project_file_repository.dart';
 import '../../../data/local_db/forge_database.dart';
 import '../../artifacts/artifact_viewer_screen.dart';
 import '../../interview/providers/interview_providers.dart';
+import '../../spec_generation/worksheet_generation_screen.dart';
 import '../providers/providers.dart';
 
 class ProjectDetailScreen extends ConsumerWidget {
@@ -17,20 +19,24 @@ class ProjectDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Watch project list to get live phase/specVersion after generation
+    final projects = ref.watch(projectListProvider).valueOrNull ?? [];
+    final live = projects.firstWhere(
+      (p) => p.id == project.id,
+      orElse: () => project,
+    );
+
     final active = ref.watch(activeProjectProvider);
-    final isBuild = project.mode == 'build';
-    final modeLabel = isBuild ? 'BUILD INTERVIEW' : 'AUDIT INTERVIEW';
-    final modeColor = isBuild
-        ? const Color(0xFFE8A04C)
-        : const Color(0xFF94A3B8);
-    final modeBackground = isBuild
-        ? const Color(0x33E8A04C)
-        : const Color(0x3364748B);
-    final ctaLabel = isBuild ? 'Start Build Interview' : 'Start Audit Interview';
+    final isBuild = live.mode == 'build';
+    final sv = live.specVersion ?? 'v1';
+    final mode = ProjectMode.values.firstWhere(
+      (m) => m.name == live.mode,
+      orElse: () => ProjectMode.build,
+    );
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(project.name),
+        title: Text(live.name),
         actions: [
           IconButton(
             icon: const Icon(Icons.close),
@@ -42,85 +48,599 @@ class ProjectDetailScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: modeBackground,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              modeLabel,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.6,
-                fontFamily: 'Menlo',
-                color: modeColor,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Phase: ${project.phase}',
-            style: const TextStyle(
-              fontSize: 12,
-              fontFamily: 'Menlo',
-              color: Color(0xFF9CA3AF),
-            ),
-          ),
-          const SizedBox(height: 24),
-          const _SectionHeader('Project State'),
-          if (active.isLoading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else
-            _ReadmeContent(raw: active.readmeContent),
-          const SizedBox(height: 24),
-          const _SectionHeader('Interview'),
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: FilledButton(
-              onPressed: () {
-                final mode = ProjectMode.values.firstWhere(
-                  (m) => m.name == project.mode,
-                  orElse: () => ProjectMode.build,
-                );
-                Navigator.of(context).pushNamed(
-                  '/interview',
-                  arguments: InterviewArgs(
-                    path: project.path,
-                    name: project.name,
-                    mode: mode,
+          _FilesSidebar(projectPath: live.path),
+          Container(width: 1, color: const Color(0xFF2C2C2E)),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+              children: [
+                // Mode badge
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isBuild
+                        ? const Color(0x33E8A04C)
+                        : const Color(0x3364748B),
+                    borderRadius: BorderRadius.circular(4),
                   ),
-                );
-              },
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFE8A04C),
-                foregroundColor: const Color(0xFF0F0F10),
-              ),
-              child: Text(
-                ctaLabel,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'Menlo',
+                  child: Text(
+                    isBuild ? 'BUILD INTERVIEW' : 'AUDIT INTERVIEW',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.6,
+                      fontFamily: 'Menlo',
+                      color: isBuild
+                          ? const Color(0xFFE8A04C)
+                          : const Color(0xFF94A3B8),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 16),
+                // Phase timeline
+                _PhaseTimeline(project: live),
+                const SizedBox(height: 24),
+                const _SectionHeader('Project State'),
+                if (active.isLoading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else
+                  _ReadmeContent(raw: active.readmeContent),
+                const SizedBox(height: 24),
+                // Phase-aware CTA
+                _SectionHeader(_ctaSectionLabel(live.phase)),
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: _buildCta(context, live, mode, sv),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 24),
-          const _SectionHeader('Artifacts'),
-          _ArtifactsList(projectPath: project.path),
+        ],
+      ),
+    );
+  }
+
+  String _ctaSectionLabel(String phase) => switch (phase) {
+        'v1_spec_locked' => 'NEXT STEP',
+        'v1_worksheet_complete' => 'STATUS',
+        _ => 'INTERVIEW',
+      };
+
+  Widget _buildCta(
+      BuildContext context, Project live, ProjectMode mode, String sv) {
+    return switch (live.phase) {
+      'v1_spec_locked' => FilledButton(
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => WorksheetGenerationScreen(
+              projectPath: live.path,
+              projectName: live.name,
+              specVersion: sv,
+            ),
+          )),
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFFE8A04C),
+            foregroundColor: const Color(0xFF0F0F10),
+          ),
+          child: const Text(
+            'Generate Setup Worksheet →',
+            style: TextStyle(
+                fontWeight: FontWeight.w600, fontFamily: 'Menlo'),
+          ),
+        ),
+      'v1_worksheet_complete' => Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F0F10),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFF22C55E)),
+          ),
+          child: const Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.check_circle,
+                    color: Color(0xFF22C55E), size: 14),
+                SizedBox(width: 8),
+                Text(
+                  'Ready for executor',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Menlo',
+                    color: Color(0xFF22C55E),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      _ => FilledButton(
+          onPressed: () => Navigator.of(context).pushNamed(
+            '/interview',
+            arguments: InterviewArgs(
+              path: live.path,
+              name: live.name,
+              mode: mode,
+            ),
+          ),
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFFE8A04C),
+            foregroundColor: const Color(0xFF0F0F10),
+          ),
+          child: Text(
+            mode == ProjectMode.build
+                ? 'Start Build Interview'
+                : 'Start Audit Interview',
+            style: const TextStyle(
+                fontWeight: FontWeight.w600, fontFamily: 'Menlo'),
+          ),
+        ),
+    };
+  }
+}
+
+// ── Phase Timeline ────────────────────────────────────────────────────────────
+
+class _PhaseTimeline extends StatefulWidget {
+  const _PhaseTimeline({required this.project});
+  final Project project;
+
+  @override
+  State<_PhaseTimeline> createState() => _PhaseTimelineState();
+}
+
+class _PhaseTimelineState extends State<_PhaseTimeline>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pulseCtrl;
+  late Animation<double> _pulseOpacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _pulseOpacity = Tween(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseCtrl.dispose();
+    super.dispose();
+  }
+
+  void _openArtifact(
+      BuildContext context, String folder, String filename, ArtifactViewMode mode) {
+    final file =
+        File(p.join(widget.project.path, folder, filename));
+    if (!file.existsSync()) return;
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ArtifactViewerScreen(
+        args: ArtifactViewArgs(
+          projectPath: widget.project.path,
+          projectName: widget.project.name,
+          filename: filename,
+          mode: mode,
+        ),
+      ),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pj = widget.project;
+    final sv = pj.specVersion ?? 'v1';
+    final mode = ProjectMode.values.firstWhere(
+      (m) => m.name == pj.mode,
+      orElse: () => ProjectMode.build,
+    );
+
+    final interviewDone = pj.phase != 'v1_interview';
+    final worksheetDone = pj.phase == 'v1_worksheet_complete';
+    final worksheetCurrent = pj.phase == 'v1_spec_locked';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          // Step 1: Interview → opens locked spec when done
+          _TimelineStep(
+            label: 'Interview',
+            isDone: interviewDone,
+            isCurrent: !interviewDone,
+            pulseOpacity: _pulseOpacity,
+            onTap: interviewDone
+                ? () => _openArtifact(
+                    context,
+                    'specs',
+                    '${pj.name}_LockedSpec_$sv.md',
+                    ArtifactViewMode.spec)
+                : () => Navigator.of(context).pushNamed(
+                      '/interview',
+                      arguments: InterviewArgs(
+                        path: pj.path,
+                        name: pj.name,
+                        mode: mode,
+                      ),
+                    ),
+          ),
+          Expanded(child: _TimelineConnector(done: interviewDone)),
+          // Step 2: Worksheet → opens worksheet when done, generates when current
+          _TimelineStep(
+            label: 'Worksheet',
+            isDone: worksheetDone,
+            isCurrent: worksheetCurrent,
+            pulseOpacity: _pulseOpacity,
+            onTap: worksheetDone
+                ? () => _openArtifact(
+                    context,
+                    'worksheets',
+                    '${pj.name}_SetupWorksheet_$sv.md',
+                    ArtifactViewMode.worksheet)
+                : worksheetCurrent
+                    ? () => Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => WorksheetGenerationScreen(
+                            projectPath: pj.path,
+                            projectName: pj.name,
+                            specVersion: sv,
+                          ),
+                        ))
+                    : null,
+          ),
+          Expanded(child: _TimelineConnector(done: worksheetDone)),
+          // Step 3: Ready → opens bullet handoff when done
+          _TimelineStep(
+            label: 'Ready',
+            isDone: worksheetDone,
+            isCurrent: false,
+            pulseOpacity: _pulseOpacity,
+            onTap: worksheetDone
+                ? () => _openArtifact(
+                    context,
+                    'handoffs',
+                    '${pj.name}_BulletHandoff_${sv}_Interview.md',
+                    ArtifactViewMode.handoff)
+                : null,
+          ),
         ],
       ),
     );
   }
 }
+
+class _TimelineConnector extends StatelessWidget {
+  const _TimelineConnector({required this.done});
+  final bool done;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 10, bottom: 19),
+      child: Container(
+        height: 1.5,
+        color: done ? const Color(0xFF22C55E) : const Color(0xFF2C2C2E),
+      ),
+    );
+  }
+}
+
+class _TimelineStep extends StatelessWidget {
+  const _TimelineStep({
+    required this.label,
+    required this.isDone,
+    required this.isCurrent,
+    required this.pulseOpacity,
+    this.onTap,
+  });
+
+  final String label;
+  final bool isDone;
+  final bool isCurrent;
+  final Animation<double> pulseOpacity;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget dot;
+    Color labelColor;
+
+    if (isDone) {
+      dot = const Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 20);
+      labelColor = const Color(0xFF22C55E);
+    } else if (isCurrent) {
+      dot = FadeTransition(
+        opacity: pulseOpacity,
+        child: Container(
+          width: 20,
+          height: 20,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: Color(0xFFE8A04C),
+          ),
+          child: const Center(
+            child: Icon(Icons.circle, color: Color(0xFF0F0F10), size: 8),
+          ),
+        ),
+      );
+      labelColor = const Color(0xFFE8A04C);
+    } else {
+      dot = Container(
+        width: 20,
+        height: 20,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFF3D4452), width: 1.5),
+        ),
+      );
+      labelColor = const Color(0xFF4B5563);
+    }
+
+    final col = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        dot,
+        const SizedBox(height: 5),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontFamily: 'Menlo',
+            letterSpacing: 0.4,
+            fontWeight:
+                isCurrent ? FontWeight.w700 : FontWeight.w500,
+            color: labelColor,
+          ),
+        ),
+      ],
+    );
+
+    if (onTap == null) return col;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(onTap: onTap, child: col),
+    );
+  }
+}
+
+// ── Sidebar ──────────────────────────────────────────────────────────────────
+
+typedef _FolderDef = ({String id, String label, IconData icon});
+
+const _folders = <_FolderDef>[
+  (id: 'forge', label: 'FORGE', icon: Icons.lock_outline),
+  (id: 'specs', label: 'SPECS', icon: Icons.description_outlined),
+  (id: 'handoffs', label: 'HANDOFFS', icon: Icons.send_outlined),
+  (id: 'worksheets', label: 'WORKSHEETS', icon: Icons.checklist_outlined),
+  (id: 'audit', label: 'AUDIT', icon: Icons.history_outlined),
+];
+
+ArtifactViewMode _modeForFolder(String folder) => switch (folder) {
+      'forge' => ArtifactViewMode.forge,
+      'specs' => ArtifactViewMode.spec,
+      'handoffs' => ArtifactViewMode.handoff,
+      'worksheets' => ArtifactViewMode.worksheet,
+      _ => ArtifactViewMode.audit,
+    };
+
+class _FilesSidebar extends StatefulWidget {
+  const _FilesSidebar({required this.projectPath});
+  final String projectPath;
+
+  @override
+  State<_FilesSidebar> createState() => _FilesSidebarState();
+}
+
+class _FilesSidebarState extends State<_FilesSidebar> with RouteAware {
+  String? _selected;
+  Future<Map<String, List<String>>>? _scanFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _scanFuture = _scan();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null) {
+      routeObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    // A sub-route was popped — rescan so newly generated files appear
+    setState(() => _scanFuture = _scan());
+  }
+
+  void _open(BuildContext context, String folder, String filename) {
+    setState(() => _selected = '$folder/$filename');
+    final projectName = p.basename(widget.projectPath);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ArtifactViewerScreen(
+          args: ArtifactViewArgs(
+            projectPath: widget.projectPath,
+            projectName: projectName,
+            filename: filename,
+            mode: _modeForFolder(folder),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<Map<String, List<String>>> _scan() async {
+    final result = <String, List<String>>{};
+    for (final f in _folders) {
+      final dir = Directory(p.join(widget.projectPath, f.id));
+      if (!dir.existsSync()) continue;
+      final files = dir
+          .listSync()
+          .whereType<File>()
+          .map((e) => p.basename(e.path))
+          .toList()
+        ..sort();
+      if (files.isNotEmpty) result[f.id] = files;
+    }
+    return result;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 220,
+      child: Container(
+        color: const Color(0xFF141414),
+        child: FutureBuilder<Map<String, List<String>>>(
+          future: _scanFuture,
+          builder: (context, snapshot) {
+            final files = snapshot.data ?? {};
+            final hasAny = files.values.any((l) => l.isNotEmpty);
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(12, 14, 12, 6),
+                  child: Text(
+                    'FILES',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
+                      fontFamily: 'Menlo',
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: !hasAny
+                      ? const Padding(
+                          padding: EdgeInsets.fromLTRB(12, 8, 12, 0),
+                          child: Text(
+                            'No files yet.\nComplete the interview to generate them.',
+                            style: TextStyle(
+                              fontFamily: 'Menlo',
+                              fontSize: 11,
+                              height: 1.5,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                        )
+                      : ListView(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          children: [
+                            for (final folder in _folders) ...[
+                              if (files[folder.id]?.isNotEmpty == true) ...[
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                                  child: Row(
+                                    children: [
+                                      Icon(folder.icon,
+                                          size: 11,
+                                          color: const Color(0xFF6B7280)),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        folder.label,
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                          letterSpacing: 0.6,
+                                          fontFamily: 'Menlo',
+                                          color: Color(0xFF6B7280),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                for (final filename in files[folder.id]!)
+                                  _FileRow(
+                                    filename: filename,
+                                    selected: _selected ==
+                                        '${folder.id}/$filename',
+                                    onTap: () =>
+                                        _open(context, folder.id, filename),
+                                  ),
+                              ],
+                            ],
+                          ],
+                        ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _FileRow extends StatelessWidget {
+  const _FileRow({
+    required this.filename,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String filename;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(24, 5, 12, 5),
+          decoration: BoxDecoration(
+            color: selected ? const Color(0x1AE8A04C) : Colors.transparent,
+            border: selected
+                ? const Border(
+                    left: BorderSide(color: Color(0xFFE8A04C), width: 2),
+                  )
+                : null,
+          ),
+          child: Text(
+            filename,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: 'Menlo',
+              fontSize: 11,
+              color: selected
+                  ? const Color(0xFFE8A04C)
+                  : const Color(0xFFD1D5DB),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Shared widgets ────────────────────────────────────────────────────────────
 
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader(this.title);
@@ -160,8 +680,8 @@ class _ReadmeContent extends StatelessWidget {
       );
     }
 
-    final done = _extractSection(raw!, '## What\'s Done');
-    final next = _extractSection(raw!, '## What\'s Next');
+    final done = _extractSection(raw!, "## What's Done");
+    final next = _extractSection(raw!, "## What's Next");
     final flags = _extractSection(raw!, '## Open Flags');
 
     return Container(
@@ -249,158 +769,5 @@ class _ReadmeContent extends StatelessWidget {
     final nextHeaderIdx = content.indexOf('\n## ', afterHeader);
     final endIdx = nextHeaderIdx < 0 ? content.length : nextHeaderIdx;
     return content.substring(afterHeader, endIdx).trim();
-  }
-}
-
-class _ArtifactsList extends StatelessWidget {
-  const _ArtifactsList({required this.projectPath});
-  final String projectPath;
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<_ArtifactsSnapshot>(
-      future: _scan(projectPath),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Center(
-              child: SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-          );
-        }
-        final data = snapshot.data!;
-        if (data.isEmpty) {
-          return const Text(
-            '(No artifacts yet — complete the interview to generate them)',
-            style: TextStyle(
-              fontFamily: 'Menlo',
-              fontSize: 12,
-              color: Color(0xFF6B7280),
-            ),
-          );
-        }
-        return Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFF0F0F10),
-            border: Border.all(color: const Color(0xFF2C2C2E)),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Column(
-            children: [
-              for (var i = 0; i < data.entries.length; i++) ...[
-                _ArtifactRow(
-                  entry: data.entries[i],
-                  onTap: () => _onArtifactTap(context, data.entries[i]),
-                ),
-                if (i < data.entries.length - 1)
-                  const Divider(height: 1, color: Color(0xFF2C2C2E)),
-              ],
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _onArtifactTap(BuildContext context, _ArtifactEntry entry) {
-    final mode = switch (entry.folder) {
-      'specs' => ArtifactViewMode.spec,
-      'handoffs' => ArtifactViewMode.handoff,
-      'worksheets' => ArtifactViewMode.worksheet,
-      _ => ArtifactViewMode.audit,
-    };
-    final projectName =
-        p.basename(projectPath);
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ArtifactViewerScreen(
-          args: ArtifactViewArgs(
-            projectPath: projectPath,
-            projectName: projectName,
-            filename: entry.filename,
-            mode: mode,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<_ArtifactsSnapshot> _scan(String projectPath) async {
-    final entries = <_ArtifactEntry>[];
-    for (final folder in const ['specs', 'handoffs', 'worksheets', 'audit']) {
-      final dir = Directory(p.join(projectPath, folder));
-      if (!dir.existsSync()) continue;
-      for (final entity in dir.listSync()) {
-        if (entity is File) {
-          entries.add(_ArtifactEntry(
-            folder: folder,
-            filename: p.basename(entity.path),
-          ));
-        }
-      }
-    }
-    return _ArtifactsSnapshot(entries);
-  }
-}
-
-class _ArtifactsSnapshot {
-  final List<_ArtifactEntry> entries;
-  const _ArtifactsSnapshot(this.entries);
-  bool get isEmpty => entries.isEmpty;
-}
-
-class _ArtifactEntry {
-  final String folder;
-  final String filename;
-  const _ArtifactEntry({required this.folder, required this.filename});
-}
-
-class _ArtifactRow extends StatelessWidget {
-  const _ArtifactRow({required this.entry, this.onTap});
-  final _ArtifactEntry entry;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            const Icon(
-              Icons.description_outlined,
-              size: 14,
-              color: Color(0xFF6B7280),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                entry.filename,
-                style: const TextStyle(
-                  fontFamily: 'Menlo',
-                  fontSize: 12,
-                  color: Color(0xFFE5E5E7),
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            Text(
-              entry.folder,
-              style: const TextStyle(
-                fontFamily: 'Menlo',
-                fontSize: 10,
-                color: Color(0xFF6B7280),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:path/path.dart' as p;
 
-enum ArtifactViewMode { spec, handoff, worksheet, audit }
+enum ArtifactViewMode { forge, spec, handoff, worksheet, audit }
 
 class ArtifactViewArgs {
   final String projectPath;
@@ -27,6 +27,7 @@ class ArtifactViewerScreen extends StatelessWidget {
 
   String get _folder {
     return switch (args.mode) {
+      ArtifactViewMode.forge => 'forge',
       ArtifactViewMode.spec => 'specs',
       ArtifactViewMode.handoff => 'handoffs',
       ArtifactViewMode.worksheet => 'worksheets',
@@ -36,6 +37,7 @@ class ArtifactViewerScreen extends StatelessWidget {
 
   String get _title {
     return switch (args.mode) {
+      ArtifactViewMode.forge => args.filename,
       ArtifactViewMode.spec => 'Spec — ${args.projectName}',
       ArtifactViewMode.handoff => 'Handoff — ${args.projectName}',
       ArtifactViewMode.worksheet => 'Worksheet — ${args.projectName}',

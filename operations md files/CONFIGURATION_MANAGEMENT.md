@@ -1,6 +1,6 @@
 # Configuration Management — The Forge
 
-**Last Updated:** 2026-06-01
+**Last Updated:** 2026-06-05
 **Status:** ✅ Synced
 
 ---
@@ -46,15 +46,56 @@
 | claude_provider.dart | lib/services/llm/providers/ | 2026-06-02 | ✅ Synced |
 | openai_provider.dart | lib/services/llm/providers/ | 2026-06-02 | ✅ Synced |
 | gemini_provider.dart | lib/services/llm/providers/ | 2026-06-02 | ✅ Synced |
-| settings_notifier.dart | lib/features/settings/ | 2026-06-02 | ✅ Synced |
+| settings_notifier.dart | lib/features/settings/ | 2026-06-05 | ✅ Synced |
 | settings_providers.dart | lib/features/settings/ | 2026-06-02 | ✅ Synced |
-| settings_screen.dart | lib/features/settings/ | 2026-06-02 | ✅ Synced |
+| settings_screen.dart | lib/features/settings/ | 2026-06-05 | ✅ Synced |
+| llm_model_config.dart | lib/services/llm/ | 2026-06-05 | ✅ Synced |
+| project_file_repository.dart | lib/data/filesystem/ | 2026-06-05 | ✅ Synced |
+| artifact_viewer_screen.dart | lib/features/artifacts/ | 2026-06-05 | ✅ Synced |
+| project_detail_screen.dart | lib/features/projects/screens/ | 2026-06-05 | ✅ Synced |
+| new_project_screen.dart | lib/features/projects/screens/ | 2026-06-05 | ✅ Synced |
+| spec_generation_screen.dart | lib/features/spec_generation/ | 2026-06-05 | ✅ Synced |
+| spec_generator.dart | lib/features/spec_generation/ | 2026-06-05 | ✅ Synced |
+| spec_notifier.dart | lib/features/spec_generation/ | 2026-06-05 | ✅ Synced |
+| worksheet_notifier.dart | lib/features/spec_generation/ | 2026-06-05 | ✅ Synced |
+| worksheet_generation_screen.dart | lib/features/spec_generation/ | 2026-06-04 | ✅ Synced |
+| app.dart | lib/core/ | 2026-06-05 | ✅ Synced |
+| DebugProfile.entitlements | macos/Runner/ | 2026-06-05 | ✅ Synced |
+| Release.entitlements | macos/Runner/ | 2026-06-05 | ✅ Synced |
+| BUG_PREVENTION.md | bugtracker/ | 2026-06-05 | ✅ Synced |
 
 
 ---
 
 
 ## Change Log
+
+### 2026-06-05 — §9.5 + Plan Mode v1 Complete + UX Polish
+
+**Action:** 5-file system amendment, macOS sandbox fixes, UX polish, first end-to-end test passing. 15 files modified, 0 new code files, 1 new coding lesson.
+
+**Files modified:**
+- `lib/data/filesystem/project_file_repository.dart` — `createProject()` creates `forge/` subdir; `writeForgeFiles()` new method; `writeHandoffPackage()` takes `projectName`; fixed `v$version` → `$version` (was generating `_vv1` filenames)
+- `lib/features/spec_generation/spec_generator.dart` — `parseComponentNames()`, `buildContextFiles()`, `buildDecisionContext()`, `buildOpenFlags()` added; HandoffPackage gains `components` + `contextFiles`
+- `lib/features/spec_generation/spec_notifier.dart` — wired `writeForgeFiles()` + updated `writeHandoffPackage()` call
+- `lib/features/spec_generation/worksheet_notifier.dart` — sets `v1_worksheet_complete` phase in DB; calls `projectListProvider.notifier.refresh()`
+- `lib/features/spec_generation/spec_generation_screen.dart` — "Back to Projects" `TextButton` added to error state
+- `lib/features/settings/settings_notifier.dart` — replaced `flutter_secure_storage` with SharedPreferences + `forge_config.json` dual-write; correct Gemini model IDs; Save button fix (controller listener)
+- `lib/services/llm/llm_model_config.dart` — correct Gemini model IDs (`gemini-3.5-flash`, `gemini-2.5-flash`, `gemini-2.5-pro`); `LlmSettings.defaults` updated
+- `lib/features/artifacts/artifact_viewer_screen.dart` — `ArtifactViewMode.forge` added
+- `lib/features/projects/screens/project_detail_screen.dart` — full rewrite: two-panel layout, interactive `_PhaseTimeline` (3 steps, pulse animation, click-to-resume/artifact), `_FilesSidebar` with `RouteAware` auto-refresh, phase-aware CTA
+- `lib/features/projects/screens/new_project_screen.dart` — API key gate with red warning banner + Settings link
+- `lib/core/app.dart` — `routeObserver` global + registered in `navigatorObservers`
+- `macos/Runner/DebugProfile.entitlements` — removed `keychain-access-groups`
+- `macos/Runner/Release.entitlements` — removed `keychain-access-groups`
+- `macos/Runner.xcodeproj/project.pbxproj` — `CODE_SIGN_STYLE` Manual → Automatic (2 targets)
+
+**Files created:**
+- `DOCS/Coding Lessons/FOR_MARC_macos-sandbox-and-interview-v1-complete.md`
+
+**Tag:** `v1.0-interview-complete`
+
+**Verification:** `dart analyze lib/` → No issues found; Testapp end-to-end run ✅
 
 ### 2026-06-02 — §4 Change: Gemini 3.5 Flash as default provider (worktree wt/llm-provider-layer)
 

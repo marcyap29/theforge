@@ -52,6 +52,15 @@ class SpecNotifier extends AutoDisposeNotifier<SpecGenState> {
       await repo.writeLockedSpec(
           projectPath, projectName, specVersion, specContent);
 
+      await repo.writeForgeFiles(
+        projectPath,
+        projectName,
+        specVersion,
+        lockedSpecContent: specContent,
+        decisionContextContent: buildDecisionContext(projectName, specVersion, specContent),
+        openFlagsContent: buildOpenFlags(projectName, specVersion, specContent),
+      );
+
       final handoffContent =
           buildBulletHandoff(interviewState, specVersion);
       await repo.writeHandoff(
@@ -69,7 +78,7 @@ class SpecNotifier extends AutoDisposeNotifier<SpecGenState> {
 
       final handoffPackage =
           buildHandoffPackage(interviewState, specVersion, specContent);
-      await repo.writeHandoffPackage(projectPath, specVersion, handoffPackage);
+      await repo.writeHandoffPackage(projectPath, projectName, specVersion, handoffPackage);
 
       final settings = ref.read(llmSettingsProvider);
       final providerName = settings

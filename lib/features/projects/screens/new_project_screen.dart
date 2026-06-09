@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/filesystem/project_file_repository.dart';
 import '../../../data/local_db/forge_database.dart';
+import '../../../features/settings/settings_providers.dart';
+import '../../../services/llm/llm_provider.dart';
 import '../providers/providers.dart';
 
 class NewProjectScreen extends ConsumerStatefulWidget {
@@ -84,7 +86,14 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final canCreate = _name.trim().isNotEmpty && !_creating;
+    final settings = ref.watch(settingsProvider).valueOrNull?.settings;
+    final architectAssignment = settings?.roleAssignments[LlmRole.architect];
+    final architectKey = architectAssignment != null
+        ? settings?.apiKeys[architectAssignment.providerType]
+        : null;
+    final hasApiKey = architectKey != null && architectKey.isNotEmpty;
+
+    final canCreate = _name.trim().isNotEmpty && !_creating && hasApiKey;
 
     return Scaffold(
       appBar: AppBar(title: const Text('New Project')),
@@ -93,6 +102,53 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (!hasApiKey) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2C1810),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFEF4444)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.key_off_outlined,
+                        color: Color(0xFFEF4444), size: 16),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'No API key configured. Add one in Settings before starting an interview.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFFEF4444),
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pushNamed('/settings'),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text(
+                        'Settings →',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFFE8A04C),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             const _SectionHeader('Project Name'),
             TextField(
               controller: _nameController,

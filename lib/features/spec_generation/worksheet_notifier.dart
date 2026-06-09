@@ -61,6 +61,13 @@ class WorksheetNotifier extends AutoDisposeNotifier<WorksheetGenState> {
         buildWorksheetAuditEntry(projectName, worksheetFilename),
       );
 
+      await ref.read(forgeDatabaseProvider).updateProjectPhase(
+            projectName,
+            'v1_worksheet_complete',
+            specVersion,
+          );
+      await ref.read(projectListProvider.notifier).refresh();
+
       state = WorksheetGenState(
         status: WorksheetGenStatus.done,
         worksheetFilename: worksheetFilename,

@@ -6,6 +6,8 @@ import '../features/projects/screens/projects_list_screen.dart';
 import '../features/settings/settings_screen.dart';
 import 'theme/app_theme.dart';
 
+final routeObserver = RouteObserver<ModalRoute<dynamic>>();
+
 class TheForgeApp extends StatelessWidget {
   const TheForgeApp({super.key});
 
@@ -17,6 +19,7 @@ class TheForgeApp extends StatelessWidget {
       theme: AppTheme.dark,
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.dark,
+      navigatorObservers: [routeObserver],
       initialRoute: '/',
       routes: {
         '/': (context) => const ProjectsListScreen(),

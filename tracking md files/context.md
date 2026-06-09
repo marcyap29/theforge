@@ -4,6 +4,145 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-06-09 — Claude Code [Reference Doc Ingestion Engine — §DOC v1]
+
+**Branch:** wt/reference-doc-ingestion (not merged)
+
+### Done
+- **§DOC-1 — Entitlements + deps + filesystem layer:** Added `file_picker` 8.3.7 to pubspec.yaml; added `com.apple.security.files.user-selected.read-only` to both entitlement files; `createProject()` now creates `/ingested/` subfolder; 4 new methods in `ProjectFileRepository`: `writeIngestedSummary()`, `readIngestedSummary()`, `listReferenceDocs()`, `copyReferenceDoc()`
+- **§DOC-2 — Ingestion engine + notifier:** Created `lib/features/projects/ingestion/` with 3 files: `reference_doc.dart` (ReferenceDoc + IngestedFacts model), `ingestion_engine.dart` (LLM prompt builder + output parser), `ingestion_notifier.dart` (project-scoped `IngestionNotifier` with add/remove/rebuildContext pipeline). Ingestion uses architect role at t=0.2 for precision extraction.
+- **§DOC-3 — Interview prompt injection:** `_interviewSystemPrompt()` accepts optional `ingestedContext` param; `InterviewNotifier.addUserMessage()` reads from disk via `readIngestedSummary()` each turn; context injected as "REFERENCE CONTEXT" block in system prompt
+- **§DOC-4 — Spec generation prompt injection:** `buildSpecPrompt()` accepts optional `ingestedContext` param; `SpecNotifier.generate()` reads from disk before building prompt (same pattern as `readLockedSpec()`); context injected between confidence map and spec structure instructions
+- **§DOC-5 — UI:** Created `reference_docs_screen.dart` (full management UI with file picker, doc cards with remove, error/empty/loading states); added `_ReferenceDocsRow` to `project_detail_screen.dart` (count + "Manage →" link); added `_DocCountChip` to interview_screen.dart AppBar (shows `N docs` when >0)
+- All 4 amendments applied: text-only (.md/.txt), project-scoped notifier, disk-persisted context, macOS entitlement
+
+### Key Technical Findings
+- `file_picker` 8.3.7 resolves as the latest compatible version with Flutter 3.38.7; 11.x requires newer analyzer
+- `NSOpenPanel` on macOS sandbox requires `user-selected.read-only` entitlement — without it the file picker dialog is silently blocked. Added to both .entitlements files.
+- Persisting ingested context to `reference_context.md` on disk is the right pattern — both the interview notifier (AutoDisposeNotifier) and spec notifier read from disk independently. Same architecture as `readLockedSpec()`.
+- `IngestionNotifier` is a vanilla `Notifier` (not `AsyncNotifier`) — all async work happens in public methods, not in `build()`. Matches `ActiveProjectNotifier` pattern.
+- The interview chip shows doc count only when >0 — avoids clutter for projects without reference docs. The project detail row always shows (0 or N) with a "Add →" / "Manage →" link.
+- Ingestion engine uses `LlmRole.architect` at t=0.2 for precision extraction of definitions, equations, and constraints. The prompt instructs verbatim quoting — no interpretation or inference.
+
+### Next
+1. User review: `git diff main..HEAD` in worktree — approve to merge
+2. After merge: end-to-end test — create project, add a .md reference doc, run interview, generate spec, verify context appears in both prompts
+3. Write `FOR_MARC_reference-doc-ingestion.md` coding lesson
+
+### Modified (all in worktree)
+- `pubspec.yaml` — added `file_picker: ^8.0.0`
+- `macos/Runner/DebugProfile.entitlements` — added `user-selected.read-only`
+- `macos/Runner/Release.entitlements` — added `user-selected.read-only`
+- `lib/data/filesystem/project_file_repository.dart` — `/ingested/` folder + 4 new methods
+- `lib/features/projects/ingestion/reference_doc.dart` — NEW: model
+- `lib/features/projects/ingestion/ingestion_engine.dart` — NEW: LLM prompt + parser
+- `lib/features/projects/ingestion/ingestion_notifier.dart` — NEW: project-scoped notifier
+- `lib/features/projects/ingestion/reference_docs_screen.dart` — NEW: management UI
+- `lib/features/interview/state/interview_notifier.dart` — disk read + prompt injection
+- `lib/features/interview/ui/interview_screen.dart` — doc count chip in AppBar
+- `lib/features/spec_generation/spec_generator.dart` — optional ingestedContext param
+- `lib/features/spec_generation/spec_notifier.dart` — disk read before spec prompt
+- `lib/features/projects/screens/project_detail_screen.dart` — Reference Docs row
+
+### Warnings
+- `file_picker` 11.x exists but requires newer analyzer — staying on 8.x for Flutter 3.38.7 compatibility
+- Binary formats (PDF, DOCX) are explicitly out of scope for v1 — only .md and .txt supported
+- Ingestion costs one LLM call per document added — the result is cached to disk and only re-parsed on explicit rebuild
+- The `reference_context.md` file aggregates all extracted facts from all docs — adding/removing a doc triggers a full rebuild of this file
+
+---
+
+## Session: 2026-06-05 — Claude Code [Plan Mode v1 — End-to-End Complete + UX Polish]
+
+### Done
+- **forge-mcp post-grade fixes**: removed dead variable `sessionsByAgent` in `queryApi.ts`; fixed `percentComplete` math bug (divided by wrong denominator); removed duplicate `deriveContextFiles` in `index.ts`
+- **Compressed `forge_mcp_build_plans.md`**: 1,292 lines → ~100 lines; Plans 1–6 replaced with status table (all ✅ Complete)
+- **§9.5 Flutter amendment**: `createProject()` now creates `forge/` subdir; `writeForgeFiles()` writes LockedSpec + DecisionContext + OpenFlags to `forge/`; `writeHandoffPackage()` updated to include `projectName`, `components`, `contextFiles`; `spec_notifier.dart` wired to call all new methods
+- **macOS build signing**: removed `keychain-access-groups` entitlement (required provisioning profile); fixed 2 Manual → Automatic signing entries in `project.pbxproj`
+- **`flutter_secure_storage` → `SharedPreferences`**: sandbox `-34018 errSecMissingEntitlement` error after entitlement removal; replaced API key storage with SharedPreferences throughout `settings_notifier.dart`
+- **Settings Save button fix**: `_controller.addListener(() => setState(() {}))` in `_ByokCardState.initState()` — button was always disabled because text was evaluated at build time without listening
+- **Gemini model IDs**: fixed `gemini-3.5-flash-preview` → `gemini-3.5-flash` / `gemini-2.5-flash` / `gemini-2.5-pro`; WebFetch confirmed current stable model IDs
+- **Back button on spec error screen**: added "Back to Projects" `TextButton` using `popUntil(r.isFirst)`
+- **File sidebar**: `project_detail_screen.dart` rewritten as two-panel layout; `_FilesSidebar` (220px) scans all 5 folders (forge/specs/handoffs/worksheets/audit) with amber selection highlighting; `ArtifactViewMode.forge` added to artifact viewer
+- **API key gate on New Project**: `new_project_screen.dart` checks architect role's API key; red banner + "Settings →" link + disabled Create button when no key configured
+- **Interactive phase timeline**: 3-step timeline (Interview → Worksheet → Ready) with amber pulse animation on current step; green ✓ with click-to-open artifact when done; pending steps gray; `ProjectDetailScreen` watches `projectListProvider` for live phase; `WorksheetGenerationScreen` now sets `v1_worksheet_complete` phase in DB
+- **Sidebar auto-refresh**: `RouteObserver` registered in `app.dart`; `_FilesSidebarState` subscribes via `RouteAware.didPopNext()` — sidebar rescans whenever a sub-route is popped
+- **CTA button phase-aware**: "Start Interview" → "Generate Setup Worksheet →" → "Ready for executor" green badge based on project phase
+- **`vv1` filename bug**: `writeHandoffPackage` had `v$version` where version already included `v` prefix → fixed to `$version`
+- **API key persistence via config file**: `settings_notifier.dart` dual-writes to `forge_config.json` in Application Support dir; file is authoritative on next launch; auto-migrates keys from SharedPreferences if found only there
+- **First end-to-end Plan Mode test**: Testapp project — interview → spec → worksheet → all artifacts generated and verified; all 5 folders populated correctly
+
+### Key Technical Findings
+- macOS sandbox + `keychain-access-groups` entitlement requires a provisioning profile with `$(AppIdentifierPrefix)` — unusable without paid Apple Developer account in dev. Removed entirely; `flutter_secure_storage` was a casualty, replaced with SharedPreferences + config file.
+- `NSUserDefaults` (SharedPreferences on macOS) can be cleared during development container resets. Config file in Application Support is more durable.
+- `FutureBuilder(future: _scan())` in a `StatefulWidget.build()` creates a new Future every build — correct, but only fires on rebuild. RouteAware subscription needed for cross-route refresh.
+- Interview state is `AutoDisposeNotifier` — disposed when navigated away from. If spec generation fails and user presses back, interview state is lost. Noted as backlog item.
+
+### Next
+1. Executor timeline: parse spec § 3 Component Map → generate LLM-narrated timeline steps per component (unique per project, shown when phase = `v1_worksheet_complete`)
+2. Watch Mode §W1 — Token Ingestion Engine (gate: end-to-end run ✅ now passed)
+3. First MCP end-to-end: register Testapp in `~/.forge/registry.json`, test `forge_session_start` + `forge_check_scope` via MCP
+4. Backlog: interview state persistence across navigation (survives spec gen failure)
+
+### Modified
+- `forge-mcp/src/index.ts`, `forge-mcp/src/lib/queryApi.ts` — post-grade fixes
+- `DOCS/forge/forge_mcp_build_plans.md` — compressed to status table
+- `lib/data/filesystem/project_file_repository.dart` — §9.5: forge/ dir, writeForgeFiles(), writeHandoffPackage() with projectName; vv1 fix
+- `lib/features/spec_generation/spec_generator.dart` — §9.5: parseComponentNames(), buildContextFiles(), buildDecisionContext(), buildOpenFlags(), buildHandoffPackage() fields
+- `lib/features/spec_generation/spec_notifier.dart` — §9.5 wiring; projectListProvider.refresh() call
+- `lib/features/spec_generation/worksheet_notifier.dart` — v1_worksheet_complete phase update + projectListProvider.refresh()
+- `lib/features/spec_generation/spec_generation_screen.dart` — Back to Projects button on error
+- `lib/features/settings/settings_notifier.dart` — SharedPreferences + forge_config.json dual-write; correct Gemini model IDs
+- `lib/features/settings/settings_screen.dart` — Save button controller listener fix
+- `lib/services/llm/llm_model_config.dart` — correct Gemini model IDs and defaults
+- `lib/features/artifacts/artifact_viewer_screen.dart` — ArtifactViewMode.forge added
+- `lib/features/projects/screens/project_detail_screen.dart` — full rewrite: two-panel layout, _PhaseTimeline, _FilesSidebar with RouteAware, phase-aware CTA
+- `lib/features/projects/screens/new_project_screen.dart` — API key gate
+- `lib/core/app.dart` — routeObserver added
+- `macos/Runner/DebugProfile.entitlements`, `macos/Runner/Release.entitlements` — keychain-access-groups removed
+- `macos/Runner.xcodeproj/project.pbxproj` — Manual → Automatic signing
+
+### Warnings
+- Testapp HandoffPackage is named `vv1` (old run before fix). New projects will generate `_v1.json` correctly.
+- Interview state lost on spec gen failure + back navigation — user must redo interview. Backlog item.
+- `flutter_markdown` 0.7.7+1 is discontinued upstream; non-blocking, migrate to `flutter_markdown_plus` when needed.
+- Worksheets/handoffs folders are normal write (not write-once) — can be regenerated.
+
+---
+
+## Session: 2026-06-04 — Claude Code [Forge MCP Server — Gap Analysis + 6 Executor Plans]
+
+### Done
+- Full repo review: Plan Mode §1–§9 all complete; backlog and context read
+- Read all ForkIt example files (5-file system reference implementation)
+- Compared Flutter app current output vs MCP server expected input — identified all gaps
+- Wrote 6 DeepSeek executor prompts for the MCP server build
+- Saved plans to `DOCS/forge/forge_mcp_build_plans.md`
+
+### Key Gap Analysis Findings
+- **File 1 path mismatch**: app writes to `specs/`, MCP expects `forge/` subfolder — plans include fallback
+- **Files 2 + 5 missing**: app doesn't generate `DecisionContext` or `OpenFlags` as separate files yet
+- **HandoffPackage missing fields**: `components` and `contextFiles` not generated by current app
+- **HandoffPackage filename**: app writes `handoff_package_v1.json`, MCP expects `{ProjectName}_HandoffPackage_v1.json` — plans include 3-pattern filename resolution
+- Plans adapt the MCP server to be forward-compatible (works with target state) AND include graceful fallbacks for current state
+
+### Next
+1. Run Plan 1 in DeepSeek → bring back for evaluation
+2. Run Plans 2–6 sequentially, each evaluated before next
+3. After MCP server is built → §9.5 Flutter app amendment to generate full 5-file system
+4. After §9.5 → first end-to-end Plan Mode run (interview → spec → MCP server → executor build)
+
+### Modified
+- `DOCS/forge/forge_mcp_build_plans.md` — NEW: 6 DeepSeek executor prompts + gap analysis
+
+### Warnings
+- MCP server goes in `forge-mcp/` subfolder inside The Forge repo
+- The ForkIt example files represent TARGET state, not current app output — plans bridge the gap
+- DeepSeek must be given full context files from previous plan on each subsequent call (append-on, not greenfield)
+- `forge_check_scope` uses exact section headings from File 5 (`## Explicit Out-of-Scope`, `## V2 Architecture Seeds`) — do not rename
+
+---
+
 ## Session: 2026-06-04 — DeepSeek V4 Pro [Session 2 — §8 Setup Worksheet + §9 Handoff Package + /goal text]
 
 ### Done

@@ -45,12 +45,14 @@ class ProjectFileRepository {
     final handoffsDir = Directory(p.join(projectDir.path, 'handoffs'));
     final worksheetsDir = Directory(p.join(projectDir.path, 'worksheets'));
     final auditDir = Directory(p.join(projectDir.path, 'audit'));
+    final forgeDir = Directory(p.join(projectDir.path, 'forge'));
 
     await projectDir.create(recursive: true);
     await specsDir.create();
     await handoffsDir.create();
     await worksheetsDir.create();
     await auditDir.create();
+    await forgeDir.create();
 
     final now = DateTime.now();
     final dateStr =
@@ -137,6 +139,23 @@ class ProjectFileRepository {
     await handoffFile.writeAsString(content);
   }
 
+  Future<void> writeForgeFiles(
+    String projectPath,
+    String projectName,
+    String specVersion, {
+    required String lockedSpecContent,
+    required String decisionContextContent,
+    required String openFlagsContent,
+  }) async {
+    final forgeDir = Directory(p.join(projectPath, 'forge'));
+    await File(p.join(forgeDir.path, '${projectName}_LockedSpec_$specVersion.md'))
+        .writeAsString(lockedSpecContent);
+    await File(p.join(forgeDir.path, '${projectName}_DecisionContext_$specVersion.md'))
+        .writeAsString(decisionContextContent);
+    await File(p.join(forgeDir.path, '${projectName}_OpenFlags_$specVersion.md'))
+        .writeAsString(openFlagsContent);
+  }
+
   Future<void> writeWorksheet(
       String projectPath, String filename, String content) async {
     final worksheetsDir = Directory(p.join(projectPath, 'worksheets'));
@@ -145,9 +164,9 @@ class ProjectFileRepository {
   }
 
   Future<void> writeHandoffPackage(
-      String projectPath, String version, Map<String, dynamic> data) async {
+      String projectPath, String projectName, String version, Map<String, dynamic> data) async {
     final packageFile =
-        File(p.join(projectPath, 'handoff_package_v$version.json'));
+        File(p.join(projectPath, '${projectName}_HandoffPackage_$version.json'));
     await packageFile.writeAsString(const JsonEncoder.withIndent('  ').convert(data));
   }
 
