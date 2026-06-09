@@ -10,6 +10,8 @@ import '../../../data/local_db/forge_database.dart';
 import '../../artifacts/artifact_viewer_screen.dart';
 import '../../interview/providers/interview_providers.dart';
 import '../../spec_generation/worksheet_generation_screen.dart';
+import '../ingestion/ingestion_notifier.dart';
+import '../ingestion/reference_docs_screen.dart';
 import '../providers/providers.dart';
 
 class ProjectDetailScreen extends ConsumerWidget {
@@ -92,6 +94,9 @@ class ProjectDetailScreen extends ConsumerWidget {
                   )
                 else
                   _ReadmeContent(raw: active.readmeContent),
+                const SizedBox(height: 24),
+                const _SectionHeader('Reference Documents'),
+                _ReferenceDocsRow(projectPath: project.path),
                 const SizedBox(height: 24),
                 // Phase-aware CTA
                 _SectionHeader(_ctaSectionLabel(live.phase)),
@@ -657,6 +662,79 @@ class _SectionHeader extends StatelessWidget {
           fontWeight: FontWeight.w600,
           letterSpacing: 0.8,
           color: Color(0xFF9CA3AF),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReferenceDocsRow extends ConsumerStatefulWidget {
+  const _ReferenceDocsRow({required this.projectPath});
+  final String projectPath;
+
+  @override
+  ConsumerState<_ReferenceDocsRow> createState() =>
+      _ReferenceDocsRowState();
+}
+
+class _ReferenceDocsRowState extends ConsumerState<_ReferenceDocsRow> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref
+          .read(ingestionNotifierProvider.notifier)
+          .loadDocs(widget.projectPath);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final docs = ref.watch(ingestionNotifierProvider).docs;
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F0F10),
+        border: Border.all(color: const Color(0xFF2C2C2E)),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: InkWell(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ReferenceDocsScreen(projectPath: widget.projectPath),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              const Icon(Icons.upload_file_outlined,
+                  size: 14, color: Color(0xFF6B7280)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  docs.isEmpty
+                      ? 'No documents added'
+                      : '${docs.length} document${docs.length == 1 ? '' : 's'} added',
+                  style: const TextStyle(
+                    fontFamily: 'Menlo',
+                    fontSize: 12,
+                    color: Color(0xFFE5E5E7),
+                  ),
+                ),
+              ),
+              Text(
+                docs.isEmpty ? 'Add →' : 'Manage →',
+                style: const TextStyle(
+                  fontFamily: 'Menlo',
+                  fontSize: 10,
+                  color: Color(0xFFE8A04C),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

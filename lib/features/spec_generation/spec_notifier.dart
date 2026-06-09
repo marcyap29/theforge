@@ -38,16 +38,16 @@ class SpecNotifier extends AutoDisposeNotifier<SpecGenState> {
 
     try {
       final llmService = ref.read(llmServiceProvider);
+      final repo = ref.read(projectFileRepositoryProvider);
+      final ingestedContext = await repo.readIngestedSummary(projectPath);
       final rawSpec = await llmService.complete(
-        systemPrompt: buildSpecPrompt(interviewState),
+        systemPrompt: buildSpecPrompt(interviewState, ingestedContext: ingestedContext),
         userPrompt: 'Generate the complete locked spec now.',
         temperature: 0.6,
         role: LlmRole.architect,
         maxTokens: 4096,
       );
       final specContent = SpecParser.clean(rawSpec);
-
-      final repo = ref.read(projectFileRepositoryProvider);
 
       await repo.writeLockedSpec(
           projectPath, projectName, specVersion, specContent);

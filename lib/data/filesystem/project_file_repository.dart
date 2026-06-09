@@ -46,6 +46,7 @@ class ProjectFileRepository {
     final worksheetsDir = Directory(p.join(projectDir.path, 'worksheets'));
     final auditDir = Directory(p.join(projectDir.path, 'audit'));
     final forgeDir = Directory(p.join(projectDir.path, 'forge'));
+    final ingestedDir = Directory(p.join(projectDir.path, 'ingested'));
 
     await projectDir.create(recursive: true);
     await specsDir.create();
@@ -53,6 +54,7 @@ class ProjectFileRepository {
     await worksheetsDir.create();
     await auditDir.create();
     await forgeDir.create();
+    await ingestedDir.create();
 
     final now = DateTime.now();
     final dateStr =
@@ -192,5 +194,40 @@ class ProjectFileRepository {
     }
 
     return projects;
+  }
+
+  Future<void> writeIngestedSummary(
+      String projectPath, String content) async {
+    final ingestedDir = Directory(p.join(projectPath, 'ingested'));
+    final summaryFile =
+        File(p.join(ingestedDir.path, 'reference_context.md'));
+    await summaryFile.writeAsString(content);
+  }
+
+  Future<String?> readIngestedSummary(String projectPath) async {
+    final summaryFile =
+        File(p.join(projectPath, 'ingested', 'reference_context.md'));
+    if (!summaryFile.existsSync()) return null;
+    return summaryFile.readAsString();
+  }
+
+  Future<List<File>> listReferenceDocs(String projectPath) async {
+    final ingestedDir = Directory(p.join(projectPath, 'ingested'));
+    if (!ingestedDir.existsSync()) return [];
+    final all = ingestedDir
+        .listSync()
+        .whereType<File>()
+        .where((f) => p.basename(f.path) != 'reference_context.md')
+        .toList();
+    return all;
+  }
+
+  Future<File> copyReferenceDoc(
+      String projectPath, String sourcePath) async {
+    final source = File(sourcePath);
+    final filename = p.basename(sourcePath);
+    final ingestedDir = Directory(p.join(projectPath, 'ingested'));
+    final destPath = p.join(ingestedDir.path, filename);
+    return source.copy(destPath);
   }
 }
