@@ -1,7 +1,7 @@
 import '../interview/state/interview_dimension.dart';
 import '../interview/state/interview_state.dart';
 
-String buildSpecPrompt(InterviewState state) {
+String buildSpecPrompt(InterviewState state, {String? ingestedContext}) {
   final isBuild = state.dimensions == buildDimensions;
   final modeLabel = isBuild ? 'Build' : 'Audit';
   final transcript = state.turns
@@ -19,6 +19,14 @@ String buildSpecPrompt(InterviewState state) {
       })
       .join('\n');
 
+  final refBlock = ingestedContext != null
+      ? '\n\nREFERENCE CONTEXT (from user-supplied documents):\n'
+          'Incorporate the following into the spec where relevant. '
+          'Definitions should appear verbatim. Equations should be preserved. '
+          'Constraints should be reflected in Hard Constraints and Out-of-Scope.\n\n'
+          '$ingestedContext\n'
+      : '';
+
   final specStructure =
       isBuild ? _buildSpecStructure : _auditSpecStructure;
 
@@ -26,7 +34,7 @@ String buildSpecPrompt(InterviewState state) {
 
 PROJECT: ${state.projectName}
 MODE: $modeLabel Interview
-
+$refBlock
 INTERVIEW TRANSCRIPT:
 $transcript
 

@@ -35,6 +35,7 @@ dependencies:
   flutter_secure_storage: ^9.2.4
   shared_preferences: ^2.3.3
   flutter_markdown: ^0.7.6
+  file_picker: ^8.0.0
 
 dev_dependencies:
   flutter_test:

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../services/llm/llm_provider.dart';
 import '../../../services/llm/llm_service_provider.dart';
+import '../../projects/providers/providers.dart';
 import '../providers/interview_providers.dart';
 import 'interview_dimension.dart';
 import 'interview_state.dart';
@@ -93,7 +94,7 @@ StubLlmResult stubInterviewStep(InterviewState state, String userMessage) {
   );
 }
 
-String _interviewSystemPrompt(InterviewState state) {
+String _interviewSystemPrompt(InterviewState state, {String? ingestedContext}) {
   final modeLabel =
       state.dimensions == buildDimensions ? 'Build Interview' : 'Audit Interview';
 
@@ -106,9 +107,17 @@ String _interviewSystemPrompt(InterviewState state) {
       .map((d) => '${d.label}: ${d.question}')
       .join('\n');
 
+  final refBlock = ingestedContext != null
+      ? '\n\nREFERENCE CONTEXT:\n'
+          'The following was extracted from reference documents provided by the user. '
+          'Use it to inform your questions but do not treat it as binding — '
+          'surface any tensions between the reference material and the user\'s answers.\n\n'
+          '$ingestedContext'
+      : '';
+
   return '''You are The Forge interviewer — a sharp, direct product architect
 running a $modeLabel for a project called "${state.projectName}".
-
+$refBlock
 Your goal: resolve ${state.dimensions.length} confidence dimensions through conversation.
 Ask ONE question per turn. Be concise. Acknowledge the user's answer first.
 
@@ -149,11 +158,13 @@ class InterviewNotifier extends FamilyAsyncNotifier<InterviewState, InterviewArg
     final stub = stubInterviewStep(withUser, text);
 
     final llmService = ref.read(llmServiceProvider);
+    final repo = ref.read(projectFileRepositoryProvider);
+    final ingestedContext = await repo.readIngestedSummary(withUser.projectPath);
     bool llmFailed = false;
     String llmText;
     try {
       llmText = await llmService.complete(
-        systemPrompt: _interviewSystemPrompt(withUser),
+        systemPrompt: _interviewSystemPrompt(withUser, ingestedContext: ingestedContext),
         userPrompt: text.trim(),
         temperature: 0.1,
         role: LlmRole.executor,

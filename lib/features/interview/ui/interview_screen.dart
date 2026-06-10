@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/filesystem/project_file_repository.dart';
 import '../../../features/spec_generation/spec_generation_screen.dart';
+import '../../projects/ingestion/ingestion_notifier.dart';
+import '../../projects/ingestion/reference_docs_screen.dart';
 import '../providers/interview_providers.dart';
 import '../state/interview_state.dart';
 import 'confidence_meter.dart';
@@ -19,6 +21,16 @@ class InterviewScreen extends ConsumerStatefulWidget {
 class _InterviewScreenState extends ConsumerState<InterviewScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref
+          .read(ingestionNotifierProvider.notifier)
+          .loadDocs(widget.args.path);
+    });
+  }
 
   @override
   void dispose() {
@@ -49,6 +61,7 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen> {
       appBar: AppBar(
         title: Text('$modeLabel Interview — ${args.name}'),
         actions: [
+          _DocCountChip(projectPath: args.path),
           IconButton(
             icon: const Icon(Icons.restart_alt),
             tooltip: 'Restart interview',
@@ -397,6 +410,46 @@ class _Composer extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DocCountChip extends ConsumerWidget {
+  const _DocCountChip({required this.projectPath});
+  final String projectPath;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final count = ref.watch(ingestionNotifierProvider).docs.length;
+    if (count == 0) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 4),
+      child: TextButton.icon(
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) =>
+                  ReferenceDocsScreen(projectPath: projectPath),
+            ),
+          );
+        },
+        icon: const Icon(Icons.upload_file_outlined,
+            size: 14, color: Color(0xFF9CA3AF)),
+        label: Text(
+          '$count doc${count == 1 ? '' : 's'}',
+          style: const TextStyle(
+            fontSize: 11,
+            fontFamily: 'Menlo',
+            color: Color(0xFF9CA3AF),
+          ),
+        ),
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
       ),
     );
