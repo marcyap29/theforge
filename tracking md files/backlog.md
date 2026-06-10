@@ -21,7 +21,7 @@ Long-term feature pool. Active sprint work lives in `planner.md`.
   → §10 Settings screen ✅
   → §MCP Forge MCP Server (TypeScript — parallel to end-to-end run) ✅
   → §9.5 Flutter 5-file system amendment + UX polish ✅
-  → §DOC Reference Doc Ingestion Engine (text-only v1) ✅ (on worktree, pending merge)
+  → §DOC Reference Doc Ingestion Engine (text-only v1) ✅ (merged 2026-06-10)
   → First end-to-end Plan Mode run ✅ (2026-06-05 — Testapp)
        ↓
   → §EX1 Executor Timeline (parse spec §3 Component Map → LLM-narrated build sequence)

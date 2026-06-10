@@ -9,6 +9,7 @@ import '../../../data/filesystem/project_file_repository.dart';
 import '../../../data/local_db/forge_database.dart';
 import '../../artifacts/artifact_viewer_screen.dart';
 import '../../interview/providers/interview_providers.dart';
+import '../../interview/ui/interview_screen.dart';
 import '../../spec_generation/worksheet_generation_screen.dart';
 import '../ingestion/ingestion_notifier.dart';
 import '../ingestion/reference_docs_screen.dart';
@@ -38,17 +39,16 @@ class ProjectDetailScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Back to Projects',
+          onPressed: () {
+            final nav = Navigator.of(context);
+            ref.read(activeProjectProvider.notifier).close();
+            nav.pop();
+          },
+        ),
         title: Text(live.name),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.close),
-            tooltip: 'Close',
-            onPressed: () {
-              ref.read(activeProjectProvider.notifier).close();
-              Navigator.of(context).pop();
-            },
-          ),
-        ],
       ),
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -167,12 +167,15 @@ class ProjectDetailScreen extends ConsumerWidget {
           ),
         ),
       _ => FilledButton(
-          onPressed: () => Navigator.of(context).pushNamed(
-            '/interview',
-            arguments: InterviewArgs(
-              path: live.path,
-              name: live.name,
-              mode: mode,
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => InterviewScreen(
+                args: InterviewArgs(
+                  path: live.path,
+                  name: live.name,
+                  mode: mode,
+                ),
+              ),
             ),
           ),
           style: FilledButton.styleFrom(
@@ -270,12 +273,15 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
                     'specs',
                     '${pj.name}_LockedSpec_$sv.md',
                     ArtifactViewMode.spec)
-                : () => Navigator.of(context).pushNamed(
-                      '/interview',
-                      arguments: InterviewArgs(
-                        path: pj.path,
-                        name: pj.name,
-                        mode: mode,
+                : () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => InterviewScreen(
+                          args: InterviewArgs(
+                            path: pj.path,
+                            name: pj.name,
+                            mode: mode,
+                          ),
+                        ),
                       ),
                     ),
           ),
@@ -691,13 +697,9 @@ class _ReferenceDocsRowState extends ConsumerState<_ReferenceDocsRow> {
   @override
   Widget build(BuildContext context) {
     final docs = ref.watch(ingestionNotifierProvider).docs;
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F0F10),
-        border: Border.all(color: const Color(0xFF2C2C2E)),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: InkWell(
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -705,8 +707,12 @@ class _ReferenceDocsRowState extends ConsumerState<_ReferenceDocsRow> {
             ),
           );
         },
-        borderRadius: BorderRadius.circular(6),
-        child: Padding(
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F0F10),
+            border: Border.all(color: const Color(0xFF2C2C2E)),
+            borderRadius: BorderRadius.circular(6),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [

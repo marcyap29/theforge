@@ -51,15 +51,26 @@ class GeminiProvider extends LlmProvider {
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     final candidates = data['candidates'] as List<dynamic>?;
     if (candidates == null || candidates.isEmpty) {
-      throw Exception('Gemini response missing candidates: ${response.body}');
+      final promptFeedback = data['promptFeedback'] as Map<String, dynamic>?;
+      final blockReason = promptFeedback?['blockReason'] as String?;
+      throw Exception(
+        blockReason != null
+            ? 'Gemini request blocked: $blockReason'
+            : 'Gemini returned no candidates',
+      );
     }
-    final content =
-        (candidates.first as Map<String, dynamic>)['content'] as Map<String, dynamic>?;
+    final candidate = candidates.first as Map<String, dynamic>;
+    final content = candidate['content'] as Map<String, dynamic>?;
     final parts = content?['parts'] as List<dynamic>?;
     if (parts == null || parts.isEmpty) {
-      throw Exception('Gemini response missing parts: ${response.body}');
+      final finishReason = candidate['finishReason'] as String? ?? 'UNKNOWN';
+      throw Exception('Gemini candidate has no content (finishReason: $finishReason)');
     }
-    return (parts.first as Map<String, dynamic>)['text'] as String;
+    final text = (parts.first as Map<String, dynamic>)['text'] as String?;
+    if (text == null) {
+      throw Exception('Gemini response part missing text field');
+    }
+    return text;
   }
 
   static String _truncate(String s) =>

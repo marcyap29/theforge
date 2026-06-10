@@ -98,7 +98,7 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
               orElse: () => LlmProviderType.gemini,
             );
       final modelId = savedModelId ??
-          (isFirstRun ? 'gemini-3.5-flash' : '');
+          (isFirstRun ? 'gemini-2.5-flash' : '');
       assignments[role] = ModelAssignment(
         providerType: providerType,
         modelId: modelId,
@@ -259,7 +259,7 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
       case LlmProviderType.gemini:
         if (key == null || key.isEmpty) return 'No API key configured.';
         provider = GeminiProvider(apiKey: key);
-        modelId = 'gemini-3.5-flash';
+        modelId = 'gemini-2.5-flash';
       case LlmProviderType.claude:
         if (key == null || key.isEmpty) return 'No API key configured.';
         provider = ClaudeProvider(apiKey: key);

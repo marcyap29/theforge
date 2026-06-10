@@ -24,9 +24,9 @@ const openAiModels = <ModelInfo>[
 ];
 
 const geminiModels = <ModelInfo>[
-  ModelInfo(id: 'gemini-3.5-flash', displayName: 'Gemini 3.5 Flash'),
   ModelInfo(id: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash'),
   ModelInfo(id: 'gemini-2.5-pro', displayName: 'Gemini 2.5 Pro'),
+  ModelInfo(id: 'gemini-1.5-flash', displayName: 'Gemini 1.5 Flash'),
 ];
 
 List<ModelInfo> modelsFor(LlmProviderType type) {
@@ -71,11 +71,11 @@ class LlmSettings {
     roleAssignments: {
       LlmRole.architect: ModelAssignment(
         providerType: LlmProviderType.gemini,
-        modelId: 'gemini-3.5-flash',
+        modelId: 'gemini-2.5-flash',
       ),
       LlmRole.executor: ModelAssignment(
         providerType: LlmProviderType.gemini,
-        modelId: 'gemini-3.5-flash',
+        modelId: 'gemini-2.5-flash',
       ),
     },
     apiKeys: {

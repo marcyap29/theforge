@@ -47,4 +47,13 @@ class ForgeDatabase extends _$ForgeDatabase {
           specVersion: Value(specVersion),
         ),
       );
+
+  Future<void> updateProjectNameAndPath(
+          String id, String newName, String newPath) =>
+      (update(projects)..where((t) => t.id.equals(id))).write(
+        ProjectsCompanion(
+          name: Value(newName),
+          path: Value(newPath),
+        ),
+      );
 }

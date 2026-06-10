@@ -4,9 +4,40 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-06-10 — Claude Code [§DOC Merge + Post-Merge Bug Fixes]
+
+**Branch:** main (merged from wt/reference-doc-ingestion)
+
+### Done
+- **§9.5 committed to main:** All uncommitted §9.5 changes committed before worktree rebase. Key: the entitlements file in the worktree was stale (still had `keychain-access-groups`) — committed HEAD was the correct source of truth.
+- **Worktree rebase:** `wt/reference-doc-ingestion` rebased onto committed §9.5. 4 merge conflicts resolved manually: `project_file_repository.dart` (kept both `forge/` + `ingested/`), both `.entitlements` files (kept `user-selected.read-only`, dropped `keychain-access-groups`), `project_detail_screen.dart` (took §9.5 two-panel layout, then separately inserted `_ReferenceDocsRow`).
+- **§DOC merged to main:** `wt/reference-doc-ingestion` merged into main with all conflicts resolved.
+- **Post-merge fix 1 — Multi-file picker:** `reference_docs_screen.dart`: added `allowMultiple: true` to `pickFiles()` call and changed single-file path to loop over `result.files`.
+- **Post-merge fix 2 — Material wrapper for InkWell:** `_ReferenceDocsRow` in `project_detail_screen.dart`: wrapped `InkWell` with `Material(color: Colors.transparent)` — macOS Flutter desktop requires an immediate Material ancestor; Scaffold-level Material is NOT sufficient. "Manage →" button was unresponsive without it.
+- **Post-merge fix 3 — Redundant loadDocs removed:** `interview_screen.dart` `initState` was calling `loadDocs()` concurrently with in-flight `addDoc` LLM calls — state race on the global `IngestionNotifier`. Removed initState call entirely; interview screen now watches provider passively via `_DocCountChip`.
+- **Build error resolved:** `flutter clean && flutter pub get` required after merge added `file_picker` dependency.
+
+### Key Technical Findings
+- Git worktrees must be created from a **committed** HEAD. Uncommitted changes on main do not carry into the worktree — they appear as conflicts at merge time. Commit first, then create or rebase the worktree.
+- `InkWell` on macOS Flutter desktop requires `Material(color: Colors.transparent)` in its immediate subtree. A `Scaffold` or `Material` higher in the tree is insufficient — ink effects require a local Material ancestor.
+- Global non-AutoDispose `Notifier` concurrent state race: do NOT call state-writing methods (e.g., `loadDocs`) from multiple widget `initState` callbacks simultaneously. Two concurrent async writers on one shared state object produce interleaved updates. Watch the provider passively from secondary screens.
+- `file_picker` `NSOpenPanel` is silently blocked by macOS sandbox without `com.apple.security.files.user-selected.read-only` in both `.entitlements` files.
+
+### Next
+- End-to-end test: create project → add reference doc → run interview → generate spec → verify context injected in both prompts
+- Write `FOR_MARC_reference-doc-ingestion.md` coding lesson
+- §EX1: Executor Timeline (parse spec §3 Component Map → LLM-narrated build sequence)
+
+### Modified
+- `lib/features/projects/ingestion/reference_docs_screen.dart` — multi-file picker
+- `lib/features/projects/screens/project_detail_screen.dart` — Material wrapper for InkWell in `_ReferenceDocsRow`
+- `lib/features/interview/ui/interview_screen.dart` — removed redundant `loadDocs` from `initState`
+
+---
+
 ## Session: 2026-06-09 — Claude Code [Reference Doc Ingestion Engine — §DOC v1]
 
-**Branch:** wt/reference-doc-ingestion (not merged)
+**Branch:** wt/reference-doc-ingestion (merged to main 2026-06-10)
 
 ### Done
 - **§DOC-1 — Entitlements + deps + filesystem layer:** Added `file_picker` 8.3.7 to pubspec.yaml; added `com.apple.security.files.user-selected.read-only` to both entitlement files; `createProject()` now creates `/ingested/` subfolder; 4 new methods in `ProjectFileRepository`: `writeIngestedSummary()`, `readIngestedSummary()`, `listReferenceDocs()`, `copyReferenceDoc()`

@@ -211,13 +211,30 @@ class ProjectFileRepository {
     return summaryFile.readAsString();
   }
 
+  Future<void> deleteProject(String projectPath) async {
+    final dir = Directory(projectPath);
+    if (dir.existsSync()) {
+      await dir.delete(recursive: true);
+    }
+  }
+
+  Future<String> renameProject(String oldPath, String newName) async {
+    final oldDir = Directory(oldPath);
+    final newPath = p.join(oldDir.parent.path, newName);
+    await oldDir.rename(newPath);
+    return newPath;
+  }
+
   Future<List<File>> listReferenceDocs(String projectPath) async {
     final ingestedDir = Directory(p.join(projectPath, 'ingested'));
     if (!ingestedDir.existsSync()) return [];
     final all = ingestedDir
         .listSync()
         .whereType<File>()
-        .where((f) => p.basename(f.path) != 'reference_context.md')
+        .where((f) {
+          final name = p.basename(f.path);
+          return name != 'reference_context.md' && !name.endsWith('.facts.md');
+        })
         .toList();
     return all;
   }

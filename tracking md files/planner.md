@@ -254,11 +254,9 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 
 ---
 
-## §DOC — Reference Doc Ingestion Engine (v1) — COMPLETE ✅ (on worktree)
+## §DOC — Reference Doc Ingestion Engine (v1) — COMPLETE ✅ (merged to main)
 
-**Completed:** 2026-06-09
-
-**Branch:** wt/reference-doc-ingestion
+**Completed:** 2026-06-09 · **Merged:** 2026-06-10
 
 - [x] `macos/Runner/*.entitlements` — added `com.apple.security.files.user-selected.read-only`
 - [x] `pubspec.yaml` — added `file_picker: ^8.0.0`
@@ -266,21 +264,25 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 - [x] `lib/features/projects/ingestion/reference_doc.dart` — ReferenceDoc + IngestedFacts model
 - [x] `lib/features/projects/ingestion/ingestion_engine.dart` — LLM prompt builder + output parser
 - [x] `lib/features/projects/ingestion/ingestion_notifier.dart` — project-scoped notifier (add/remove/rebuild)
-- [x] `lib/features/projects/ingestion/reference_docs_screen.dart` — management UI with file picker
+- [x] `lib/features/projects/ingestion/reference_docs_screen.dart` — management UI with file picker (multi-file)
 - [x] `lib/features/interview/state/interview_notifier.dart` — reads ingested context from disk per turn
 - [x] `lib/features/spec_generation/spec_generator.dart` — buildSpecPrompt() accepts ingestedContext
 - [x] `lib/features/spec_generation/spec_notifier.dart` — reads ingested context from disk before spec prompt
-- [x] `lib/features/projects/screens/project_detail_screen.dart` — Reference Docs row
-- [x] `lib/features/interview/ui/interview_screen.dart` — doc count chip in AppBar
+- [x] `lib/features/projects/screens/project_detail_screen.dart` — Reference Docs row with Material wrapper fix
+- [x] `lib/features/interview/ui/interview_screen.dart` — doc count chip in AppBar; removed redundant initState loadDocs
 - [x] `dart analyze lib/` — zero issues
 - [x] `grep -ri firebase lib/` — zero matches
+
+### Post-Merge Fixes (2026-06-10)
+- **Multi-file picker**: `allowMultiple: true` + loop over `result.files` in `reference_docs_screen.dart`
+- **InkWell/Material wrapper**: `_ReferenceDocsRow` wrapped with `Material(color: Colors.transparent)` — "Manage →" was unresponsive without it on macOS desktop
+- **State race fixed**: removed `loadDocs` from `interview_screen.dart` `initState` — concurrent call raced with in-flight `addDoc` LLM calls
 
 ### Notes
 - Text-only v1: .md and .txt files only. Binary formats (PDF, DOCX) out of scope.
 - Ingestion uses architect role at t=0.2 for precision extraction. Results cached to `ingested/reference_context.md`.
-- Notifier is project-scoped (not interview-scoped) — docs survive navigation and interview sessions.
+- Notifier is global (not AutoDispose, not family) — docs survive navigation and interview sessions.
 - macOS entitlement `user-selected.read-only` is required for file_picker's NSOpenPanel.
-- Committed to worktree; needs user review and approval before merge to main.
 
 ---
 

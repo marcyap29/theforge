@@ -57,8 +57,9 @@
 - **`flutter_secure_storage` requires `keychain-access-groups` on macOS sandbox.** If that entitlement is removed, every read/write throws `-34018 errSecMissingEntitlement`. Replace with SharedPreferences + config file dual-write.
 - **`CODE_SIGN_STYLE = Manual` without a provisioning profile breaks the build.** Use `Automatic` for development unless you have a provisioning profile configured.
 - **`NSUserDefaults` can be cleared by container resets during development.** Dual-write sensitive settings to a config file in `getApplicationSupportDirectory()` as the authoritative source on next launch.
+- **`file_picker` requires `com.apple.security.files.user-selected.read-only` in both `.entitlements` files.** Without it, `NSOpenPanel` is silently blocked by the macOS sandbox — no error, no dialog, nothing. Add to both `DebugProfile.entitlements` and `Release.entitlements`.
 
-**Past bugs:** June 2026 — `keychain-access-groups` broke macOS build; `flutter_secure_storage` broke API key storage after entitlement removal. Fixed by removing entitlement and switching to SharedPreferences + `forge_config.json`.
+**Past bugs:** June 2026 — `keychain-access-groups` broke macOS build; `flutter_secure_storage` broke API key storage after entitlement removal. Fixed by removing entitlement and switching to SharedPreferences + `forge_config.json`. June 2026 — `file_picker` NSOpenPanel silently blocked until `user-selected.read-only` entitlement added.
 
 ---
 
@@ -77,8 +78,9 @@
 - **`AutoDisposeNotifier` state is lost on pop.** Interview state is `AutoDisposeNotifier` — if the user navigates away (e.g., back from spec gen error), all state is gone. Persist to disk before any navigation that could result in a pop back to the project list.
 - **`FutureBuilder(future: _scan())` in a `StatefulWidget` only refreshes on `build()`.** Popping a route does not automatically trigger `build()` on the widget beneath. Use `RouteAware.didPopNext()` to call `setState` and create a new future when the parent route becomes visible again.
 - **Never use `vv1` double-prefix.** If a version string already contains `v` (e.g., `'v1'`), don't prepend another: use `${version}` not `v${version}` in filenames.
+- **`InkWell` on macOS Flutter desktop requires an immediate `Material` ancestor.** A `Scaffold` or any other `Material` widget higher in the tree is NOT sufficient — Flutter's ink system requires a local `Material` in the subtree. Wrap with `Material(color: Colors.transparent)` around the `InkWell`. Match the `_FileRow` pattern in `project_detail_screen.dart`.
 
-**Past bugs:** June 2026 — HandoffPackage named `_vv1` due to `v$version` where `version = 'v1'`.
+**Past bugs:** June 2026 — HandoffPackage named `_vv1` due to `v$version` where `version = 'v1'`. June 2026 — `_ReferenceDocsRow` Manage button unresponsive on macOS until wrapped with `Material(color: Colors.transparent)`.
 
 ---
 
@@ -88,6 +90,14 @@
 - **Race conditions on user input** — disable UI triggers while async work is in flight.
 - **Optimistic state without rollback** — if spec write fails, do not update the project state in Flutter.
 - **Stale references after refactor** — grep the full repo for old names before declaring a rename done.
+- **Multiple `initState` callers on a global Notifier** — do NOT call state-writing methods (e.g., `loadDocs`) from `initState` in more than one widget when sharing a global non-AutoDispose `Notifier`. Two concurrent async writers produce interleaved state updates. Secondary screens should watch the provider passively; only the screen that owns the interaction should trigger explicit loads.
+
+---
+
+## Development Process Rules
+
+- **Create git worktrees from a committed HEAD only.** If uncommitted changes exist on main, commit them first. A worktree branches from the last commit — any uncommitted changes on main are invisible to the worktree and reappear as conflicts at merge time. The sign: merge conflicts on files you didn't touch in the worktree branch.
+- **Run `flutter pub get` after any merge that adds a new dependency.** If a `pubspec.yaml` change lands via merge, the app won't build until `pub get` runs. Use `flutter clean && flutter pub get` when a module import fails at compile time.
 
 ---
 
