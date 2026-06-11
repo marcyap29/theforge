@@ -4,6 +4,41 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-06-11 — Claude Code [Open Items + §EX1 Executor Timeline]
+
+**Branch:** main
+
+### Done
+- **§DOC E2E code verification:** Confirmed both injection paths are correctly wired — `interview_notifier.dart:162` reads `readIngestedSummary()` from disk each turn and injects as REFERENCE CONTEXT block; `spec_notifier.dart:42` does the same before `buildSpecPrompt()`. Manual UI run still needed to fully confirm end-to-end.
+- **FOR_MARC_reference-doc-ingestion.md:** 9-step coding lesson written — disk-as-cache pattern, three roads not taken, per-doc facts file architecture, three post-merge bugs (allowMultiple, InkWell/Material, state race), macOS entitlement pitfall, transferable patterns.
+- **forge-mcp/ silenced in .gitignore:** forge-mcp has its own git history and origin remote — kept repos independent, removed `??` noise from parent `git status`.
+- **§EX1 Executor Timeline — shipped:** `buildExecutorTimelinePrompt()` added to `spec_generator.dart`; `executor_timeline_notifier.dart` created (AutoDisposeFamilyAsyncNotifier by projectPath — scans handoffs/ on build, loads from disk if found); `_BuildSequenceSection` widget added to `ProjectDetailScreen` behind `phase == v1_worksheet_complete` gate; all 4 states (notGenerated/generating/done/error).
+- **§EX1 post-review fixes:** Two lint issues from Gemma left unfixed — `super.key` unused parameter on private widget + import not sorted alphabetically. Both fixed; `dart analyze lib/` → zero issues.
+- **Bugtracker updated:** BUG-UI-001 (InkWell/Material macOS) and BUG-UI-002 (IngestionNotifier state race) recorded; BUG_PREVENTION.md updated with macOS InkWell rule and multiple-initState-writers rule.
+
+### Key Technical Findings
+- `AutoDisposeFamilyAsyncNotifier<State, Arg>` is the correct base class for autoDispose family providers in Riverpod 2.x — `FamilyAsyncNotifier` without the AutoDispose prefix fails the type bounds check at `AsyncNotifierProvider.autoDispose.family<>`.
+- Private widgets (`_Foo`) don't need `super.key` — they're never constructed externally with a key. Always omit `super.key` from private widget constructors to avoid the `unused_element_parameter` warning.
+- When an external agent adds an import, it tends to append at the bottom rather than insert alphabetically — always check import ordering lint after agent work.
+
+### Next
+- Manual end-to-end test: create project → add reference doc → run interview → generate spec → verify context in both prompts; then test BUILD SEQUENCE generation
+- §W1 Watch Mode: Token Ingestion Engine (next on critical path)
+
+### Modified
+- `.gitignore` — forge-mcp/ excluded
+- `DOCS/Coding Lessons/FOR_MARC_reference-doc-ingestion.md` — NEW
+- `DOCS/forge/ex1_executor_timeline_plan.md` — NEW (Gemma handoff, now executed)
+- `lib/features/spec_generation/spec_generator.dart` — `buildExecutorTimelinePrompt()` added
+- `lib/features/spec_generation/executor_timeline_notifier.dart` — NEW
+- `lib/features/projects/screens/project_detail_screen.dart` — `_BuildSequenceSection` + import fix
+- `bugtracker/bug_tracker.md` — BUG-UI-001, BUG-UI-002 added
+- `bugtracker/records/BUG-UI-001-inkwell-material-macos.md` — NEW
+- `bugtracker/records/BUG-UI-002-ingestion-state-race.md` — NEW
+- `bugtracker/BUG_PREVENTION.md` — macOS InkWell rule + multiple initState writers rule added
+
+---
+
 ## Session: 2026-06-10 — Claude Code [§DOC Merge + Post-Merge Bug Fixes]
 
 **Branch:** main (merged from wt/reference-doc-ingestion)

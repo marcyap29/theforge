@@ -24,7 +24,7 @@ Long-term feature pool. Active sprint work lives in `planner.md`.
   → §DOC Reference Doc Ingestion Engine (text-only v1) ✅ (merged 2026-06-10)
   → First end-to-end Plan Mode run ✅ (2026-06-05 — Testapp)
        ↓
-  → §EX1 Executor Timeline (parse spec §3 Component Map → LLM-narrated build sequence)
+  → §EX1 Executor Timeline (parse spec §3 Component Map → LLM-narrated build sequence) ✅
        ↓
   → §W1 Watch Mode: Token Ingestion Engine
   → §W2 Watch Mode: Git Activity Engine + CI Outcome Correlator
@@ -68,21 +68,7 @@ Every §N that brings The Forge closer to a working interview-to-spec run unbloc
 ## High Priority
 
 ### §EX1 — Executor Timeline (Project-Specific Build Sequence)
-
-**What it is:** When `phase == v1_worksheet_complete`, parse the locked spec's `§3 Component Map` table and call the LLM once to generate a narrated build sequence — one milestone per component, ordered by dependency. Displayed in `ProjectDetailScreen` below the phase timeline under a new "BUILD SEQUENCE" section. Each step has a label, a one-line description, and a status (pending).
-
-**Why it matters:** The generic "Ready for executor" state gives no guidance on what to build first. A spec-derived timeline makes the hand-off actionable and is unique per project — no two projects have the same sequence.
-
-**Architecture:**
-- `spec_generator.dart` — `parseComponentNames()` already exists; add `buildExecutorTimelinePrompt(projectName, specContent)`
-- New `executor_timeline_notifier.dart` — `ExecutorTimelineNotifier(AutoDisposeNotifier)` with `generate(projectPath, projectName, specVersion)` 
-- New `executor_timeline_screen.dart` (or inline widget in ProjectDetailScreen) — idle/generating/done states
-- `ProjectDetailScreen` — add "Build Sequence" section visible only when `phase == v1_worksheet_complete`
-- Store result in `handoffs/{ProjectName}_BuildSequence_v1.md` so it persists across sessions
-
-**Dependencies:** §9.5 ✅ (spec is locked and parseable)
-
-**Status:** Not started — next up after this commit
+✅ Complete 2026-06-11 — `buildExecutorTimelinePrompt()` in spec_generator; `executor_timeline_notifier.dart` (AutoDisposeFamilyAsyncNotifier, disk-backed); `_BuildSequenceSection` widget in ProjectDetailScreen behind phase gate; `dart analyze lib/` zero issues
 
 ---
 
@@ -668,6 +654,9 @@ Output: {
 
 ### §DOC — Reference Doc Ingestion Engine (v1)
 ✅ Complete 2026-06-09 (worktree wt/reference-doc-ingestion, pending merge) — text-only ingestion for .md/.txt files; LLM extracts definitions/equations/constraints; cached to `ingested/reference_context.md` on disk; injected into both interview and spec prompts; 4 new files in `lib/features/projects/ingestion/`; macOS entitlements updated; `dart analyze lib/` zero issues
+
+### §EX1 — Executor Timeline
+✅ Complete 2026-06-11 — `buildExecutorTimelinePrompt()` in `spec_generator.dart`; `executor_timeline_notifier.dart` (AutoDisposeFamilyAsyncNotifier by projectPath, disk-backed); `_BuildSequenceSection` inline widget in `ProjectDetailScreen` behind `phase == v1_worksheet_complete` gate; all 4 states; `dart analyze lib/` zero issues
 
 ---
 

@@ -286,12 +286,22 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 
 ---
 
-## Next Up — §EX1: Executor Timeline
+## §EX1 — Executor Timeline — COMPLETE ✅
 
-**What it is:** When `phase == v1_worksheet_complete`, parse the spec's `§3 Component Map` table and generate an LLM-narrated timeline (one milestone per component, unique per project). Displayed in `ProjectDetailScreen` below the phase timeline when Ready is green.
+**Completed:** 2026-06-11 (Gemma4 + Claude Code review)
 
-**Why it matters:** Gives the executor agent a visual build sequence unique to the project — mirrors how The Forge's own timeline is driven by its spec.
+- [x] `lib/features/spec_generation/spec_generator.dart` — `buildExecutorTimelinePrompt(projectName, specContent)` added
+- [x] `lib/features/spec_generation/executor_timeline_notifier.dart` — NEW: `AutoDisposeFamilyAsyncNotifier` by projectPath; `build()` scans handoffs/ on mount; `generate()` reads locked spec → LLM → writes `_BuildSequence_{specVersion}.md`
+- [x] `lib/features/projects/screens/project_detail_screen.dart` — `_BuildSequenceSection` widget; phase-gated on `v1_worksheet_complete`; all 4 states (notGenerated / generating / done / error with retry)
+- [x] `dart analyze lib/` — zero issues
 
-**Dependencies:** §9.5 complete ✅ (spec is locked and parseable); `parseComponentNames()` already exists in `spec_generator.dart`
+### Notes
+- Scans `handoffs/` for `*_BuildSequence_*` on every mount — no re-generation on subsequent opens
+- LLM call: architect role, t=0.3 (procedural), maxTokens 2048
+- Post-review fixes: removed `super.key` from private widget (unused_element_parameter warning); moved executor_timeline import to correct alphabetical position (directives_ordering info)
 
-**Status:** Backlog — not started
+---
+
+## Next Up — §W1: Watch Mode Token Ingestion Engine
+
+**Status:** Not started — next on critical path after §EX1 ✅
