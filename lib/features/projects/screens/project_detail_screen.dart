@@ -10,6 +10,7 @@ import '../../../data/local_db/forge_database.dart';
 import '../../artifacts/artifact_viewer_screen.dart';
 import '../../interview/providers/interview_providers.dart';
 import '../../interview/ui/interview_screen.dart';
+import '../../spec_generation/executor_timeline_notifier.dart';
 import '../../spec_generation/worksheet_generation_screen.dart';
 import '../ingestion/ingestion_notifier.dart';
 import '../ingestion/reference_docs_screen.dart';
@@ -101,6 +102,8 @@ class ProjectDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 24),
                 const _SectionHeader('Reference Documents'),
                 _ReferenceDocsRow(projectPath: project.path),
+                if (live.phase == 'v1_worksheet_complete')
+                  _BuildSequenceSection(project: live),
                 const SizedBox(height: 24),
                 // Phase-aware CTA
                 _SectionHeader(_ctaSectionLabel(live.phase)),
@@ -747,6 +750,160 @@ class _ReferenceDocsRowState extends ConsumerState<_ReferenceDocsRow> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BuildSequenceSection extends ConsumerWidget {
+  final Project project;
+
+  const _BuildSequenceSection({required this.project});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(executorTimelineProvider(project.path));
+    final sv = project.specVersion ?? 'v1';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F0F10),
+          border: Border.all(color: const Color(0xFF2C2C2E)),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'BUILD SEQUENCE',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.8,
+                fontFamily: 'Menlo',
+                color: Color(0xFFE8A04C),
+              ),
+            ),
+            const SizedBox(height: 8),
+            state.when(
+              data: (s) {
+                switch (s.status) {
+                  case ExecutorTimelineStatus.notGenerated:
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Generate an LLM-narrated build order from your spec.',
+                          style: TextStyle(
+                            fontFamily: 'Menlo',
+                            fontSize: 12,
+                            color: Color(0xFF9CA3AF),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        FilledButton(
+                          onPressed: () => ref
+                              .read(executorTimelineProvider(project.path).notifier)
+                              .generate(project.name, sv),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFFE8A04C),
+                            foregroundColor: const Color(0xFF0F0F10),
+                          ),
+                          child: const Text(
+                            'Generate Build Sequence',
+                            style: TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Menlo'),
+                          ),
+                        ),
+                      ],
+                    );
+                  case ExecutorTimelineStatus.generating:
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Color(0xFFE8A04C),
+                              ),
+                            ),
+                            SizedBox(width: 12),
+                            Text(
+                              'Generating...',
+                              style: TextStyle(
+                                fontFamily: 'Menlo',
+                                fontSize: 12,
+                                color: Color(0xFF9CA3AF),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  case ExecutorTimelineStatus.done:
+                    return Container(
+                      constraints: const BoxConstraints(maxHeight: 300),
+                      child: SingleChildScrollView(
+                        child: Text(
+                          s.content ?? '',
+                          style: const TextStyle(
+                            fontFamily: 'Menlo',
+                            fontSize: 12,
+                            height: 1.5,
+                            color: Color(0xFFD1D5DB),
+                          ),
+                        ),
+                      ),
+                    );
+                  case ExecutorTimelineStatus.error:
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          s.error ?? 'An unknown error occurred',
+                          style: const TextStyle(
+                            color: Color(0xFFEF4444),
+                            fontFamily: 'Menlo',
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: () => ref
+                              .read(executorTimelineProvider(project.path).notifier)
+                              .generate(project.name, sv),
+                          child: const Text(
+                            'Retry',
+                            style: TextStyle(color: Color(0xFFE8A04C), fontFamily: 'Menlo'),
+                          ),
+                        ),
+                      ],
+                    );
+                }
+              },
+              loading: () => const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Color(0xFFE8A04C),
+                  ),
+                ),
+              ),
+              error: (e, s) => Text(
+                'Error loading timeline: $e',
+                style: const TextStyle(color: Color(0xFFEF4444), fontFamily: 'Menlo', fontSize: 12),
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -215,19 +215,68 @@ Do not stop because the work is hard. Stop only when genuinely blocked.
 }
 
 List<String> parseComponentNames(String specContent) {
-  final section = _extractSection(specContent, '## 3. Component Map');
-  if (section == null) return [];
-  return section
-      .split('\n')
-      .where((l) => l.startsWith('|') && !RegExp(r'^\|[-| ]+\|$').hasMatch(l.trim()))
-      .skip(1)
-      .map((l) {
-        final cols = l.split('|');
-        return cols.length > 1 ? cols[1].trim() : '';
-      })
-      .where((s) => s.isNotEmpty)
-      .toList();
-}
+    final section = _extractSection(specContent, '## 3. Component Map');
+    if (section == null) return [];
+    return section
+        .split('\n')
+        .where((l) => l.startsWith('|') && !RegExp(r'^\|[-| ]+\|$').hasMatch(l.trim()))
+        .skip(1)
+        .map((l) {
+          final cols = l.split('|');
+          return cols.length > 1 ? cols[1].trim() : '';
+        })
+        .where((s) => s.isNotEmpty)
+        .toList();
+  }
+
+  String buildExecutorTimelinePrompt(String projectName, String specContent) {
+    final goal = _extractSection(specContent, '## 1. Immutable Goal Statement') ??
+        _extractSection(specContent, '## 1. Project Goal Statement') ??
+        '(see spec)';
+    final constraints = _extractSection(specContent, '## 2. Hard Constraints') ?? '(see spec)';
+    final componentSection = _extractSection(specContent, '## 3. Component Map') ?? '(see spec)';
+    final components = parseComponentNames(specContent);
+    final componentList = components.isEmpty
+        ? '(no components found)'
+        : components.map((c) => '- $c').join('\n');
+
+    return '''You are a senior technical architect generating an ordered build sequence.
+
+PROJECT: $projectName
+
+GOAL:
+$goal
+
+HARD CONSTRAINTS:
+$constraints
+
+COMPONENT MAP (table):
+$componentSection
+
+COMPONENTS IDENTIFIED:
+$componentList
+
+Generate a concrete, ordered build sequence. Order by dependency: components with no upstream dependencies come first. Each step enables the next.
+
+Output this exact format and nothing else:
+
+# $projectName — Build Sequence
+
+## Step 1: [ComponentName]
+[One sentence: what to build and what it unblocks downstream]
+
+## Step 2: [ComponentName]
+[One sentence]
+
+(continue for every component in the Component Map — one step per component, no extras)
+
+Rules:
+- Use the exact component names from the Component Map
+- No TBD, no filler
+- Each step's one sentence explains WHY it comes at this position
+- Do not add components not in the spec''';
+  }
+
 
 Map<String, String> buildContextFiles(String projectName, String specVersion) {
   return {
