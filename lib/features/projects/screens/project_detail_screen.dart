@@ -44,8 +44,12 @@ class ProjectDetailScreen extends ConsumerWidget {
           tooltip: 'Back to Projects',
           onPressed: () {
             final nav = Navigator.of(context);
+            if (nav.canPop()) {
+              nav.pop();
+            } else {
+              nav.pushReplacementNamed('/');
+            }
             ref.read(activeProjectProvider.notifier).close();
-            nav.pop();
           },
         ),
         title: Text(live.name),
@@ -479,8 +483,10 @@ class _FilesSidebarState extends State<_FilesSidebar> with RouteAware {
 
   @override
   void didPopNext() {
-    // A sub-route was popped — rescan so newly generated files appear
-    setState(() => _scanFuture = _scan());
+    final next = _scan();
+    setState(() {
+      _scanFuture = next;
+    });
   }
 
   void _open(BuildContext context, String folder, String filename) {

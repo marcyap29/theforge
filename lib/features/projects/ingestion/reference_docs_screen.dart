@@ -30,15 +30,17 @@ class _ReferenceDocsScreenState extends ConsumerState<ReferenceDocsScreen> {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['md', 'txt'],
+      allowMultiple: true,
     );
     if (result == null || result.files.isEmpty) return;
-    final filePath = result.files.single.path;
-    if (filePath == null) return;
 
     if (!mounted) return;
-    await ref
-        .read(ingestionNotifierProvider.notifier)
-        .addDoc(widget.projectPath, filePath);
+    final notifier = ref.read(ingestionNotifierProvider.notifier);
+    for (final file in result.files) {
+      final filePath = file.path;
+      if (filePath == null) continue;
+      await notifier.addDoc(widget.projectPath, filePath);
+    }
   }
 
   Future<void> _remove(String docId) async {

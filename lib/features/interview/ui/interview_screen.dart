@@ -23,16 +23,6 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen> {
   final _scrollController = ScrollController();
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref
-          .read(ingestionNotifierProvider.notifier)
-          .loadDocs(widget.args.path);
-    });
-  }
-
-  @override
   void dispose() {
     _controller.dispose();
     _scrollController.dispose();
