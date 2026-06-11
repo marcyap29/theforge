@@ -480,27 +480,51 @@ LlmProvider.complete({
 
 ### §W1 — Token Ingestion Engine
 
-**What it is:** Polls the Anthropic API hourly for per-engineer token spend, normalizes into daily and 30-day aggregates, and calculates cost at current model pricing. The foundation data source for all Watch Mode signals.
+**What it is:** Multi-provider usage ingestion layer — polls cloud LLM provider APIs hourly for per-engineer token spend, normalizes into a shared output format, and calculates cost in USD. The foundation data source for all Watch Mode signals (§W2–§W6 all depend on it).
 
-**Owns:** Anthropic API polling (per-engineer key from Workspace Config), usage normalization, daily/30-day aggregation, cost-in-USD calculation, session-level granularity.
+**Architecture — abstract `UsageProvider` interface:**
+All provider-specific polling is behind one interface. §W2–§W6 never touch a provider directly — they consume the normalized output only.
 
-**Demo data bridge:** Ship with the 4 synthetic engineer profiles from the Vigilint spec (The Runaway 9x baseline, The Ghost 0.1x, The High Performer 1.5x, Self 1.0x = $15/day) using fixed-seed RNG (Random(42)) so demos work before any real team is configured.
-
-**Interface contract:**
-```
-Input:  { engineerHandle: string, apiKey: string, lookbackDays: number }
-Output: {
-  engineerHandle: string,
-  dailyBreakdown: { date: ISO, tokensUsed: number, costUSD: number }[],
-  totalCostUSD30d: number,
-  sessionCount: number,
-  alertFlags: ('spend_threshold' | 'runaway_session')[]
+```dart
+abstract class UsageProvider {
+  String get providerName;           // 'anthropic' | 'openai' | 'gemini' | 'ollama'
+  Future<EngineerUsage> fetchUsage({
+    required String engineerHandle,
+    required String apiKey,
+    required int lookbackDays,
+  });
 }
 ```
 
-**Dependencies:** §W0 — Workspace Config extension (add team roster, per-engineer API keys, alert thresholds to existing WorkspaceConfig schema from §10)
+**Provider implementations (v1 scope):**
+| Provider | Source API | Notes |
+|---|---|---|
+| `AnthropicUsageProvider` | `api.anthropic.com/v1/usage` | Per-workspace key; model-level breakdown |
+| `OpenAiUsageProvider` | `api.openai.com/v1/usage` | Per-org key; model + user breakdown |
+| `GeminiUsageProvider` | Google Cloud Billing / AI Studio API | Per-project key; may require Cloud billing export |
+| `OllamaUsageProvider` | Local only — no central API | Returns stub/empty; see Open Flag below |
 
-**Status:** Not started — gated on Plan Mode end-to-end run
+**Open Flag — local model telemetry:** Ollama/Llama/OpenCode running locally have no central API to poll. Tracking local spend requires a proxy layer (sidecar in front of `localhost:11434`) or client-side instrumentation. Out of scope for §W1 v1 — flag for §W0 Workspace Config to surface as an unsupported provider warning, not a crash.
+
+**Normalized output (all providers → same shape):**
+```
+EngineerUsage {
+  engineerHandle: string,
+  providerName:   string,
+  dailyBreakdown: [{ date: ISO, tokensUsed: int, costUSD: double }],
+  totalCostUSD30d: double,
+  sessionCount:    int,
+  alertFlags:      ('spend_threshold' | 'runaway_session')[],
+}
+```
+
+**Owns:** Provider adapter implementations, usage normalization, daily/30-day aggregation, cost-in-USD calculation (provider-specific pricing tables), session-level granularity, alert flag evaluation.
+
+**Demo data bridge:** Ship with the 4 synthetic engineer profiles from the Vigilint spec (The Runaway 9x baseline, The Ghost 0.1x, The High Performer 1.5x, Self 1.0x = $15/day) using fixed-seed RNG (`Random(42)`) so demos work before any real team is configured. Demo profiles implement the same `EngineerUsage` shape — identical code path to live data.
+
+**Dependencies:** §W0 — Workspace Config extension: per-engineer `{ handle, providerType, apiKey, alertThreshold }` roster added to existing Settings schema from §10.
+
+**Status:** Not started — next on critical path after §EX1 ✅
 
 ---
 
