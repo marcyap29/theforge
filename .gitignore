@@ -61,3 +61,6 @@ functions/.env
 # macOS
 *.xcuserstate
 xcuserdata/
+
+# Nested repos (managed independently)
+forge-mcp/
