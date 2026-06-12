@@ -212,9 +212,10 @@ class _PhaseTimeline extends StatefulWidget {
 }
 
 class _PhaseTimelineState extends State<_PhaseTimeline>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, RouteAware {
   late AnimationController _pulseCtrl;
   late Animation<double> _pulseOpacity;
+  Map<String, dynamic>? _progress;
 
   @override
   void initState() {
@@ -226,10 +227,33 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
     _pulseOpacity = Tween(begin: 0.3, end: 1.0).animate(
       CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
     );
+    _loadProgress();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null) {
+      routeObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void didPopNext() => _loadProgress();
+
+  void _loadProgress() {
+    final repo = ProjectFileRepository();
+    repo
+        .readInterviewProgress(widget.project.path, widget.project.name)
+        .then((data) {
+      if (mounted) setState(() => _progress = data);
+    });
   }
 
   @override
   void dispose() {
+    routeObserver.unsubscribe(this);
     _pulseCtrl.dispose();
     super.dispose();
   }
@@ -267,30 +291,44 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Step 1: Interview → opens locked spec when done
-          _TimelineStep(
-            label: 'Interview',
-            isDone: interviewDone,
-            isCurrent: !interviewDone,
-            pulseOpacity: _pulseOpacity,
-            onTap: interviewDone
-                ? () => _openArtifact(
-                    context,
-                    'specs',
-                    '${pj.name}_LockedSpec_$sv.md',
-                    ArtifactViewMode.spec)
-                : () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => InterviewScreen(
-                          args: InterviewArgs(
-                            path: pj.path,
-                            name: pj.name,
-                            mode: mode,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _TimelineStep(
+                label: 'Interview',
+                isDone: interviewDone,
+                isCurrent: !interviewDone,
+                pulseOpacity: _pulseOpacity,
+                onTap: interviewDone
+                    ? () => _openArtifact(
+                        context,
+                        'specs',
+                        '${pj.name}_LockedSpec_$sv.md',
+                        ArtifactViewMode.spec)
+                    : () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => InterviewScreen(
+                              args: InterviewArgs(
+                                path: pj.path,
+                                name: pj.name,
+                                mode: mode,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
+              ),
+              if (mode == ProjectMode.build &&
+                  (!interviewDone || _progress != null))
+                _LayerSubRow(
+                  progress: _progress,
+                  interviewDone: interviewDone,
+                  pulseOpacity: _pulseOpacity,
+                ),
+            ],
           ),
           Expanded(child: _TimelineConnector(done: interviewDone)),
           // Step 2: Worksheet → opens worksheet when done, generates when current
@@ -427,6 +465,119 @@ class _TimelineStep extends StatelessWidget {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(onTap: onTap, child: col),
+    );
+  }
+}
+
+class _LayerSubRow extends StatelessWidget {
+  const _LayerSubRow({
+    required this.progress,
+    required this.interviewDone,
+    required this.pulseOpacity,
+  });
+
+  final Map<String, dynamic>? progress;
+  final bool interviewDone;
+  final Animation<double> pulseOpacity;
+
+  @override
+  Widget build(BuildContext context) {
+    const layers = ['L1', 'L2', 'L3', 'L4'];
+
+    final currentLayer = progress?['currentLayer'] as String?;
+    final completed = (progress?['completedLayers'] as List<dynamic>?)
+            ?.cast<String>() ??
+        <String>[];
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, left: 2),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (int i = 0; i < layers.length; i++) ...[
+            _LayerDot(
+              label: layers[i],
+              isDone: interviewDone || completed.contains(layers[i]),
+              isCurrent: !interviewDone && currentLayer == layers[i],
+              pulseOpacity: pulseOpacity,
+            ),
+            if (i < layers.length - 1)
+              Container(
+                width: 12,
+                height: 1,
+                margin: const EdgeInsets.only(bottom: 10),
+                color: (interviewDone || completed.contains(layers[i]))
+                    ? const Color(0xFF22C55E)
+                    : const Color(0xFF2C2C2E),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _LayerDot extends StatelessWidget {
+  const _LayerDot({
+    required this.label,
+    required this.isDone,
+    required this.isCurrent,
+    required this.pulseOpacity,
+  });
+
+  final String label;
+  final bool isDone;
+  final bool isCurrent;
+  final Animation<double> pulseOpacity;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget dot;
+    Color labelColor;
+
+    if (isDone) {
+      dot = const Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 12);
+      labelColor = const Color(0xFF22C55E);
+    } else if (isCurrent) {
+      dot = FadeTransition(
+        opacity: pulseOpacity,
+        child: Container(
+          width: 12,
+          height: 12,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: Color(0xFFE8A04C),
+          ),
+        ),
+      );
+      labelColor = const Color(0xFFE8A04C);
+    } else {
+      dot = Container(
+        width: 12,
+        height: 12,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFF3D4452), width: 1.0),
+        ),
+      );
+      labelColor = const Color(0xFF4B5563);
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        dot,
+        const SizedBox(height: 3),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 8,
+            fontFamily: 'Menlo',
+            letterSpacing: 0.3,
+            color: labelColor,
+          ),
+        ),
+      ],
     );
   }
 }
