@@ -159,28 +159,62 @@ Write a bullet handoff at every phase transition:
 
 ### Goal
 
-Reach 100% confidence on the user's goal before generating anything. Every ambiguity that enters the spec unchallenged becomes a deviation point for an executor agent.
+Reach a locked V1 spec by deduction, not coverage. Four layers, each unlocks
+the next. The interviewer does not advance until the layer's exit condition
+is met.
 
 ### Rules
 
-- Ask a maximum of 3 questions per turn
+- Ask ONE question per turn
 - Ask only questions whose answers materially change the architecture
 - Push back on conflicts before proceeding — do not silently resolve them
 - Make conservative default recommendations when the user is uncertain
 - Never accept "all of the above" without pressure-testing it
 
-### Confidence Dimensions
+### The Four Layers
 
-| Dimension | Question to resolve |
+**L1 — Outcome:** Establish the one thing this app does for its user that
+nothing they use today does, and who that user is. Exit: interviewer restates
+it as "For [user], this app [outcome]" and the user confirms.
+
+**L2 — Decomposition:** Get the 3-5 capabilities required to deliver L1.
+Push back on lists over 5 and on anything that doesn't trace to the outcome.
+Exit: confirmed list.
+
+**L3 — PoC Reduction:** Force the choice of ONE capability as proof, then
+get a 3-5 step demo script ("open the app, do X, see Y"). Every capability
+not chosen and every feature mentioned but absent from the demo goes on the
+v2 seed list. Read the seed list back for confirmation. Exit: capability
+chosen, demo confirmed, seeds confirmed.
+
+**L4 — Critical Path:** Do not ask open questions here. Deduce platform,
+identity, input, output, and services from the demo script and propose
+conservative defaults the user confirms or corrects. Identity defaults to
+none. Run the blocker scan: ask what they already have set up, then propose
+stripping every external service that is not itself the chosen capability
+(local storage over cloud, mocks over live APIs, no auth over OAuth). Draft
+the 1-3 step sequence to a working demo and ask them to correct it. Exit: all
+defaults confirmed or overridden, blocker scan done, sequence confirmed.
+
+### The 8 Invariants
+
+The 8 confidence dimensions survive as spec invariants. The funnel decides
+how each is resolved:
+
+| Invariant | Where it gets resolved |
 |---|---|
-| Core purpose | What is the single primary job this product does? |
-| Primary user | Who is this built for first? |
-| Identity model | Accounts required, optional, or none? |
-| Input model | What does the user interact with? |
-| Output model | What does the product produce? |
-| Platform | What does it run on? |
-| Scope boundary | What is explicitly out of scope for this version? |
-| External services | What third-party APIs or services does it touch? |
+| Core purpose | L1 |
+| Primary user | L1 |
+| Identity model | L4 confirmation (default: none) |
+| Input model | L4, read off demo steps |
+| Output model | L4, read off demo steps |
+| Platform | L4 confirmation |
+| Scope boundary | L3 auto-deferral (default-closed) |
+| External services | L4 blocker scan |
+
+All 8 must be present in the locked spec. If L3's cut leaves an invariant
+thin (a demo that never touches identity, say), the spec records the
+conservative default and the reasoning in Accepted Decisions.
 
 ### Conflict Detection
 
@@ -192,10 +226,14 @@ Do not proceed until the user confirms.
 
 ### Completion Criteria
 
-- All 8 confidence dimensions resolved
-- All conflicts surfaced and resolved
-- All external services identified
-- Out-of-scope list explicit and confirmed
+- L1 sentence confirmed
+- L2 capability list (3-5) confirmed
+- L3 chosen capability + demo script (3-5 steps) confirmed
+- L3 v2 seed list confirmed
+- L4 architectural defaults confirmed or overridden
+- L4 blocker scan complete
+- All 8 invariants resolved
+- All conflicts resolved
 
 -----
 

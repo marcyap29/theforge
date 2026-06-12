@@ -247,4 +247,11 @@ class ProjectFileRepository {
     final destPath = p.join(ingestedDir.path, filename);
     return source.copy(destPath);
   }
+
+  Future<void> writeIngestedFile(
+      String projectPath, String filename, String content) async {
+    final ingestedDir = Directory(p.join(projectPath, 'ingested'));
+    final file = File(p.join(ingestedDir.path, filename));
+    await file.writeAsString(content);
+  }
 }
