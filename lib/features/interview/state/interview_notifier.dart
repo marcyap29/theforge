@@ -74,72 +74,74 @@ ForgeStateParse parseForgeState(String llmRaw) {
   final visibleText = llmRaw.replaceFirst(match.group(0)!, '').trim();
   final jsonStr = match.group(1)!;
 
-  Map<String, dynamic> parsed;
+  ForgeStateParse degradedResult() => (
+        extracted: null,
+        layer: null,
+        layerComplete: false,
+        conflicts: const <ConflictItem>[],
+        visibleText: visibleText,
+        parseOk: false,
+      );
+
   try {
-    parsed = jsonDecode(jsonStr) as Map<String, dynamic>;
-  } on FormatException {
+    final parsed = jsonDecode(jsonStr) as Map<String, dynamic>;
+    final extractedRaw = parsed['extracted'] as Map<String, dynamic>? ?? {};
+    final extracted = <String, dynamic>{
+      'outcome': extractedRaw['outcome'] as String?,
+      'primaryUser': extractedRaw['primaryUser'] as String?,
+      'capabilities':
+          (extractedRaw['capabilities'] as List<dynamic>?)?.cast<String>() ??
+              <String>[],
+      'chosenCapability': extractedRaw['chosenCapability'] as String?,
+      'demoScript':
+          (extractedRaw['demoScript'] as List<dynamic>?)?.cast<String>() ??
+              <String>[],
+      'v2Seeds':
+          (extractedRaw['v2Seeds'] as List<dynamic>?)?.cast<String>() ??
+              <String>[],
+      'platform': extractedRaw['platform'] as String?,
+      'identityModel': extractedRaw['identityModel'] as String?,
+      'inputModel': extractedRaw['inputModel'] as String?,
+      'outputModel': extractedRaw['outputModel'] as String?,
+      'externalServices':
+          (extractedRaw['externalServices'] as List<dynamic>?)
+                  ?.map((e) => e as Map<String, dynamic>)
+                  .toList() ??
+              <Map<String, dynamic>>[],
+    };
+
+    final layer = parsed['layer'] as String?;
+    final layerComplete = parsed['layerComplete'] as bool? ?? false;
+
+    final conflictsRaw = parsed['conflicts'] as List<dynamic>? ?? [];
+    final conflicts = conflictsRaw.map((c) {
+      final cm = c as Map<String, dynamic>;
+      final a = cm['a'] as String? ?? '';
+      final b = cm['b'] as String? ?? '';
+      final id =
+          '${a}_$b'.replaceAll(RegExp(r'\s+'), '_').toLowerCase();
+      return ConflictItem(
+        id: id,
+        dimensionALabel: a,
+        dimensionBLabel: b,
+        description: cm['description'] as String? ?? '',
+        recommendation: cm['recommendation'] as String? ?? '',
+      );
+    }).toList();
+
     return (
-      extracted: null,
-      layer: null,
-      layerComplete: false,
-      conflicts: const [],
+      extracted: extracted,
+      layer: layer,
+      layerComplete: layerComplete,
+      conflicts: conflicts,
       visibleText: visibleText,
-      parseOk: false,
+      parseOk: true,
     );
+  } on FormatException {
+    return degradedResult();
+  } on TypeError {
+    return degradedResult();
   }
-
-  final extractedRaw = parsed['extracted'] as Map<String, dynamic>? ?? {};
-  final extracted = <String, dynamic>{
-    'outcome': extractedRaw['outcome'] as String?,
-    'primaryUser': extractedRaw['primaryUser'] as String?,
-    'capabilities':
-        (extractedRaw['capabilities'] as List<dynamic>?)?.cast<String>() ??
-            <String>[],
-    'chosenCapability': extractedRaw['chosenCapability'] as String?,
-    'demoScript':
-        (extractedRaw['demoScript'] as List<dynamic>?)?.cast<String>() ??
-            <String>[],
-    'v2Seeds':
-        (extractedRaw['v2Seeds'] as List<dynamic>?)?.cast<String>() ??
-            <String>[],
-    'platform': extractedRaw['platform'] as String?,
-    'identityModel': extractedRaw['identityModel'] as String?,
-    'inputModel': extractedRaw['inputModel'] as String?,
-    'outputModel': extractedRaw['outputModel'] as String?,
-    'externalServices':
-        (extractedRaw['externalServices'] as List<dynamic>?)
-                ?.map((e) => e as Map<String, dynamic>)
-                .toList() ??
-            <Map<String, dynamic>>[],
-  };
-
-  final layer = parsed['layer'] as String?;
-  final layerComplete = parsed['layerComplete'] as bool? ?? false;
-
-  final conflictsRaw = parsed['conflicts'] as List<dynamic>? ?? [];
-  final conflicts = conflictsRaw.map((c) {
-    final cm = c as Map<String, dynamic>;
-    final a = cm['a'] as String? ?? '';
-    final b = cm['b'] as String? ?? '';
-    final id =
-        '${a}_$b'.replaceAll(RegExp(r'\s+'), '_').toLowerCase();
-    return ConflictItem(
-      id: id,
-      dimensionALabel: a,
-      dimensionBLabel: b,
-      description: cm['description'] as String? ?? '',
-      recommendation: cm['recommendation'] as String? ?? '',
-    );
-  }).toList();
-
-  return (
-    extracted: extracted,
-    layer: layer,
-    layerComplete: layerComplete,
-    conflicts: conflicts,
-    visibleText: visibleText,
-    parseOk: true,
-  );
 }
 
 String _v2SeedsMarkdown(List<String> seeds) {
