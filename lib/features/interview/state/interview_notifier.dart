@@ -156,6 +156,23 @@ List<String> _completedLayers(String currentLayer) {
   return order.sublist(0, idx);
 }
 
+// Proxy layer advancement from the confidence map when the forge-state block
+// is unavailable (parseDegraded path). The stub marks buildDimensions in
+// array order, so confidence resolution is a reliable layer proxy.
+String _layerFromConfidence(
+    String current, Map<String, DimensionState> map) {
+  bool resolved(String id) => map[id] == DimensionState.resolved;
+  switch (current) {
+    case 'L1':
+      if (resolved('corePurpose') && resolved('primaryUser')) return 'L2';
+    case 'L2':
+      if (resolved('identityModel') || resolved('inputModel')) return 'L3';
+    case 'L3':
+      if (resolved('outputModel') || resolved('platform')) return 'L4';
+  }
+  return current;
+}
+
 String _auditInterviewSystemPrompt(InterviewState state,
     {String? ingestedContext}) {
   const modeLabel = 'Audit Interview';
@@ -436,13 +453,28 @@ class InterviewNotifier
     final ingestedContext =
         await repo.readIngestedSummary(withUser.projectPath);
 
+    // Build contextual user prompt including prior conversation so the LLM
+    // doesn't re-ask questions it already has answers to. withUser.turns
+    // already contains the current user turn at index [length-1]; exclude it
+    // so the current message appears only once, as the final prompt line.
+    final priorTurns =
+        withUser.turns.sublist(0, withUser.turns.length - 1);
+    final historyBlock = priorTurns.isEmpty
+        ? ''
+        : priorTurns
+                .map((t) =>
+                    '${t.isUser ? "User" : "Interviewer"}: ${t.content}')
+                .join('\n\n') +
+            '\n\n---\n\n';
+    final contextualPrompt = '${historyBlock}User: ${text.trim()}';
+
     bool llmFailed = false;
     String llmRaw = '';
     try {
       llmRaw = await llmService.complete(
         systemPrompt: _interviewSystemPrompt(withUser,
             ingestedContext: ingestedContext),
-        userPrompt: text.trim(),
+        userPrompt: contextualPrompt,
         temperature: 0.1,
         role: LlmRole.executor,
       );
@@ -482,31 +514,28 @@ class InterviewNotifier
           systemPrompt: _interviewSystemPrompt(withUser,
               ingestedContext: ingestedContext),
           userPrompt:
-              '${text.trim()}\n\nYour previous response did not include a ```forge-state block. '
+              '$contextualPrompt\n\nYour previous response did not include a ```forge-state block. '
               'Re-emit the SAME answer with the mandatory ```forge-state JSON block appended. '
               'The block is required on every turn.',
           temperature: 0.1,
           role: LlmRole.executor,
         );
       } catch (_) {
-        final interviewerTurn = InterviewTurn(
-          role: 'interviewer',
-          content: parse.visibleText,
-          timestamp: DateTime.now(),
-        );
-        state = AsyncData(
-          withUser.copyWith(
-            turns: [...withUser.turns, interviewerTurn],
-            isLoading: false,
-            parseDegraded: true,
-          ),
-        );
-        return;
+        retryRaw = '';
       }
-      parse = parseForgeState(retryRaw);
+      parse = parseForgeState(retryRaw.isNotEmpty ? retryRaw : llmRaw);
     }
 
+    // forge-state block missing after retry — advance state using stub proxy
+    // so the layer doesn't freeze. Show LLM text (better than stub text).
     if (!parse.parseOk) {
+      final stub = stubInterviewStep(withUser, text);
+      final newMap = Map<String, DimensionState>.from(withUser.confidenceMap);
+      stub.confidenceUpdates.forEach((k, v) => newMap[k] = v);
+      final newLayerDegraded =
+          _layerFromConfidence(withUser.currentLayer, newMap);
+      final allResolved =
+          newMap.values.every((s) => s == DimensionState.resolved);
       final interviewerTurn = InterviewTurn(
         role: 'interviewer',
         content: parse.visibleText,
@@ -514,10 +543,21 @@ class InterviewNotifier
       );
       state = AsyncData(
         withUser.copyWith(
+          confidenceMap: newMap,
           turns: [...withUser.turns, interviewerTurn],
           isLoading: false,
           parseDegraded: true,
+          currentLayer: newLayerDegraded,
+          specGenEnabled: allResolved && withUser.openConflicts.isEmpty,
         ),
+      );
+      await repo.writeInterviewProgress(
+        withUser.projectPath,
+        withUser.projectName,
+        {
+          'currentLayer': newLayerDegraded,
+          'completedLayers': _completedLayers(newLayerDegraded),
+        },
       );
       return;
     }
@@ -572,6 +612,7 @@ class InterviewNotifier
         openConflicts: newConflicts,
         specGenEnabled: specGenEnabled,
         isLoading: false,
+        llmUnavailable: false,
         currentLayer: newLayer,
         extracted: mergedExtracted,
         parseDegraded: false,
