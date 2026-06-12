@@ -48,6 +48,9 @@ class InterviewState {
   final bool specGenEnabled;
   final bool isLoading;
   final bool llmUnavailable;
+  final String currentLayer;
+  final Map<String, dynamic> extracted;
+  final bool parseDegraded;
 
   const InterviewState({
     required this.projectPath,
@@ -58,7 +61,10 @@ class InterviewState {
     required this.openConflicts,
     required this.specGenEnabled,
     required this.isLoading,
+    required this.currentLayer,
+    required this.extracted,
     this.llmUnavailable = false,
+    this.parseDegraded = false,
   });
 
   factory InterviewState.empty(
@@ -66,6 +72,7 @@ class InterviewState {
     String projectName,
     List<DimensionDef> dimensions,
   ) {
+    final isBuild = dimensions == buildDimensions;
     return InterviewState(
       projectPath: projectPath,
       projectName: projectName,
@@ -77,6 +84,21 @@ class InterviewState {
       openConflicts: const [],
       specGenEnabled: false,
       isLoading: false,
+      currentLayer: isBuild ? 'L1' : '',
+      extracted: const <String, dynamic>{
+        'outcome': null,
+        'primaryUser': null,
+        'capabilities': <String>[],
+        'chosenCapability': null,
+        'demoScript': <String>[],
+        'v2Seeds': <String>[],
+        'platform': null,
+        'identityModel': null,
+        'inputModel': null,
+        'outputModel': null,
+        'externalServices': <Map<String, dynamic>>[],
+      },
+      parseDegraded: false,
     );
   }
 
@@ -90,6 +112,9 @@ class InterviewState {
     bool? specGenEnabled,
     bool? isLoading,
     bool? llmUnavailable,
+    String? currentLayer,
+    Map<String, dynamic>? extracted,
+    bool? parseDegraded,
   }) {
     return InterviewState(
       projectPath: projectPath ?? this.projectPath,
@@ -101,6 +126,9 @@ class InterviewState {
       specGenEnabled: specGenEnabled ?? this.specGenEnabled,
       isLoading: isLoading ?? this.isLoading,
       llmUnavailable: llmUnavailable ?? this.llmUnavailable,
+      currentLayer: currentLayer ?? this.currentLayer,
+      extracted: extracted ?? this.extracted,
+      parseDegraded: parseDegraded ?? this.parseDegraded,
     );
   }
 }

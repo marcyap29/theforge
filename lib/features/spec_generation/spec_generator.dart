@@ -30,6 +30,38 @@ String buildSpecPrompt(InterviewState state, {String? ingestedContext}) {
   final specStructure =
       isBuild ? _buildSpecStructure : _auditSpecStructure;
 
+  final extracted = state.extracted;
+  final hasFunnelData = isBuild &&
+      state.currentLayer.isNotEmpty &&
+      extracted['outcome'] != null;
+
+  final funnelBlock = hasFunnelData
+      ? '''
+
+FUNNEL OUTPUT (drive the spec from this — it is the user's confirmed V1 cut):
+
+Outcome: ${extracted['outcome']}
+Primary user: ${extracted['primaryUser']}
+Capabilities (confirmed): ${(extracted['capabilities'] as List).join(', ')}
+Chosen capability for V1: ${extracted['chosenCapability']}
+
+Demo script (each step is a Completion Criterion row):
+${(extracted['demoScript'] as List).asMap().entries.map((e) => '${e.key + 1}. ${e.value}').join('\n')}
+
+Architectural defaults (confirmed by the user — put these in Hard Constraints):
+- Platform: ${extracted['platform']}
+- Identity model: ${extracted['identityModel']}
+- Input model: ${extracted['inputModel']}
+- Output model: ${extracted['outputModel']}
+
+External services (only services with core=true belong in V1):
+${(extracted['externalServices'] as List).map((s) => '- ${s['name']} (core=${s['core']}, stripped=${s['stripped']})').join('\n')}
+
+V2 seeds (put these in Explicit Out-of-Scope and v2 Architecture Notes — never V1):
+${(extracted['v2Seeds'] as List).map((s) => '- $s').join('\n')}
+'''
+      : '';
+
   return '''You are The Forge spec writer — a sharp, direct technical architect.
 
 PROJECT: ${state.projectName}
@@ -40,8 +72,11 @@ $transcript
 
 CONFIDENCE MAP:
 $confidenceSummary
-
+$funnelBlock
 Generate a complete $modeLabel Locked Spec following this exact structure. Be specific and concrete — no "TBD", no filler. Every Completion Criterion must be autonomously verifiable by an executor agent. Every Accepted Decision must state what was rejected and why.
+- Completion Criteria rows must mirror the demo script steps one-for-one.
+- Hard Constraints come from the Architectural defaults block — do not invent.
+- Anything in the V2 seeds list goes ONLY in Explicit Out-of-Scope (§7) and v2 Architecture Notes (§10). Never §3 Component Map or §5 Completion Criteria.
 
 $specStructure''';
 }

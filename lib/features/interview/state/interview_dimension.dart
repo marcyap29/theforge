@@ -104,3 +104,41 @@ const auditDimensions = <DimensionDef>[
 
 List<DimensionDef> dimensionsFor(ProjectMode mode) =>
     mode == ProjectMode.build ? buildDimensions : auditDimensions;
+
+@immutable
+class LayerDef {
+  final String id;
+  final String label;
+  final String purpose;
+  const LayerDef({
+    required this.id,
+    required this.label,
+    required this.purpose,
+  });
+}
+
+const buildLayers = <LayerDef>[
+  LayerDef(
+    id: 'L1',
+    label: 'Outcome',
+    purpose:
+        'The one thing this app does for its user that nothing they use today does.',
+  ),
+  LayerDef(
+    id: 'L2',
+    label: 'Decomposition',
+    purpose: '3 to 5 capabilities required to deliver the outcome.',
+  ),
+  LayerDef(
+    id: 'L3',
+    label: 'PoC Reduction',
+    purpose:
+        'One capability chosen as the proof; a 3 to 5 step demo script bounds V1.',
+  ),
+  LayerDef(
+    id: 'L4',
+    label: 'Critical Path',
+    purpose:
+        'Platform, identity, IO, services deduced from the demo; blockers stripped.',
+  ),
+];
