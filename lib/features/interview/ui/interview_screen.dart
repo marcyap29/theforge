@@ -18,14 +18,30 @@ class InterviewScreen extends ConsumerStatefulWidget {
   ConsumerState<InterviewScreen> createState() => _InterviewScreenState();
 }
 
-class _InterviewScreenState extends ConsumerState<InterviewScreen> {
+class _InterviewScreenState extends ConsumerState<InterviewScreen>
+    with SingleTickerProviderStateMixin {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
+  late AnimationController _pulseCtrl;
+  late Animation<double> _pulseOpacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _pulseOpacity = Tween(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
+    );
+  }
 
   @override
   void dispose() {
     _controller.dispose();
     _scrollController.dispose();
+    _pulseCtrl.dispose();
     super.dispose();
   }
 
@@ -70,6 +86,13 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen> {
         data: (state) {
           return Column(
             children: [
+              if (args.mode == ProjectMode.build &&
+                  state.currentLayer.isNotEmpty)
+                _InterviewLayerStrip(
+                  currentLayer: state.currentLayer,
+                  allComplete: state.specGenEnabled,
+                  pulseOpacity: _pulseOpacity,
+                ),
               ConfidenceMeter(
                 dimensions: state.dimensions,
                 confidenceMap: state.confidenceMap,
@@ -402,6 +425,145 @@ class _Composer extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _InterviewLayerStrip extends StatelessWidget {
+  const _InterviewLayerStrip({
+    required this.currentLayer,
+    required this.allComplete,
+    required this.pulseOpacity,
+  });
+
+  final String currentLayer;
+  final bool allComplete;
+  final Animation<double> pulseOpacity;
+
+  @override
+  Widget build(BuildContext context) {
+    const layers = ['L1', 'L2', 'L3', 'L4'];
+    const labels = ['Outcome', 'Decomposition', 'PoC', 'Critical Path'];
+    final idx = layers.indexOf(currentLayer);
+    final completed = idx > 0 ? layers.sublist(0, idx) : <String>[];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0F0F10),
+        border: Border(
+          bottom: BorderSide(color: Color(0xFF2C2C2E), width: 1),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Text(
+            'FUNNEL',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+              color: Color(0xFF6B7280),
+              fontFamily: 'Menlo',
+            ),
+          ),
+          const SizedBox(width: 16),
+          for (int i = 0; i < layers.length; i++) ...[
+            _LayerIndicator(
+              id: layers[i],
+              label: labels[i],
+              isDone: allComplete || completed.contains(layers[i]),
+              isCurrent: !allComplete && currentLayer == layers[i],
+              pulseOpacity: pulseOpacity,
+            ),
+            if (i < layers.length - 1)
+              Container(
+                width: 28,
+                height: 1,
+                margin: const EdgeInsets.only(bottom: 14),
+                color: (allComplete || completed.contains(layers[i]))
+                    ? const Color(0xFF22C55E)
+                    : const Color(0xFF2C2C2E),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _LayerIndicator extends StatelessWidget {
+  const _LayerIndicator({
+    required this.id,
+    required this.label,
+    required this.isDone,
+    required this.isCurrent,
+    required this.pulseOpacity,
+  });
+
+  final String id;
+  final String label;
+  final bool isDone;
+  final bool isCurrent;
+  final Animation<double> pulseOpacity;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget dot;
+    Color textColor;
+
+    if (isDone) {
+      dot = const Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 14);
+      textColor = const Color(0xFF22C55E);
+    } else if (isCurrent) {
+      dot = FadeTransition(
+        opacity: pulseOpacity,
+        child: Container(
+          width: 14,
+          height: 14,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: Color(0xFFE8A04C),
+          ),
+        ),
+      );
+      textColor = const Color(0xFFE8A04C);
+    } else {
+      dot = Container(
+        width: 14,
+        height: 14,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFF3D4452), width: 1.0),
+        ),
+      );
+      textColor = const Color(0xFF4B5563);
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        dot,
+        const SizedBox(height: 3),
+        Text(
+          id,
+          style: TextStyle(
+            fontSize: 9,
+            fontFamily: 'Menlo',
+            fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+            color: textColor,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 8,
+            fontFamily: 'Menlo',
+            color: textColor.withAlpha(180),
+          ),
+        ),
+      ],
     );
   }
 }
