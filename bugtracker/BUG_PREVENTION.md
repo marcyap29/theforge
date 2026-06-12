@@ -45,8 +45,11 @@
 - **Interview state never touches disk mid-session.** State lives in Riverpod during an interview. The only file writes happen on phase completion via `ProjectFileRepository`.
 - **Conflict detection blocks progression.** A detected conflict must be surfaced and explicitly resolved by the user before the interview advances. Never auto-resolve silently.
 - **Confidence at 100% is required before spec generation is triggered.** All 8 dimensions must be resolved. Never allow a partial interview to proceed to spec generation.
+- **Never gate Flutter state transitions on a boolean the LLM emits when that boolean appears as a hardcoded value in the system prompt template.** LLMs copy example values from the template literally — a template showing `"layerComplete": false` means the model will always emit `false`. Make the Flutter app authoritative for state advancement; use LLM output for data extraction only, never for flow control signals.
+- **Never gate UI affordances (button enabled/disabled) on LLM-emitted booleans.** Same reason as above. Derive enabled state from Flutter-side conditions (field presence, confidence map, conflicts) that the app controls directly.
+- **When writing RegExp to match LLM-emitted code fences, use `\n\s*` before the closing fence, not `\n` alone.** LLMs from different providers vary on trailing whitespace and line endings (`\n` vs `\r\n`). A strict `\n\`\`\`` pattern silently drops the entire block rather than erroring visibly.
 
-**Past bugs:** *(none yet)*
+**Past bugs:** BUG-INTERVIEW-001 (2026-06-12) — funnel stuck at L1 for 20+ turns; BUG-INTERVIEW-002 (2026-06-12) — Generate Spec button permanently disabled; BUG-INTERVIEW-003 (2026-06-12) — forge-state block silently dropped on trailing whitespace.
 
 ---
 
