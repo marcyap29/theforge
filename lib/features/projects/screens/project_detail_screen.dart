@@ -591,6 +591,7 @@ const _folders = <_FolderDef>[
   (id: 'specs', label: 'SPECS', icon: Icons.description_outlined),
   (id: 'handoffs', label: 'HANDOFFS', icon: Icons.send_outlined),
   (id: 'worksheets', label: 'WORKSHEETS', icon: Icons.checklist_outlined),
+  (id: 'ingested', label: 'INGESTED', icon: Icons.input_outlined),
   (id: 'audit', label: 'AUDIT', icon: Icons.history_outlined),
 ];
 

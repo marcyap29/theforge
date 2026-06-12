@@ -167,8 +167,9 @@ class ProjectFileRepository {
 
   Future<void> writeHandoffPackage(
       String projectPath, String projectName, String version, Map<String, dynamic> data) async {
+    final handoffsDir = Directory(p.join(projectPath, 'handoffs'));
     final packageFile =
-        File(p.join(projectPath, '${projectName}_HandoffPackage_$version.json'));
+        File(p.join(handoffsDir.path, '${projectName}_HandoffPackage_$version.json'));
     await packageFile.writeAsString(const JsonEncoder.withIndent('  ').convert(data));
   }
 
