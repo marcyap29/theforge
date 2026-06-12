@@ -57,7 +57,7 @@ StubLlmResult stubInterviewStep(InterviewState state, String userMessage) {
 }
 
 ForgeStateParse parseForgeState(String llmRaw) {
-  final fencePattern = RegExp(r'```forge-state\s*\n([\s\S]*?)\n```');
+  final fencePattern = RegExp(r'```forge-state[^\n]*\n([\s\S]*?)\n\s*```');
   final match = fencePattern.firstMatch(llmRaw);
 
   if (match == null) {
@@ -532,11 +532,11 @@ class InterviewNotifier
       }
     }
 
+    // Flutter side is authoritative for layer advancement — do not require
+    // layerComplete from the LLM (models copy the false-example literally).
     String newLayer = withUser.currentLayer;
-    if (parse.layerComplete && parse.layer != null) {
-      if (_layerGateMet(parse.layer!, mergedExtracted)) {
-        newLayer = _nextLayer(parse.layer!);
-      }
+    if (_layerGateMet(withUser.currentLayer, mergedExtracted)) {
+      newLayer = _nextLayer(withUser.currentLayer);
     }
 
     final confidenceUpdates = _confidenceFromExtracted(mergedExtracted);
@@ -547,12 +547,10 @@ class InterviewNotifier
 
     final allResolved =
         newMap.values.every((s) => s == DimensionState.resolved);
-    final specGenEnabled = newLayer == 'L4' &&
-        parse.layerComplete &&
-        newConflicts.isEmpty &&
-        allResolved;
+    final specGenEnabled = allResolved && newConflicts.isEmpty;
 
-    if (parse.layer == 'L3' && parse.layerComplete) {
+    // Write v2 seeds when we advance out of L3 (gate just passed).
+    if (withUser.currentLayer == 'L3' && newLayer == 'L4') {
       final v2Seeds = mergedExtracted['v2Seeds'] as List<String>;
       await repo.writeIngestedFile(
         withUser.projectPath,
