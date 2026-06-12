@@ -21,6 +21,7 @@
 | backlog.md | tracking md files/ | 2026-06-01 | ✅ Synced |
 | BUG_PREVENTION.md | bugtracker/ | 2026-05-31 | ✅ Synced |
 | workflow_template.md | DOCS/forge/ | 2026-05-31 | ✅ Synced |
+| The_Forge_InterviewFunnel_Plan_v1.md | DOCS/forge/ | 2026-06-11 | ✅ Synced |
 | positioning_brief.md | DOCS/forge/ | 2026-05-31 | ✅ Synced |
 | pubspec.yaml | root | 2026-05-31 | ✅ Synced |
 | analysis_options.yaml | root | 2026-05-31 | ✅ Synced |

@@ -4,6 +4,26 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-06-11 — Cowork [Interview Funnel Redesign Plan]
+
+**Branch:** main (docs only, no code)
+
+### Done
+- **DOCS/forge/The_Forge_InterviewFunnel_Plan_v1.md — NEW:** Planning doc for converting the Build Interview from a flat 8-dimension list into a 4-layer deductive funnel (L1 Outcome → L2 Decomposition → L3 PoC reduction via demo script → L4 Critical Path confirmations + blocker scan). The 8 dimensions survive as spec invariants. Includes revised system prompt draft and a structured-output contract (fenced `forge-state` JSON block per turn) to replace stub-driven confidence resolution.
+- **Key finding:** `stubInterviewStep` in `interview_notifier.dart` drives the confidence map by user-turn count and injects a scripted conflict at turn 3 regardless of content — the LLM only supplies chat text. Stub confidence updates merge in even when the LLM call succeeds (lines 177–181). Any interview redesign is cosmetic until resolution is content-driven; the plan's §5 specifies the fix.
+- **Inconsistency flagged:** workflow_template.md Stage 1A says max 3 questions per turn; `_interviewSystemPrompt` says exactly one. Plan standardizes on one.
+
+### Next
+- Marc marks up The_Forge_InterviewFunnel_Plan_v1.md; open questions in §11 (L2 cap, demo length, seed persistence, v2 funnel variant)
+- On approval: execute plan §9 file list (interview_dimension/state/notifier, spec_generator, workflow_template Stage 1A rewrite)
+
+### Modified
+- `DOCS/forge/The_Forge_InterviewFunnel_Plan_v1.md` — NEW
+- `operations md files/CONFIGURATION_MANAGEMENT.md` — inventory row added
+- `tracking md files/context.md` — this block
+
+---
+
 ## Session: 2026-06-11 — Claude Code [Open Items + §EX1 Executor Timeline]
 
 **Branch:** main
