@@ -254,4 +254,23 @@ class ProjectFileRepository {
     final file = File(p.join(ingestedDir.path, filename));
     await file.writeAsString(content);
   }
+
+  Future<void> writeInterviewProgress(
+      String projectPath, String projectName, Map<String, dynamic> data) async {
+    final auditDir = Directory(p.join(projectPath, 'audit'));
+    final file = File(p.join(auditDir.path, '${projectName}_InterviewState.json'));
+    await file.writeAsString(jsonEncode(data));
+  }
+
+  Future<Map<String, dynamic>?> readInterviewProgress(
+      String projectPath, String projectName) async {
+    final file = File(
+        p.join(projectPath, 'audit', '${projectName}_InterviewState.json'));
+    if (!file.existsSync()) return null;
+    try {
+      return jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+    } on FormatException {
+      return null;
+    }
+  }
 }

@@ -149,6 +149,13 @@ String _v2SeedsMarkdown(List<String> seeds) {
   return '# V2 Seeds\n\n${seeds.map((s) => '- $s').join('\n')}\n';
 }
 
+List<String> _completedLayers(String currentLayer) {
+  const order = ['L1', 'L2', 'L3', 'L4'];
+  final idx = order.indexOf(currentLayer);
+  if (idx <= 0) return const [];
+  return order.sublist(0, idx);
+}
+
 String _auditInterviewSystemPrompt(InterviewState state,
     {String? ingestedContext}) {
   const modeLabel = 'Audit Interview';
@@ -571,6 +578,15 @@ class InterviewNotifier
         extracted: mergedExtracted,
         parseDegraded: false,
       ),
+    );
+
+    await repo.writeInterviewProgress(
+      withUser.projectPath,
+      withUser.projectName,
+      {
+        'currentLayer': newLayer,
+        'completedLayers': _completedLayers(newLayer),
+      },
     );
   }
 
