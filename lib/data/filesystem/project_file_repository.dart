@@ -274,4 +274,28 @@ class ProjectFileRepository {
       return null;
     }
   }
+
+  Future<String?> readFeatureContext(
+      String projectPath, String projectName, String priorSpecVersion) async {
+    final specFile = File(p.join(
+        projectPath, 'specs', '${projectName}_LockedSpec_$priorSpecVersion.md'));
+    final seedsFile = File(p.join(
+        projectPath, 'ingested', '${projectName}_V2Seeds.md'));
+
+    final specContent =
+        specFile.existsSync() ? await specFile.readAsString() : null;
+    final seedsContent =
+        seedsFile.existsSync() ? await seedsFile.readAsString() : null;
+
+    if (specContent == null && seedsContent == null) return null;
+
+    final parts = <String>[];
+    if (specContent != null) {
+      parts.add('PRIOR LOCKED SPEC ($priorSpecVersion — immutable):\n$specContent');
+    }
+    if (seedsContent != null) {
+      parts.add('V2 SEEDS (features deferred from $priorSpecVersion):\n$seedsContent');
+    }
+    return parts.join('\n\n---\n\n');
+  }
 }

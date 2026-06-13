@@ -6,6 +6,7 @@ import '../../../features/spec_generation/spec_generation_screen.dart';
 import '../../projects/ingestion/ingestion_notifier.dart';
 import '../../projects/ingestion/reference_docs_screen.dart';
 import '../providers/interview_providers.dart';
+import '../state/interview_notifier.dart';
 import '../state/interview_state.dart';
 import 'confidence_meter.dart';
 
@@ -151,15 +152,22 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen>
                     width: double.infinity,
                     child: FilledButton.icon(
                       icon: const Icon(Icons.auto_awesome),
-                      label: const Text('Generate Spec'),
+                      label: Text(args.priorSpecVersion != null
+                          ? 'Generate ${nextSpecVersion(args.priorSpecVersion!)} Spec'
+                          : 'Generate Spec'),
                       onPressed: () {
                         final interviewState =
                             ref.read(interviewProvider(args)).valueOrNull;
                         if (interviewState == null) return;
+                        final targetVersion = args.priorSpecVersion != null
+                            ? nextSpecVersion(args.priorSpecVersion!)
+                            : 'v1';
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) => SpecGenerationScreen(
-                                interviewState: interviewState),
+                              interviewState: interviewState,
+                              targetSpecVersion: targetVersion,
+                            ),
                           ),
                         );
                       },

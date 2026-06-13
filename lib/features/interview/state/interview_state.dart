@@ -51,6 +51,7 @@ class InterviewState {
   final String currentLayer;
   final Map<String, dynamic> extracted;
   final bool parseDegraded;
+  final String? featureContext;
 
   const InterviewState({
     required this.projectPath,
@@ -65,6 +66,7 @@ class InterviewState {
     required this.extracted,
     this.llmUnavailable = false,
     this.parseDegraded = false,
+    this.featureContext,
   });
 
   factory InterviewState.empty(
@@ -115,6 +117,7 @@ class InterviewState {
     String? currentLayer,
     Map<String, dynamic>? extracted,
     bool? parseDegraded,
+    String? featureContext,
   }) {
     return InterviewState(
       projectPath: projectPath ?? this.projectPath,
@@ -129,6 +132,7 @@ class InterviewState {
       currentLayer: currentLayer ?? this.currentLayer,
       extracted: extracted ?? this.extracted,
       parseDegraded: parseDegraded ?? this.parseDegraded,
+      featureContext: featureContext ?? this.featureContext,
     );
   }
 }

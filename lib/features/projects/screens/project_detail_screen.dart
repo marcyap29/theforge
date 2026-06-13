@@ -75,7 +75,9 @@ class ProjectDetailScreen extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    isBuild ? 'BUILD INTERVIEW' : 'AUDIT INTERVIEW',
+                    isBuild
+                        ? 'BUILD INTERVIEW${_versionOf(live.phase) == 'v1' ? '' : ' — ${_versionOf(live.phase).toUpperCase()}'}'
+                        : 'AUDIT INTERVIEW',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -102,14 +104,13 @@ class ProjectDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 24),
                 const _SectionHeader('Reference Documents'),
                 _ReferenceDocsRow(projectPath: project.path),
-                if (live.phase == 'v1_worksheet_complete')
+                if (_stageOf(live.phase) == 'worksheet_complete')
                   _BuildSequenceSection(project: live),
                 const SizedBox(height: 24),
                 // Phase-aware CTA
                 _SectionHeader(_ctaSectionLabel(live.phase)),
                 SizedBox(
                   width: double.infinity,
-                  height: 44,
                   child: _buildCta(context, live, mode, sv),
                 ),
               ],
@@ -120,16 +121,19 @@ class ProjectDetailScreen extends ConsumerWidget {
     );
   }
 
-  String _ctaSectionLabel(String phase) => switch (phase) {
-        'v1_spec_locked' => 'NEXT STEP',
-        'v1_worksheet_complete' => 'STATUS',
+  String _ctaSectionLabel(String phase) => switch (_stageOf(phase)) {
+        'spec_locked' => 'NEXT STEP',
+        'worksheet_complete' => 'STATUS',
         _ => 'INTERVIEW',
       };
 
   Widget _buildCta(
       BuildContext context, Project live, ProjectMode mode, String sv) {
-    return switch (live.phase) {
-      'v1_spec_locked' => FilledButton(
+    final stage = _stageOf(live.phase);
+    final version = _versionOf(live.phase);
+
+    return switch (stage) {
+      'spec_locked' => FilledButton(
           onPressed: () => Navigator.of(context).push(MaterialPageRoute(
             builder: (_) => WorksheetGenerationScreen(
               projectPath: live.path,
@@ -138,6 +142,7 @@ class ProjectDetailScreen extends ConsumerWidget {
             ),
           )),
           style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(44),
             backgroundColor: const Color(0xFFE8A04C),
             foregroundColor: const Color(0xFF0F0F10),
           ),
@@ -147,31 +152,70 @@ class ProjectDetailScreen extends ConsumerWidget {
                 fontWeight: FontWeight.w600, fontFamily: 'Menlo'),
           ),
         ),
-      'v1_worksheet_complete' => Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFF0F0F10),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFF22C55E)),
-          ),
-          child: const Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.check_circle,
-                    color: Color(0xFF22C55E), size: 14),
-                SizedBox(width: 8),
-                Text(
-                  'Ready for executor',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'Menlo',
-                    color: Color(0xFF22C55E),
+      'worksheet_complete' => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F0F10),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFF22C55E)),
+              ),
+              child: Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.check_circle,
+                        color: Color(0xFF22C55E), size: 14),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${version.toUpperCase()} ready for executor',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Menlo',
+                        color: Color(0xFF22C55E),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (mode == ProjectMode.build) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => InterviewScreen(
+                        args: InterviewArgs(
+                          path: live.path,
+                          name: live.name,
+                          mode: ProjectMode.build,
+                          priorSpecVersion: version,
+                        ),
+                      ),
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFE8A04C)),
+                    foregroundColor: const Color(0xFFE8A04C),
+                  ),
+                  child: Text(
+                    'Start ${_nextVersion(version).toUpperCase()} Interview →',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Menlo',
+                      fontSize: 13,
+                    ),
                   ),
                 ),
-              ],
-            ),
-          ),
+              ),
+            ],
+          ],
         ),
       _ => FilledButton(
           onPressed: () => Navigator.of(context).push(
@@ -186,6 +230,7 @@ class ProjectDetailScreen extends ConsumerWidget {
             ),
           ),
           style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(44),
             backgroundColor: const Color(0xFFE8A04C),
             foregroundColor: const Color(0xFF0F0F10),
           ),
@@ -199,6 +244,26 @@ class ProjectDetailScreen extends ConsumerWidget {
         ),
     };
   }
+}
+
+// ── Phase helpers ─────────────────────────────────────────────────────────────
+
+String _versionOf(String phase) {
+  final idx = phase.indexOf('_');
+  return idx > 0 ? phase.substring(0, idx) : 'v1';
+}
+
+String _stageOf(String phase) {
+  final idx = phase.indexOf('_');
+  return idx > 0 ? phase.substring(idx + 1) : phase;
+}
+
+String _nextVersion(String current) {
+  if (current.startsWith('v')) {
+    final n = int.tryParse(current.substring(1));
+    if (n != null) return 'v${n + 1}';
+  }
+  return 'v2';
 }
 
 // ── Phase Timeline ────────────────────────────────────────────────────────────
@@ -284,9 +349,10 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
       orElse: () => ProjectMode.build,
     );
 
-    final interviewDone = pj.phase != 'v1_interview';
-    final worksheetDone = pj.phase == 'v1_worksheet_complete';
-    final worksheetCurrent = pj.phase == 'v1_spec_locked';
+    final stage = _stageOf(pj.phase);
+    final interviewDone = stage != 'interview';
+    final worksheetDone = stage == 'worksheet_complete';
+    final worksheetCurrent = stage == 'spec_locked';
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),

@@ -288,11 +288,99 @@ Set `layerComplete: true` only when the current layer's exit condition is
 met. Set `conflicts: []` unless you detected an actual contradiction.''';
 }
 
+String _featureInterviewSystemPrompt(InterviewState state,
+    {String? ingestedContext, required String priorSpecVersion}) {
+  final nextVersion = nextSpecVersion(priorSpecVersion);
+
+  final refBlock = ingestedContext != null
+      ? '\n\nREFERENCE CONTEXT:\n'
+          'The following was extracted from reference documents provided by the user. '
+          'Use it to inform your questions but do not treat it as binding — '
+          'surface any tensions between the reference material and the user\'s answers.\n\n'
+          '$ingestedContext\n'
+      : '';
+
+  final contextBlock = state.featureContext != null
+      ? '\n\nFEATURE CONTEXT — READ BEFORE ASKING ANYTHING:\n'
+          'You are running a Feature Interview to scope $nextVersion.\n'
+          'The prior spec and deferred features are below. '
+          'Use them so you do not re-ask questions already answered in $priorSpecVersion.\n\n'
+          '${state.featureContext}\n'
+      : '';
+
+  final extractedJson =
+      const JsonEncoder.withIndent('  ').convert(state.extracted);
+
+  return '''You are The Forge interviewer — a sharp, direct product architect
+running a Feature Interview for a project called "${state.projectName}".
+You are scoping $nextVersion. $priorSpecVersion is already shipped.
+$refBlock$contextBlock
+THE FUNNEL — you are currently at ${state.currentLayer}. Do not advance until
+the exit condition is met. Never ask about a later layer early.
+
+L1 OUTCOME REFRAME (keep this short — 1-2 turns maximum):
+The core outcome and user from $priorSpecVersion are already known (see FEATURE CONTEXT above).
+Ask: "Given $priorSpecVersion is live, what is the ONE next capability that makes it
+more valuable for [user]?" Confirm or adjust the outcome and user quickly, then exit L1.
+Exit: outcome and primary user confirmed.
+
+L2 DECOMPOSITION:
+The V2 Seeds in the FEATURE CONTEXT are your capability menu. Present the most
+relevant 3-5 seeds as candidates. Push back if the user wants something outside
+the seeds (ask why it belongs in $nextVersion). Hard cap at 5. Exit: confirmed list.
+
+L3 POC REDUCTION:
+Same as $priorSpecVersion: one sub-capability, 3-5 step demo script.
+Every seed not chosen and every feature mentioned but absent from the demo goes
+on the $nextVersion seed list. Read the seed list back for confirmation.
+Exit: capability chosen, demo confirmed, seeds confirmed.
+
+L4 CRITICAL PATH (INCREMENTAL — key difference from $priorSpecVersion):
+Most architecture is inherited. Ask ONLY about what changes:
+- Which $priorSpecVersion components does this feature touch?
+- What is new — not in $priorSpecVersion at all?
+- Identity/platform/input/output: inherit from $priorSpecVersion unless the
+  demo implies a change. Only ask if the demo requires something different.
+Run the blocker scan. Draft the 1-3 step sequence to a working demo.
+Exit: incremental changes confirmed, blocker scan done.
+
+STATE SO FAR (cumulative extracted map — re-emit every field every turn):
+$extractedJson
+
+RULES
+- Ask ONE question per turn. Acknowledge the answer first. Be concise.
+- The $priorSpecVersion locked spec is immutable. Never suggest modifying it.
+- When the user mentions a feature not in the seeds, acknowledge it, add it to
+  the $nextVersion seed list, and return to the current layer's question.
+- One new feature per version. If the user wants two, pick one and defer.
+- When answers conflict: "Your answers on [X] and [Y] pull in opposite
+  directions. [X] implies [A]. [Y] implies [B]. I recommend [conservative
+  option] for $nextVersion because [reason]. Do you accept this scope?"
+
+After EVERY response, append a fenced forge-state block. MANDATORY every turn.
+Emit the FULL extracted map each turn (cumulative, not deltas):
+
+\`\`\`forge-state
+{
+  "layer": "${state.currentLayer}",
+  "layerComplete": false,
+  "extracted": { ... full map ... },
+  "conflicts": []
+}
+\`\`\`
+
+Set layerComplete: true only when the current layer exit condition is met.''';
+}
+
 String _interviewSystemPrompt(InterviewState state,
-    {String? ingestedContext}) {
+    {String? ingestedContext, String? priorSpecVersion}) {
   final isBuild = state.dimensions == buildDimensions;
   if (!isBuild) {
     return _auditInterviewSystemPrompt(state, ingestedContext: ingestedContext);
+  }
+  if (priorSpecVersion != null) {
+    return _featureInterviewSystemPrompt(state,
+        ingestedContext: ingestedContext, priorSpecVersion: priorSpecVersion);
   }
   return _buildInterviewSystemPrompt(state, ingestedContext: ingestedContext);
 }
@@ -366,12 +454,32 @@ Map<String, DimensionState> _confidenceFromExtracted(
   return updates;
 }
 
+String nextSpecVersion(String current) {
+  if (current.startsWith('v')) {
+    final n = int.tryParse(current.substring(1));
+    if (n != null) return 'v${n + 1}';
+  }
+  return 'v2';
+}
+
 class InterviewNotifier
     extends FamilyAsyncNotifier<InterviewState, InterviewArgs> {
   @override
   Future<InterviewState> build(InterviewArgs args) async {
     final dims = dimensionsFor(args.mode);
-    return InterviewState.empty(args.path, args.name, dims);
+
+    String? featureContext;
+    if (args.priorSpecVersion != null) {
+      final repo = ref.read(projectFileRepositoryProvider);
+      featureContext = await repo.readFeatureContext(
+        args.path,
+        args.name,
+        args.priorSpecVersion!,
+      );
+    }
+
+    return InterviewState.empty(args.path, args.name, dims)
+        .copyWith(featureContext: featureContext);
   }
 
   Future<void> addUserMessage(String text) async {
@@ -473,7 +581,8 @@ class InterviewNotifier
     try {
       llmRaw = await llmService.complete(
         systemPrompt: _interviewSystemPrompt(withUser,
-            ingestedContext: ingestedContext),
+            ingestedContext: ingestedContext,
+            priorSpecVersion: arg.priorSpecVersion),
         userPrompt: contextualPrompt,
         temperature: 0.1,
         role: LlmRole.executor,
@@ -512,7 +621,8 @@ class InterviewNotifier
       try {
         retryRaw = await llmService.complete(
           systemPrompt: _interviewSystemPrompt(withUser,
-              ingestedContext: ingestedContext),
+              ingestedContext: ingestedContext,
+              priorSpecVersion: arg.priorSpecVersion),
           userPrompt:
               '$contextualPrompt\n\nYour previous response did not include a ```forge-state block. '
               'Re-emit the SAME answer with the mandatory ```forge-state JSON block appended. '

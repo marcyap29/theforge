@@ -8,8 +8,13 @@ import 'spec_providers.dart';
 import 'worksheet_generation_screen.dart';
 
 class SpecGenerationScreen extends ConsumerStatefulWidget {
-  const SpecGenerationScreen({super.key, required this.interviewState});
+  const SpecGenerationScreen({
+    super.key,
+    required this.interviewState,
+    this.targetSpecVersion = 'v1',
+  });
   final InterviewState interviewState;
+  final String targetSpecVersion;
 
   @override
   ConsumerState<SpecGenerationScreen> createState() =>
@@ -21,7 +26,10 @@ class _SpecGenerationScreenState extends ConsumerState<SpecGenerationScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(specNotifierProvider.notifier).generate(widget.interviewState);
+      ref.read(specNotifierProvider.notifier).generate(
+            widget.interviewState,
+            targetSpecVersion: widget.targetSpecVersion,
+          );
     });
   }
 
