@@ -288,9 +288,66 @@ Set `layerComplete: true` only when the current layer's exit condition is
 met. Set `conflicts: []` unless you detected an actual contradiction.''';
 }
 
+String? _extractGoalStatement(String? featureContext) {
+  if (featureContext == null) return null;
+  final lines = featureContext.split('\n');
+  bool inGoalSection = false;
+  for (final line in lines) {
+    if (RegExp(r'##\s+\d*\.?\s*(Immutable )?Goal Statement', caseSensitive: false)
+        .hasMatch(line)) {
+      inGoalSection = true;
+      continue;
+    }
+    if (inGoalSection) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty || trimmed.startsWith('#')) {
+        if (trimmed.startsWith('#')) break;
+        continue;
+      }
+      return trimmed.replaceAll(RegExp(r'^\*+|\*+$'), '').trim();
+    }
+  }
+  return null;
+}
+
+List<String> _extractComponents(String? featureContext) {
+  if (featureContext == null) return const [];
+  final lines = featureContext.split('\n');
+  bool inComponentSection = false;
+  bool pastHeader = false;
+  final components = <String>[];
+  for (final line in lines) {
+    if (RegExp(r'##\s+\d*\.?\s*Component\s+(Map|List)', caseSensitive: false)
+        .hasMatch(line)) {
+      inComponentSection = true;
+      pastHeader = false;
+      continue;
+    }
+    if (inComponentSection) {
+      if (line.trim().startsWith('#')) break;
+      if (!line.trim().startsWith('|')) continue;
+      if (!pastHeader) {
+        // Skip header row and separator row
+        if (line.contains('---')) {
+          pastHeader = true;
+        }
+        continue;
+      }
+      final cols = line.split('|').map((c) => c.trim()).where((c) => c.isNotEmpty).toList();
+      if (cols.isNotEmpty) {
+        final name = cols[0].replaceAll(RegExp(r'[`*_]'), '').trim();
+        if (name.isNotEmpty) components.add(name);
+      }
+    }
+  }
+  return components;
+}
+
 String _featureInterviewSystemPrompt(InterviewState state,
     {String? ingestedContext, required String priorSpecVersion}) {
   final nextVersion = nextSpecVersion(priorSpecVersion);
+  final goalStatement = _extractGoalStatement(state.featureContext);
+  final components = _extractComponents(state.featureContext);
 
   final refBlock = ingestedContext != null
       ? '\n\nREFERENCE CONTEXT:\n'
@@ -304,61 +361,80 @@ String _featureInterviewSystemPrompt(InterviewState state,
       ? '\n\nFEATURE CONTEXT — READ BEFORE ASKING ANYTHING:\n'
           'You are running a Feature Interview to scope $nextVersion.\n'
           'The prior spec and deferred features are below. '
-          'Use them so you do not re-ask questions already answered in $priorSpecVersion.\n\n'
+          'Do not re-ask anything already established in $priorSpecVersion.\n\n'
           '${state.featureContext}\n'
       : '';
+
+  final goalRef = goalStatement != null
+      ? '\n\nSCOPE ANCHOR — $priorSpecVersion core purpose (immutable):\n'
+          '"$goalStatement"\n'
+          'Every suggestion in this interview must trace to this purpose or extend it '
+          'naturally. If it does not, say so kindly and offer to seed it for a future version.\n'
+      : '';
+
+  final componentList = components.isNotEmpty
+      ? components.join(', ')
+      : '(see spec above)';
 
   final extractedJson =
       const JsonEncoder.withIndent('  ').convert(state.extracted);
 
   return '''You are The Forge interviewer — a sharp, direct product architect
 running a Feature Interview for a project called "${state.projectName}".
-You are scoping $nextVersion. $priorSpecVersion is already shipped.
-$refBlock$contextBlock
+You are scoping $nextVersion. $priorSpecVersion is already shipped and immutable.
+$refBlock$contextBlock$goalRef
 THE FUNNEL — you are currently at ${state.currentLayer}. Do not advance until
 the exit condition is met. Never ask about a later layer early.
 
-L1 OUTCOME REFRAME (keep this short — 1-2 turns maximum):
-The core outcome and user from $priorSpecVersion are already known (see FEATURE CONTEXT above).
-Ask: "Given $priorSpecVersion is live, what is the ONE next capability that makes it
-more valuable for [user]?" Confirm or adjust the outcome and user quickly, then exit L1.
-Exit: outcome and primary user confirmed.
+L1 OPENING — PRESENT FIRST, THEN ASK (1-2 turns):
+Do NOT open with a question. Start by presenting what $priorSpecVersion delivered:
+"${state.projectName} $priorSpecVersion shipped [restate the outcome in one sentence from FEATURE CONTEXT].
+The components built were: $componentList.
+The features deferred were: [list the v2 seeds from FEATURE CONTEXT, or 'none captured' if empty].
+What is the ONE thing you'd add or improve for $nextVersion?"
+After the user responds, confirm it in one sentence and exit L1.
+Exit: new outcome confirmed.
 
 L2 DECOMPOSITION:
-The V2 Seeds in the FEATURE CONTEXT are your capability menu. Present the most
-relevant 3-5 seeds as candidates. Push back if the user wants something outside
-the seeds (ask why it belongs in $nextVersion). Hard cap at 5. Exit: confirmed list.
+Present the deferred seeds from FEATURE CONTEXT as the candidate menu for $nextVersion.
+Hard cap at 5 capabilities. If the user suggests something not in the seeds, apply the
+SCOPE GUARD below before accepting it. Exit: confirmed capability list.
 
 L3 POC REDUCTION:
-Same as $priorSpecVersion: one sub-capability, 3-5 step demo script.
-Every seed not chosen and every feature mentioned but absent from the demo goes
-on the $nextVersion seed list. Read the seed list back for confirmation.
-Exit: capability chosen, demo confirmed, seeds confirmed.
+One capability chosen as proof. Get a 3-5 step demo script. Every capability not
+chosen and every new feature mentioned goes on the next-version seed list.
+Read the seed list back. Exit: capability chosen, demo confirmed, seeds confirmed.
 
-L4 CRITICAL PATH (INCREMENTAL — key difference from $priorSpecVersion):
-Most architecture is inherited. Ask ONLY about what changes:
+L4 CRITICAL PATH (INCREMENTAL):
+Most architecture is inherited from $priorSpecVersion. Ask ONLY about what changes:
 - Which $priorSpecVersion components does this feature touch?
-- What is new — not in $priorSpecVersion at all?
-- Identity/platform/input/output: inherit from $priorSpecVersion unless the
-  demo implies a change. Only ask if the demo requires something different.
-Run the blocker scan. Draft the 1-3 step sequence to a working demo.
-Exit: incremental changes confirmed, blocker scan done.
+- What is genuinely new (not in $priorSpecVersion)?
+- Inherit platform/identity/input/output from $priorSpecVersion unless the demo
+  requires something different — only ask if there is a real change.
+Run the blocker scan. Draft the 1-3 step sequence. Exit: incremental delta confirmed.
+
+SCOPE GUARD (apply at every layer whenever a suggestion arrives):
+1. Check: does this trace to the SCOPE ANCHOR above, or pull toward a different direction?
+2. If it fits: accept and continue.
+3. If it does not fit, respond kindly:
+   "The core of ${state.projectName} is [restate anchor]. [Suggestion] feels like it's
+   pulling toward [different direction] — that could be strong $nextVersion territory or
+   even later. Want to seed it and keep $nextVersion focused on [closer alternative]?"
+4. If the user insists after the pushback, accept it but flag it in the seed list with
+   a note that it was outside the original scope anchor.
+Never hard-block. Seed everything that gets deferred.
 
 STATE SO FAR (cumulative extracted map — re-emit every field every turn):
 $extractedJson
 
 RULES
 - Ask ONE question per turn. Acknowledge the answer first. Be concise.
-- The $priorSpecVersion locked spec is immutable. Never suggest modifying it.
-- When the user mentions a feature not in the seeds, acknowledge it, add it to
-  the $nextVersion seed list, and return to the current layer's question.
-- One new feature per version. If the user wants two, pick one and defer.
-- When answers conflict: "Your answers on [X] and [Y] pull in opposite
-  directions. [X] implies [A]. [Y] implies [B]. I recommend [conservative
-  option] for $nextVersion because [reason]. Do you accept this scope?"
+- $priorSpecVersion is immutable. Never suggest changing it.
+- One new capability per version. If the user wants two, pick one and defer the other.
+- When answers conflict: state both sides, recommend the conservative path, ask for
+  confirmation before proceeding.
 
-After EVERY response, append a fenced forge-state block. MANDATORY every turn.
-Emit the FULL extracted map each turn (cumulative, not deltas):
+After EVERY response, append a fenced forge-state block. MANDATORY every turn:
 
 \`\`\`forge-state
 {
