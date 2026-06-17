@@ -543,7 +543,8 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
   late AnimationController _pulseCtrl;
   late Animation<double> _pulseOpacity;
   Map<String, dynamic>? _progress;
-  List<String> _components = [];
+  // version → component names; loaded for all completed versions
+  final Map<String, List<String>> _allComponents = {};
 
   @override
   void initState() {
@@ -561,9 +562,19 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
 
   Future<void> _loadComponents() async {
     final pj = widget.project;
-    final sv = pj.specVersion ?? 'v1';
+    final stage = _stageOf(pj.phase);
+    final currentVersion = _versionOf(pj.phase);
+    final n = int.tryParse(currentVersion.substring(1)) ?? 1;
+    final completedCount = stage == 'worksheet_complete' ? n : n - 1;
+    for (int i = 1; i <= completedCount; i++) {
+      await _loadVersionComponents(pj, 'v$i');
+    }
+  }
+
+  Future<void> _loadVersionComponents(Project pj, String version) async {
     try {
-      final file = File(p.join(pj.path, 'specs', '${pj.name}_LockedSpec_$sv.md'));
+      final file = File(p.join(
+          pj.path, 'specs', '${pj.name}_LockedSpec_$version.md'));
       if (!file.existsSync()) return;
       final content = await file.readAsString();
       final result = <String>[];
@@ -571,7 +582,8 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
       bool inSection = false;
       bool pastHeader = false;
       for (final line in lines) {
-        if (RegExp(r'##\s+\d*\.?\s*Component\s+(Map|List)', caseSensitive: false)
+        if (RegExp(r'##\s+\d*\.?\s*Component\s+(Map|List)',
+                caseSensitive: false)
             .hasMatch(line)) {
           inSection = true;
           pastHeader = false;
@@ -584,14 +596,18 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
             if (line.contains('---')) pastHeader = true;
             continue;
           }
-          final cols = line.split('|').map((c) => c.trim()).where((c) => c.isNotEmpty).toList();
+          final cols = line
+              .split('|')
+              .map((c) => c.trim())
+              .where((c) => c.isNotEmpty)
+              .toList();
           if (cols.isNotEmpty) {
             final name = cols[0].replaceAll(RegExp(r'[`*_]'), '').trim();
             if (name.isNotEmpty) result.add(name);
           }
         }
       }
-      if (mounted) setState(() => _components = result);
+      if (mounted) setState(() => _allComponents[version] = result);
     } catch (_) {}
   }
 
@@ -695,36 +711,78 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
                     ),
                   ),
                 ),
-                // Component chips
-                if (_components.isNotEmpty)
+                // Latest version: expanded chips
+                if ((_allComponents[_versionOf(pj.phase)] ?? []).isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 5),
                     child: Wrap(
                       spacing: 4,
                       runSpacing: 3,
                       children: [
-                        for (final c in _components)
+                        for (final c in _allComponents[_versionOf(pj.phase)]!)
                           Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: const Color(0xFF0F2318),
                               borderRadius: BorderRadius.circular(3),
-                              border:
-                                  Border.all(color: const Color(0xFF1A3324)),
+                              border: Border.all(
+                                  color: const Color(0xFF1A3324)),
                             ),
-                            child: Text(
-                              c,
-                              style: const TextStyle(
-                                fontSize: 9,
-                                fontFamily: 'Menlo',
-                                color: Color(0xFF4ADE80),
-                              ),
-                            ),
+                            child: Text(c,
+                                style: const TextStyle(
+                                  fontSize: 9,
+                                  fontFamily: 'Menlo',
+                                  color: Color(0xFF4ADE80),
+                                )),
                           ),
                       ],
                     ),
                   ),
+                // Prior versions: collapsed pills on one row (V1 ✓  V2 ✓ ...)
+                Builder(builder: (_) {
+                  final latestN =
+                      int.tryParse(_versionOf(pj.phase).substring(1)) ?? 1;
+                  final priorVersions = List.generate(
+                      latestN - 1, (i) => 'v${i + 1}');
+                  if (priorVersions.isEmpty) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 5),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (final v in priorVersions) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0A1A0E),
+                              borderRadius: BorderRadius.circular(3),
+                              border: Border.all(
+                                  color: const Color(0xFF1A3324)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.check_circle,
+                                    color: Color(0xFF22C55E), size: 9),
+                                const SizedBox(width: 3),
+                                Text(v.toUpperCase(),
+                                    style: const TextStyle(
+                                      fontSize: 9,
+                                      fontFamily: 'Menlo',
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF22C55E),
+                                    )),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                        ],
+                      ],
+                    ),
+                  );
+                }),
                 // "Interview" label + L1–L4 on the same row
                 if (mode == ProjectMode.build)
                   Padding(
