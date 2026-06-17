@@ -67,11 +67,6 @@ class ProjectDetailScreen extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
               children: [
-                _VersionHistoryLane(
-                  phase: live.phase,
-                  projectPath: live.path,
-                  projectName: live.name,
-                ),
                 _PhaseTimeline(project: live),
                 const SizedBox(height: 24),
                 const _SectionHeader('Project State'),
@@ -548,6 +543,7 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
   late AnimationController _pulseCtrl;
   late Animation<double> _pulseOpacity;
   Map<String, dynamic>? _progress;
+  List<String> _components = [];
 
   @override
   void initState() {
@@ -560,6 +556,43 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
       CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
     );
     _loadProgress();
+    _loadComponents();
+  }
+
+  Future<void> _loadComponents() async {
+    final pj = widget.project;
+    final sv = pj.specVersion ?? 'v1';
+    try {
+      final file = File(p.join(pj.path, 'specs', '${pj.name}_LockedSpec_$sv.md'));
+      if (!file.existsSync()) return;
+      final content = await file.readAsString();
+      final result = <String>[];
+      final lines = content.split('\n');
+      bool inSection = false;
+      bool pastHeader = false;
+      for (final line in lines) {
+        if (RegExp(r'##\s+\d*\.?\s*Component\s+(Map|List)', caseSensitive: false)
+            .hasMatch(line)) {
+          inSection = true;
+          pastHeader = false;
+          continue;
+        }
+        if (inSection) {
+          if (line.trim().startsWith('#')) break;
+          if (!line.trim().startsWith('|')) continue;
+          if (!pastHeader) {
+            if (line.contains('---')) pastHeader = true;
+            continue;
+          }
+          final cols = line.split('|').map((c) => c.trim()).where((c) => c.isNotEmpty).toList();
+          if (cols.isNotEmpty) {
+            final name = cols[0].replaceAll(RegExp(r'[`*_]'), '').trim();
+            if (name.isNotEmpty) result.add(name);
+          }
+        }
+      }
+      if (mounted) setState(() => _components = result);
+    } catch (_) {}
   }
 
   @override
@@ -626,24 +659,110 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Step 1: Interview → opens locked spec when done
+          // Step 1: Interview
+          // When worksheet is complete: show "V1 SHIPPED" + chips + "Interview L1–L4" row
+          // Otherwise: standard "Interview" label + L1–L4 below
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _TimelineStep(
-                label: 'Interview',
-                isDone: interviewDone,
-                isCurrent: !interviewDone,
-                pulseOpacity: _pulseOpacity,
-                onTap: interviewDone
-                    ? () => _openArtifact(
-                        context,
-                        'specs',
-                        '${pj.name}_LockedSpec_$sv.md',
-                        ArtifactViewMode.spec)
-                    : () => Navigator.of(context).push(
-                          MaterialPageRoute(
+              if (worksheetDone) ...[
+                // Checkmark dot + "V1 SHIPPED" label
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: () => _openArtifact(
+                        context, 'specs', '${pj.name}_LockedSpec_$sv.md',
+                        ArtifactViewMode.spec),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.check_circle,
+                            color: Color(0xFF22C55E), size: 20),
+                        const SizedBox(height: 5),
+                        Text(
+                          '${_versionOf(pj.phase).toUpperCase()} SHIPPED',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontFamily: 'Menlo',
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.4,
+                            color: Color(0xFF22C55E),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // Component chips
+                if (_components.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 5),
+                    child: Wrap(
+                      spacing: 4,
+                      runSpacing: 3,
+                      children: [
+                        for (final c in _components)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0F2318),
+                              borderRadius: BorderRadius.circular(3),
+                              border:
+                                  Border.all(color: const Color(0xFF1A3324)),
+                            ),
+                            child: Text(
+                              c,
+                              style: const TextStyle(
+                                fontSize: 9,
+                                fontFamily: 'Menlo',
+                                color: Color(0xFF4ADE80),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                // "Interview" label + L1–L4 on the same row
+                if (mode == ProjectMode.build)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 5),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'Interview',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontFamily: 'Menlo',
+                            letterSpacing: 0.3,
+                            color: Color(0xFF4B5563),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _LayerSubRow(
+                          progress: _progress,
+                          interviewDone: true,
+                          pulseOpacity: _pulseOpacity,
+                        ),
+                      ],
+                    ),
+                  ),
+              ] else ...[
+                _TimelineStep(
+                  label: 'Interview',
+                  isDone: interviewDone,
+                  isCurrent: !interviewDone,
+                  pulseOpacity: _pulseOpacity,
+                  onTap: interviewDone
+                      ? () => _openArtifact(
+                          context, 'specs',
+                          '${pj.name}_LockedSpec_$sv.md',
+                          ArtifactViewMode.spec)
+                      : () => Navigator.of(context).push(MaterialPageRoute(
                             builder: (_) => InterviewScreen(
                               args: InterviewArgs(
                                 path: pj.path,
@@ -651,16 +770,16 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
                                 mode: mode,
                               ),
                             ),
-                          ),
-                        ),
-              ),
-              if (mode == ProjectMode.build &&
-                  (!interviewDone || _progress != null))
-                _LayerSubRow(
-                  progress: _progress,
-                  interviewDone: interviewDone,
-                  pulseOpacity: _pulseOpacity,
+                          )),
                 ),
+                if (mode == ProjectMode.build &&
+                    (!interviewDone || _progress != null))
+                  _LayerSubRow(
+                    progress: _progress,
+                    interviewDone: interviewDone,
+                    pulseOpacity: _pulseOpacity,
+                  ),
+              ],
             ],
           ),
           Expanded(child: _TimelineConnector(done: interviewDone)),
