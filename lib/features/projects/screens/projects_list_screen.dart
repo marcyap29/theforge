@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 
 import '../../../data/local_db/forge_database.dart';
 import '../providers/providers.dart';
@@ -334,7 +337,7 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
   }
 }
 
-class _ProjectRow extends ConsumerWidget {
+class _ProjectRow extends ConsumerStatefulWidget {
   const _ProjectRow({
     required this.project,
     required this.isSelecting,
@@ -352,6 +355,54 @@ class _ProjectRow extends ConsumerWidget {
   final VoidCallback onToggleSelection;
   final VoidCallback onRename;
   final VoidCallback onDelete;
+
+  @override
+  ConsumerState<_ProjectRow> createState() => _ProjectRowState();
+}
+
+class _ProjectRowState extends ConsumerState<_ProjectRow> {
+  String? _goal;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadGoal();
+  }
+
+  Future<void> _loadGoal() async {
+    final sv = widget.project.specVersion;
+    if (sv == null) return;
+    try {
+      final file = File(p.join(
+        widget.project.path, 'specs',
+        '${widget.project.name}_LockedSpec_$sv.md',
+      ));
+      if (!file.existsSync()) return;
+      final content = await file.readAsString();
+      final goal = _parseGoal(content);
+      if (mounted && goal != null) setState(() => _goal = goal);
+    } catch (_) {}
+  }
+
+  String? _parseGoal(String spec) {
+    final lines = spec.split('\n');
+    bool inSection = false;
+    for (final line in lines) {
+      if (RegExp(r'##\s+\d*\.?\s*(Immutable )?Goal Statement',
+              caseSensitive: false)
+          .hasMatch(line)) {
+        inSection = true;
+        continue;
+      }
+      if (inSection) {
+        final t = line.trim();
+        if (t.isEmpty) continue;
+        if (t.startsWith('#')) break;
+        return t.replaceAll(RegExp(r'^\*+|\*+$'), '').trim();
+      }
+    }
+    return null;
+  }
 
   Future<void> _showContextMenu(
       BuildContext context, Offset globalPosition) async {
@@ -385,38 +436,57 @@ class _ProjectRow extends ConsumerWidget {
       ],
     );
 
-    if (choice == _RowAction.rename) onRename();
-    if (choice == _RowAction.delete) onDelete();
+    if (choice == _RowAction.rename) widget.onRename();
+    if (choice == _RowAction.delete) widget.onDelete();
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    final project = widget.project;
     final modeLabel = project.mode == 'build' ? 'Build' : 'Audit';
     final lastOpened = project.lastOpened == null
         ? 'never opened'
         : 'last opened ${_formatDate(project.lastOpened!)}';
+    final phaseRow = '${project.phase} · $modeLabel · $lastOpened';
 
     return GestureDetector(
-      onSecondaryTapUp: isSelecting
+      onSecondaryTapUp: widget.isSelecting
           ? null
           : (details) =>
               _showContextMenu(context, details.globalPosition),
       child: ListTile(
-        leading: isSelecting
+        leading: widget.isSelecting
             ? Checkbox(
-                value: isSelected,
+                value: widget.isSelected,
                 activeColor: const Color(0xFFE8A04C),
-                onChanged: (_) => onToggleSelection(),
+                onChanged: (_) => widget.onToggleSelection(),
               )
             : null,
-        selected: isSelected,
+        selected: widget.isSelected,
         selectedTileColor: const Color(0x1AE8A04C),
         title: Text(project.name),
-        subtitle: Text('${project.phase} · $modeLabel · $lastOpened'),
-        trailing: isSelecting ? null : _ModeBadge(mode: modeLabel),
-        onLongPress: isSelecting ? null : onLongPress,
-        onTap: isSelecting
-            ? onToggleSelection
+        subtitle: _goal != null
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _goal!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF9CA3AF),
+                    ),
+                  ),
+                  Text(phaseRow),
+                ],
+              )
+            : Text(phaseRow),
+        trailing: widget.isSelecting ? null : _ModeBadge(mode: modeLabel),
+        onLongPress: widget.isSelecting ? null : widget.onLongPress,
+        onTap: widget.isSelecting
+            ? widget.onToggleSelection
             : () async {
                 final repo = ref.read(projectFileRepositoryProvider);
                 final db = ref.read(forgeDatabaseProvider);

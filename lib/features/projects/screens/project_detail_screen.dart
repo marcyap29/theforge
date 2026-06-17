@@ -52,7 +52,11 @@ class ProjectDetailScreen extends ConsumerWidget {
             ref.read(activeProjectProvider.notifier).close();
           },
         ),
-        title: Text(live.name),
+        title: _AppBarTitle(
+          projectName: live.name,
+          projectPath: live.path,
+          specVersion: live.specVersion,
+        ),
       ),
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -223,6 +227,89 @@ class ProjectDetailScreen extends ConsumerWidget {
   }
 }
 
+// ── AppBar title with goal subtitle ──────────────────────────────────────────
+
+class _AppBarTitle extends StatefulWidget {
+  const _AppBarTitle({
+    required this.projectName,
+    required this.projectPath,
+    required this.specVersion,
+  });
+  final String projectName;
+  final String projectPath;
+  final String? specVersion;
+
+  @override
+  State<_AppBarTitle> createState() => _AppBarTitleState();
+}
+
+class _AppBarTitleState extends State<_AppBarTitle> {
+  String? _goal;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final sv = widget.specVersion ?? 'v1';
+    try {
+      final file = File(p.join(
+        widget.projectPath, 'specs',
+        '${widget.projectName}_LockedSpec_$sv.md',
+      ));
+      if (!file.existsSync()) return;
+      final content = await file.readAsString();
+      final goal = _parseGoal(content);
+      if (mounted && goal != null) setState(() => _goal = goal);
+    } catch (_) {}
+  }
+
+  String? _parseGoal(String spec) {
+    final lines = spec.split('\n');
+    bool inSection = false;
+    for (final line in lines) {
+      if (RegExp(r'##\s+\d*\.?\s*(Immutable )?Goal Statement',
+              caseSensitive: false)
+          .hasMatch(line)) {
+        inSection = true;
+        continue;
+      }
+      if (inSection) {
+        final t = line.trim();
+        if (t.isEmpty) continue;
+        if (t.startsWith('#')) break;
+        return t.replaceAll(RegExp(r'^\*+|\*+$'), '').trim();
+      }
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(widget.projectName),
+        if (_goal != null)
+          Text(
+            _goal!,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 11,
+              fontFamily: 'Menlo',
+              fontWeight: FontWeight.w400,
+              color: Color(0xFF6B7280),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 // ── Version history lane ──────────────────────────────────────────────────────
 
 typedef _SpecSummary = ({String? goal, List<String> components});
@@ -364,7 +451,6 @@ class _VersionHistoryLaneState extends State<_VersionHistoryLane> {
 
   Widget _buildShippedPanel(String version) {
     final data = _specData[version];
-    final goal = data?.goal;
     final components = data?.components ?? [];
 
     return Container(
@@ -395,20 +481,6 @@ class _VersionHistoryLaneState extends State<_VersionHistoryLane> {
               ),
             ],
           ),
-          if (goal != null) ...[
-            const SizedBox(height: 5),
-            Text(
-              goal,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 11,
-                fontFamily: 'Menlo',
-                color: Color(0xFF6B7280),
-                height: 1.4,
-              ),
-            ),
-          ],
           if (components.isNotEmpty) ...[
             const SizedBox(height: 6),
             Wrap(
