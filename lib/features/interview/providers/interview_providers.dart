@@ -10,11 +10,13 @@ class InterviewArgs {
   final String path;
   final String name;
   final ProjectMode mode;
+  final String? priorSpecVersion;
 
   const InterviewArgs({
     required this.path,
     required this.name,
     required this.mode,
+    this.priorSpecVersion,
   });
 
   @override
@@ -23,10 +25,11 @@ class InterviewArgs {
       (other is InterviewArgs &&
           other.path == path &&
           other.name == name &&
-          other.mode == mode);
+          other.mode == mode &&
+          other.priorSpecVersion == priorSpecVersion);
 
   @override
-  int get hashCode => Object.hash(path, name, mode);
+  int get hashCode => Object.hash(path, name, mode, priorSpecVersion);
 }
 
 final interviewProvider =

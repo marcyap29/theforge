@@ -288,11 +288,175 @@ Set `layerComplete: true` only when the current layer's exit condition is
 met. Set `conflicts: []` unless you detected an actual contradiction.''';
 }
 
+String? _extractGoalStatement(String? featureContext) {
+  if (featureContext == null) return null;
+  final lines = featureContext.split('\n');
+  bool inGoalSection = false;
+  for (final line in lines) {
+    if (RegExp(r'##\s+\d*\.?\s*(Immutable )?Goal Statement', caseSensitive: false)
+        .hasMatch(line)) {
+      inGoalSection = true;
+      continue;
+    }
+    if (inGoalSection) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty || trimmed.startsWith('#')) {
+        if (trimmed.startsWith('#')) break;
+        continue;
+      }
+      return trimmed.replaceAll(RegExp(r'^\*+|\*+$'), '').trim();
+    }
+  }
+  return null;
+}
+
+List<String> _extractComponents(String? featureContext) {
+  if (featureContext == null) return const [];
+  final lines = featureContext.split('\n');
+  bool inComponentSection = false;
+  bool pastHeader = false;
+  final components = <String>[];
+  for (final line in lines) {
+    if (RegExp(r'##\s+\d*\.?\s*Component\s+(Map|List)', caseSensitive: false)
+        .hasMatch(line)) {
+      inComponentSection = true;
+      pastHeader = false;
+      continue;
+    }
+    if (inComponentSection) {
+      if (line.trim().startsWith('#')) break;
+      if (!line.trim().startsWith('|')) continue;
+      if (!pastHeader) {
+        // Skip header row and separator row
+        if (line.contains('---')) {
+          pastHeader = true;
+        }
+        continue;
+      }
+      final cols = line.split('|').map((c) => c.trim()).where((c) => c.isNotEmpty).toList();
+      if (cols.isNotEmpty) {
+        final name = cols[0].replaceAll(RegExp(r'[`*_]'), '').trim();
+        if (name.isNotEmpty) components.add(name);
+      }
+    }
+  }
+  return components;
+}
+
+String _featureInterviewSystemPrompt(InterviewState state,
+    {String? ingestedContext, required String priorSpecVersion}) {
+  final nextVersion = nextSpecVersion(priorSpecVersion);
+  final goalStatement = _extractGoalStatement(state.featureContext);
+  final components = _extractComponents(state.featureContext);
+
+  final refBlock = ingestedContext != null
+      ? '\n\nREFERENCE CONTEXT:\n'
+          'The following was extracted from reference documents provided by the user. '
+          'Use it to inform your questions but do not treat it as binding — '
+          'surface any tensions between the reference material and the user\'s answers.\n\n'
+          '$ingestedContext\n'
+      : '';
+
+  final contextBlock = state.featureContext != null
+      ? '\n\nFEATURE CONTEXT — READ BEFORE ASKING ANYTHING:\n'
+          'You are running a Feature Interview to scope $nextVersion.\n'
+          'The prior spec and deferred features are below. '
+          'Do not re-ask anything already established in $priorSpecVersion.\n\n'
+          '${state.featureContext}\n'
+      : '';
+
+  final goalRef = goalStatement != null
+      ? '\n\nSCOPE ANCHOR — $priorSpecVersion core purpose (immutable):\n'
+          '"$goalStatement"\n'
+          'Every suggestion in this interview must trace to this purpose or extend it '
+          'naturally. If it does not, say so kindly and offer to seed it for a future version.\n'
+      : '';
+
+  final componentList = components.isNotEmpty
+      ? components.join(', ')
+      : '(see spec above)';
+
+  final extractedJson =
+      const JsonEncoder.withIndent('  ').convert(state.extracted);
+
+  return '''You are The Forge interviewer — a sharp, direct product architect
+running a Feature Interview for a project called "${state.projectName}".
+You are scoping $nextVersion. $priorSpecVersion is already shipped and immutable.
+$refBlock$contextBlock$goalRef
+THE FUNNEL — you are currently at ${state.currentLayer}. Do not advance until
+the exit condition is met. Never ask about a later layer early.
+
+L1 OPENING — PRESENT FIRST, THEN ASK (1-2 turns):
+Do NOT open with a question. Start by presenting what $priorSpecVersion delivered:
+"${state.projectName} $priorSpecVersion shipped [restate the outcome in one sentence from FEATURE CONTEXT].
+The components built were: $componentList.
+The features deferred were: [list the v2 seeds from FEATURE CONTEXT, or 'none captured' if empty].
+What is the ONE thing you'd add or improve for $nextVersion?"
+After the user responds, confirm it in one sentence and exit L1.
+Exit: new outcome confirmed.
+
+L2 DECOMPOSITION:
+Present the deferred seeds from FEATURE CONTEXT as the candidate menu for $nextVersion.
+Hard cap at 5 capabilities. If the user suggests something not in the seeds, apply the
+SCOPE GUARD below before accepting it. Exit: confirmed capability list.
+
+L3 POC REDUCTION:
+One capability chosen as proof. Get a 3-5 step demo script. Every capability not
+chosen and every new feature mentioned goes on the next-version seed list.
+Read the seed list back. Exit: capability chosen, demo confirmed, seeds confirmed.
+
+L4 CRITICAL PATH (INCREMENTAL):
+Most architecture is inherited from $priorSpecVersion. Ask ONLY about what changes:
+- Which $priorSpecVersion components does this feature touch?
+- What is genuinely new (not in $priorSpecVersion)?
+- Inherit platform/identity/input/output from $priorSpecVersion unless the demo
+  requires something different — only ask if there is a real change.
+Run the blocker scan. Draft the 1-3 step sequence. Exit: incremental delta confirmed.
+
+SCOPE GUARD (apply at every layer whenever a suggestion arrives):
+1. Check: does this trace to the SCOPE ANCHOR above, or pull toward a different direction?
+2. If it fits: accept and continue.
+3. If it does not fit, respond kindly:
+   "The core of ${state.projectName} is [restate anchor]. [Suggestion] feels like it's
+   pulling toward [different direction] — that could be strong $nextVersion territory or
+   even later. Want to seed it and keep $nextVersion focused on [closer alternative]?"
+4. If the user insists after the pushback, accept it but flag it in the seed list with
+   a note that it was outside the original scope anchor.
+Never hard-block. Seed everything that gets deferred.
+
+STATE SO FAR (cumulative extracted map — re-emit every field every turn):
+$extractedJson
+
+RULES
+- Ask ONE question per turn. Acknowledge the answer first. Be concise.
+- $priorSpecVersion is immutable. Never suggest changing it.
+- One new capability per version. If the user wants two, pick one and defer the other.
+- When answers conflict: state both sides, recommend the conservative path, ask for
+  confirmation before proceeding.
+
+After EVERY response, append a fenced forge-state block. MANDATORY every turn:
+
+\`\`\`forge-state
+{
+  "layer": "${state.currentLayer}",
+  "layerComplete": false,
+  "extracted": { ... full map ... },
+  "conflicts": []
+}
+\`\`\`
+
+Set layerComplete: true only when the current layer exit condition is met.''';
+}
+
 String _interviewSystemPrompt(InterviewState state,
-    {String? ingestedContext}) {
+    {String? ingestedContext, String? priorSpecVersion}) {
   final isBuild = state.dimensions == buildDimensions;
   if (!isBuild) {
     return _auditInterviewSystemPrompt(state, ingestedContext: ingestedContext);
+  }
+  if (priorSpecVersion != null) {
+    return _featureInterviewSystemPrompt(state,
+        ingestedContext: ingestedContext, priorSpecVersion: priorSpecVersion);
   }
   return _buildInterviewSystemPrompt(state, ingestedContext: ingestedContext);
 }
@@ -366,12 +530,32 @@ Map<String, DimensionState> _confidenceFromExtracted(
   return updates;
 }
 
+String nextSpecVersion(String current) {
+  if (current.startsWith('v')) {
+    final n = int.tryParse(current.substring(1));
+    if (n != null) return 'v${n + 1}';
+  }
+  return 'v2';
+}
+
 class InterviewNotifier
     extends FamilyAsyncNotifier<InterviewState, InterviewArgs> {
   @override
   Future<InterviewState> build(InterviewArgs args) async {
     final dims = dimensionsFor(args.mode);
-    return InterviewState.empty(args.path, args.name, dims);
+
+    String? featureContext;
+    if (args.priorSpecVersion != null) {
+      final repo = ref.read(projectFileRepositoryProvider);
+      featureContext = await repo.readFeatureContext(
+        args.path,
+        args.name,
+        args.priorSpecVersion!,
+      );
+    }
+
+    return InterviewState.empty(args.path, args.name, dims)
+        .copyWith(featureContext: featureContext);
   }
 
   Future<void> addUserMessage(String text) async {
@@ -473,7 +657,8 @@ class InterviewNotifier
     try {
       llmRaw = await llmService.complete(
         systemPrompt: _interviewSystemPrompt(withUser,
-            ingestedContext: ingestedContext),
+            ingestedContext: ingestedContext,
+            priorSpecVersion: arg.priorSpecVersion),
         userPrompt: contextualPrompt,
         temperature: 0.1,
         role: LlmRole.executor,
@@ -512,7 +697,8 @@ class InterviewNotifier
       try {
         retryRaw = await llmService.complete(
           systemPrompt: _interviewSystemPrompt(withUser,
-              ingestedContext: ingestedContext),
+              ingestedContext: ingestedContext,
+              priorSpecVersion: arg.priorSpecVersion),
           userPrompt:
               '$contextualPrompt\n\nYour previous response did not include a ```forge-state block. '
               'Re-emit the SAME answer with the mandatory ```forge-state JSON block appended. '

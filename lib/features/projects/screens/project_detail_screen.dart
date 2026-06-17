@@ -31,7 +31,6 @@ class ProjectDetailScreen extends ConsumerWidget {
     );
 
     final active = ref.watch(activeProjectProvider);
-    final isBuild = live.mode == 'build';
     final sv = live.specVersion ?? 'v1';
     final mode = ProjectMode.values.firstWhere(
       (m) => m.name == live.mode,
@@ -53,7 +52,11 @@ class ProjectDetailScreen extends ConsumerWidget {
             ref.read(activeProjectProvider.notifier).close();
           },
         ),
-        title: Text(live.name),
+        title: _AppBarTitle(
+          projectName: live.name,
+          projectPath: live.path,
+          specVersion: live.specVersion,
+        ),
       ),
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -64,31 +67,6 @@ class ProjectDetailScreen extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
               children: [
-                // Mode badge
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: isBuild
-                        ? const Color(0x33E8A04C)
-                        : const Color(0x3364748B),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    isBuild ? 'BUILD INTERVIEW' : 'AUDIT INTERVIEW',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.6,
-                      fontFamily: 'Menlo',
-                      color: isBuild
-                          ? const Color(0xFFE8A04C)
-                          : const Color(0xFF94A3B8),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Phase timeline
                 _PhaseTimeline(project: live),
                 const SizedBox(height: 24),
                 const _SectionHeader('Project State'),
@@ -102,14 +80,13 @@ class ProjectDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 24),
                 const _SectionHeader('Reference Documents'),
                 _ReferenceDocsRow(projectPath: project.path),
-                if (live.phase == 'v1_worksheet_complete')
+                if (_stageOf(live.phase) == 'worksheet_complete')
                   _BuildSequenceSection(project: live),
                 const SizedBox(height: 24),
                 // Phase-aware CTA
                 _SectionHeader(_ctaSectionLabel(live.phase)),
                 SizedBox(
                   width: double.infinity,
-                  height: 44,
                   child: _buildCta(context, live, mode, sv),
                 ),
               ],
@@ -120,16 +97,19 @@ class ProjectDetailScreen extends ConsumerWidget {
     );
   }
 
-  String _ctaSectionLabel(String phase) => switch (phase) {
-        'v1_spec_locked' => 'NEXT STEP',
-        'v1_worksheet_complete' => 'STATUS',
+  String _ctaSectionLabel(String phase) => switch (_stageOf(phase)) {
+        'spec_locked' => 'NEXT STEP',
+        'worksheet_complete' => 'STATUS',
         _ => 'INTERVIEW',
       };
 
   Widget _buildCta(
       BuildContext context, Project live, ProjectMode mode, String sv) {
-    return switch (live.phase) {
-      'v1_spec_locked' => FilledButton(
+    final stage = _stageOf(live.phase);
+    final version = _versionOf(live.phase);
+
+    return switch (stage) {
+      'spec_locked' => FilledButton(
           onPressed: () => Navigator.of(context).push(MaterialPageRoute(
             builder: (_) => WorksheetGenerationScreen(
               projectPath: live.path,
@@ -138,6 +118,7 @@ class ProjectDetailScreen extends ConsumerWidget {
             ),
           )),
           style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(44),
             backgroundColor: const Color(0xFFE8A04C),
             foregroundColor: const Color(0xFF0F0F10),
           ),
@@ -147,31 +128,70 @@ class ProjectDetailScreen extends ConsumerWidget {
                 fontWeight: FontWeight.w600, fontFamily: 'Menlo'),
           ),
         ),
-      'v1_worksheet_complete' => Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFF0F0F10),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFF22C55E)),
-          ),
-          child: const Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.check_circle,
-                    color: Color(0xFF22C55E), size: 14),
-                SizedBox(width: 8),
-                Text(
-                  'Ready for executor',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'Menlo',
-                    color: Color(0xFF22C55E),
+      'worksheet_complete' => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F0F10),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFF22C55E)),
+              ),
+              child: Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.check_circle,
+                        color: Color(0xFF22C55E), size: 14),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${version.toUpperCase()} ready for executor',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Menlo',
+                        color: Color(0xFF22C55E),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (mode == ProjectMode.build) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => InterviewScreen(
+                        args: InterviewArgs(
+                          path: live.path,
+                          name: live.name,
+                          mode: ProjectMode.build,
+                          priorSpecVersion: version,
+                        ),
+                      ),
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFE8A04C)),
+                    foregroundColor: const Color(0xFFE8A04C),
+                  ),
+                  child: Text(
+                    'Start ${_nextVersion(version).toUpperCase()} Interview →',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Menlo',
+                      fontSize: 13,
+                    ),
                   ),
                 ),
-              ],
-            ),
-          ),
+              ),
+            ],
+          ],
         ),
       _ => FilledButton(
           onPressed: () => Navigator.of(context).push(
@@ -186,6 +206,7 @@ class ProjectDetailScreen extends ConsumerWidget {
             ),
           ),
           style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(44),
             backgroundColor: const Color(0xFFE8A04C),
             foregroundColor: const Color(0xFF0F0F10),
           ),
@@ -199,6 +220,312 @@ class ProjectDetailScreen extends ConsumerWidget {
         ),
     };
   }
+}
+
+// ── AppBar title with goal subtitle ──────────────────────────────────────────
+
+class _AppBarTitle extends StatefulWidget {
+  const _AppBarTitle({
+    required this.projectName,
+    required this.projectPath,
+    required this.specVersion,
+  });
+  final String projectName;
+  final String projectPath;
+  final String? specVersion;
+
+  @override
+  State<_AppBarTitle> createState() => _AppBarTitleState();
+}
+
+class _AppBarTitleState extends State<_AppBarTitle> {
+  String? _goal;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final sv = widget.specVersion ?? 'v1';
+    try {
+      final file = File(p.join(
+        widget.projectPath, 'specs',
+        '${widget.projectName}_LockedSpec_$sv.md',
+      ));
+      if (!file.existsSync()) return;
+      final content = await file.readAsString();
+      final goal = _parseGoal(content);
+      if (mounted && goal != null) setState(() => _goal = goal);
+    } catch (_) {}
+  }
+
+  String? _parseGoal(String spec) {
+    final lines = spec.split('\n');
+    bool inSection = false;
+    for (final line in lines) {
+      if (RegExp(r'##\s+\d*\.?\s*(Immutable )?Goal Statement',
+              caseSensitive: false)
+          .hasMatch(line)) {
+        inSection = true;
+        continue;
+      }
+      if (inSection) {
+        final t = line.trim();
+        if (t.isEmpty) continue;
+        if (t.startsWith('#')) break;
+        return t.replaceAll(RegExp(r'^\*+|\*+$'), '').trim();
+      }
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(widget.projectName),
+        if (_goal != null)
+          Text(
+            _goal!,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 11,
+              fontFamily: 'Menlo',
+              fontWeight: FontWeight.w400,
+              color: Color(0xFF6B7280),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ── Version history lane ──────────────────────────────────────────────────────
+
+typedef _SpecSummary = ({String? goal, List<String> components});
+
+class _VersionHistoryLane extends StatefulWidget {
+  const _VersionHistoryLane({
+    required this.phase,
+    required this.projectPath,
+    required this.projectName,
+  });
+  final String phase;
+  final String projectPath;
+  final String projectName;
+
+  @override
+  State<_VersionHistoryLane> createState() => _VersionHistoryLaneState();
+}
+
+class _VersionHistoryLaneState extends State<_VersionHistoryLane> {
+  final Map<String, _SpecSummary> _specData = {};
+
+  /// Versions that are fully complete (worksheet_complete for that version).
+  List<String> _completedVersions() {
+    final version = _versionOf(widget.phase);
+    final stage = _stageOf(widget.phase);
+    final n = int.tryParse(version.substring(1)) ?? 1;
+    // If current stage is worksheet_complete, current version is also done.
+    final completedCount = (stage == 'worksheet_complete') ? n : n - 1;
+    if (completedCount <= 0) return const [];
+    return List.generate(completedCount, (i) => 'v${i + 1}');
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSpecs();
+  }
+
+  Future<void> _loadSpecs() async {
+    for (final v in _completedVersions()) {
+      final summary = await _loadSpec(v);
+      if (mounted) setState(() => _specData[v] = summary);
+    }
+  }
+
+  Future<_SpecSummary> _loadSpec(String version) async {
+    try {
+      final file = File(p.join(
+        widget.projectPath, 'specs',
+        '${widget.projectName}_LockedSpec_$version.md',
+      ));
+      if (!file.existsSync()) return (goal: null, components: <String>[]);
+      final content = await file.readAsString();
+      return (goal: _parseGoal(content), components: _parseComponents(content));
+    } catch (_) {
+      return (goal: null, components: <String>[]);
+    }
+  }
+
+  String? _parseGoal(String spec) {
+    final lines = spec.split('\n');
+    bool inSection = false;
+    for (final line in lines) {
+      if (RegExp(r'##\s+\d*\.?\s*(Immutable )?Goal Statement', caseSensitive: false)
+          .hasMatch(line)) {
+        inSection = true;
+        continue;
+      }
+      if (inSection) {
+        final t = line.trim();
+        if (t.isEmpty) continue;
+        if (t.startsWith('#')) break;
+        return t.replaceAll(RegExp(r'^\*+|\*+$'), '').trim();
+      }
+    }
+    return null;
+  }
+
+  List<String> _parseComponents(String spec) {
+    final lines = spec.split('\n');
+    bool inSection = false;
+    bool pastHeader = false;
+    final result = <String>[];
+    for (final line in lines) {
+      if (RegExp(r'##\s+\d*\.?\s*Component\s+(Map|List)', caseSensitive: false)
+          .hasMatch(line)) {
+        inSection = true;
+        pastHeader = false;
+        continue;
+      }
+      if (inSection) {
+        if (line.trim().startsWith('#')) break;
+        if (!line.trim().startsWith('|')) continue;
+        if (!pastHeader) {
+          if (line.contains('---')) pastHeader = true;
+          continue;
+        }
+        final cols = line.split('|').map((c) => c.trim()).where((c) => c.isNotEmpty).toList();
+        if (cols.isNotEmpty) {
+          final name = cols[0].replaceAll(RegExp(r'[`*_]'), '').trim();
+          if (name.isNotEmpty) result.add(name);
+        }
+      }
+    }
+    return result;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final completed = _completedVersions();
+    if (completed.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final v in completed) _buildShippedPanel(v),
+          // Show "V2 — IN PROGRESS" label only when there are prior completed versions
+          // and current version is not itself complete (i.e., v2 spec locked but not yet worksheeted)
+          if (_stageOf(widget.phase) != 'worksheet_complete')
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                '${_versionOf(widget.phase).toUpperCase()} — IN PROGRESS',
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
+                  fontFamily: 'Menlo',
+                  color: Color(0xFFE8A04C),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShippedPanel(String version) {
+    final data = _specData[version];
+    final components = data?.components ?? [];
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A1A0E),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFF1A3324)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 12),
+              const SizedBox(width: 6),
+              Text(
+                '${version.toUpperCase()} SHIPPED',
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                  fontFamily: 'Menlo',
+                  color: Color(0xFF22C55E),
+                ),
+              ),
+            ],
+          ),
+          if (components.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 5,
+              runSpacing: 4,
+              children: [
+                for (final c in components)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F2318),
+                      borderRadius: BorderRadius.circular(3),
+                      border: Border.all(color: const Color(0xFF1A3324)),
+                    ),
+                    child: Text(
+                      c,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontFamily: 'Menlo',
+                        color: Color(0xFF4ADE80),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── Phase helpers ─────────────────────────────────────────────────────────────
+
+String _versionOf(String phase) {
+  final idx = phase.indexOf('_');
+  return idx > 0 ? phase.substring(0, idx) : 'v1';
+}
+
+String _stageOf(String phase) {
+  final idx = phase.indexOf('_');
+  return idx > 0 ? phase.substring(idx + 1) : phase;
+}
+
+String _nextVersion(String current) {
+  if (current.startsWith('v')) {
+    final n = int.tryParse(current.substring(1));
+    if (n != null) return 'v${n + 1}';
+  }
+  return 'v2';
 }
 
 // ── Phase Timeline ────────────────────────────────────────────────────────────
@@ -216,6 +543,8 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
   late AnimationController _pulseCtrl;
   late Animation<double> _pulseOpacity;
   Map<String, dynamic>? _progress;
+  // version → component names; loaded for all completed versions
+  final Map<String, List<String>> _allComponents = {};
 
   @override
   void initState() {
@@ -228,6 +557,58 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
       CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
     );
     _loadProgress();
+    _loadComponents();
+  }
+
+  Future<void> _loadComponents() async {
+    final pj = widget.project;
+    final stage = _stageOf(pj.phase);
+    final currentVersion = _versionOf(pj.phase);
+    final n = int.tryParse(currentVersion.substring(1)) ?? 1;
+    final completedCount = stage == 'worksheet_complete' ? n : n - 1;
+    for (int i = 1; i <= completedCount; i++) {
+      await _loadVersionComponents(pj, 'v$i');
+    }
+  }
+
+  Future<void> _loadVersionComponents(Project pj, String version) async {
+    try {
+      final file = File(p.join(
+          pj.path, 'specs', '${pj.name}_LockedSpec_$version.md'));
+      if (!file.existsSync()) return;
+      final content = await file.readAsString();
+      final result = <String>[];
+      final lines = content.split('\n');
+      bool inSection = false;
+      bool pastHeader = false;
+      for (final line in lines) {
+        if (RegExp(r'##\s+\d*\.?\s*Component\s+(Map|List)',
+                caseSensitive: false)
+            .hasMatch(line)) {
+          inSection = true;
+          pastHeader = false;
+          continue;
+        }
+        if (inSection) {
+          if (line.trim().startsWith('#')) break;
+          if (!line.trim().startsWith('|')) continue;
+          if (!pastHeader) {
+            if (line.contains('---')) pastHeader = true;
+            continue;
+          }
+          final cols = line
+              .split('|')
+              .map((c) => c.trim())
+              .where((c) => c.isNotEmpty)
+              .toList();
+          if (cols.isNotEmpty) {
+            final name = cols[0].replaceAll(RegExp(r'[`*_]'), '').trim();
+            if (name.isNotEmpty) result.add(name);
+          }
+        }
+      }
+      if (mounted) setState(() => _allComponents[version] = result);
+    } catch (_) {}
   }
 
   @override
@@ -284,53 +665,93 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
       orElse: () => ProjectMode.build,
     );
 
-    final interviewDone = pj.phase != 'v1_interview';
-    final worksheetDone = pj.phase == 'v1_worksheet_complete';
-    final worksheetCurrent = pj.phase == 'v1_spec_locked';
+    final stage = _stageOf(pj.phase);
+    final interviewDone = stage != 'interview';
+    final worksheetDone = stage == 'worksheet_complete';
+    final worksheetCurrent = stage == 'spec_locked';
+
+    final latestVersion = _versionOf(pj.phase);
+    final latestN = int.tryParse(latestVersion.substring(1)) ?? 1;
+    final priorVersions = worksheetDone
+        ? List.generate(latestN - 1, (i) => 'v${i + 1}')
+        : <String>[];
+    final latestChips = _allComponents[latestVersion] ?? [];
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Step 1: Interview → opens locked spec when done
-          Column(
+          // ── Main timeline row: compact dots + connectors ──────────────────
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
             children: [
-              _TimelineStep(
-                label: 'Interview',
-                isDone: interviewDone,
-                isCurrent: !interviewDone,
-                pulseOpacity: _pulseOpacity,
-                onTap: interviewDone
-                    ? () => _openArtifact(
-                        context,
-                        'specs',
-                        '${pj.name}_LockedSpec_$sv.md',
-                        ArtifactViewMode.spec)
-                    : () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => InterviewScreen(
-                              args: InterviewArgs(
-                                path: pj.path,
-                                name: pj.name,
-                                mode: mode,
+              // Interview dot — compact, never widens the row
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (worksheetDone)
+                    MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        onTap: () => _openArtifact(
+                            context, 'specs',
+                            '${pj.name}_LockedSpec_$sv.md',
+                            ArtifactViewMode.spec),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.check_circle,
+                                color: Color(0xFF22C55E), size: 20),
+                            const SizedBox(height: 5),
+                            Text(
+                              '${latestVersion.toUpperCase()} SHIPPED',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontFamily: 'Menlo',
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.4,
+                                color: Color(0xFF22C55E),
                               ),
                             ),
-                          ),
+                          ],
                         ),
+                      ),
+                    )
+                  else ...[
+                    _TimelineStep(
+                      label: 'Interview',
+                      isDone: interviewDone,
+                      isCurrent: !interviewDone,
+                      pulseOpacity: _pulseOpacity,
+                      onTap: interviewDone
+                          ? () => _openArtifact(
+                              context, 'specs',
+                              '${pj.name}_LockedSpec_$sv.md',
+                              ArtifactViewMode.spec)
+                          : () => Navigator.of(context).push(MaterialPageRoute(
+                                builder: (_) => InterviewScreen(
+                                  args: InterviewArgs(
+                                    path: pj.path,
+                                    name: pj.name,
+                                    mode: mode,
+                                  ),
+                                ),
+                              )),
+                    ),
+                    if (mode == ProjectMode.build &&
+                        (!interviewDone || _progress != null))
+                      _LayerSubRow(
+                        progress: _progress,
+                        interviewDone: interviewDone,
+                        pulseOpacity: _pulseOpacity,
+                      ),
+                  ],
+                ],
               ),
-              if (mode == ProjectMode.build &&
-                  (!interviewDone || _progress != null))
-                _LayerSubRow(
-                  progress: _progress,
-                  interviewDone: interviewDone,
-                  pulseOpacity: _pulseOpacity,
-                ),
-            ],
-          ),
-          Expanded(child: _TimelineConnector(done: interviewDone)),
+              Expanded(child: _TimelineConnector(done: interviewDone)),
           // Step 2: Worksheet → opens worksheet when done, generates when current
           _TimelineStep(
             label: 'Worksheet',
@@ -370,7 +791,101 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
           ),
         ],
       ),
-    );
+      // ── Below timeline: version detail (worksheetDone, Build mode only) ──
+      if (worksheetDone && mode == ProjectMode.build) ...[
+        // Latest version component chips
+        if (latestChips.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Wrap(
+              spacing: 4,
+              runSpacing: 3,
+              children: [
+                for (final c in latestChips)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F2318),
+                      borderRadius: BorderRadius.circular(3),
+                      border: Border.all(color: const Color(0xFF1A3324)),
+                    ),
+                    child: Text(c,
+                        style: const TextStyle(
+                          fontSize: 9,
+                          fontFamily: 'Menlo',
+                          color: Color(0xFF4ADE80),
+                        )),
+                  ),
+              ],
+            ),
+          ),
+        // Prior versions: collapsed pills (only shown when v2+)
+        if (priorVersions.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final v in priorVersions) ...[
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0A1A0E),
+                      borderRadius: BorderRadius.circular(3),
+                      border: Border.all(color: const Color(0xFF1A3324)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.check_circle,
+                            color: Color(0xFF22C55E), size: 9),
+                        const SizedBox(width: 3),
+                        Text(v.toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 9,
+                              fontFamily: 'Menlo',
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF22C55E),
+                            )),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                ],
+              ],
+            ),
+          ),
+        // "Interview" label + L1–L4 on the same row
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Text(
+                'Interview',
+                style: TextStyle(
+                  fontSize: 9,
+                  fontFamily: 'Menlo',
+                  letterSpacing: 0.3,
+                  color: Color(0xFF4B5563),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _LayerSubRow(
+                progress: _progress,
+                interviewDone: true,
+                pulseOpacity: _pulseOpacity,
+              ),
+            ],
+          ),
+        ),
+      ],
+    ],
+  ),
+);
   }
 }
 

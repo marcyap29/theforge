@@ -6,6 +6,7 @@ import '../../../features/spec_generation/spec_generation_screen.dart';
 import '../../projects/ingestion/ingestion_notifier.dart';
 import '../../projects/ingestion/reference_docs_screen.dart';
 import '../providers/interview_providers.dart';
+import '../state/interview_notifier.dart';
 import '../state/interview_state.dart';
 import 'confidence_meter.dart';
 
@@ -86,12 +87,19 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen>
         data: (state) {
           return Column(
             children: [
+              if (args.priorSpecVersion != null &&
+                  state.featureContext != null)
+                _V1BuiltHeader(
+                  featureContext: state.featureContext!,
+                  priorVersion: args.priorSpecVersion!,
+                ),
               if (args.mode == ProjectMode.build &&
                   state.currentLayer.isNotEmpty)
                 _InterviewLayerStrip(
                   currentLayer: state.currentLayer,
                   allComplete: state.specGenEnabled,
                   pulseOpacity: _pulseOpacity,
+                  priorVersion: args.priorSpecVersion,
                 ),
               ConfidenceMeter(
                 dimensions: state.dimensions,
@@ -151,15 +159,22 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen>
                     width: double.infinity,
                     child: FilledButton.icon(
                       icon: const Icon(Icons.auto_awesome),
-                      label: const Text('Generate Spec'),
+                      label: Text(args.priorSpecVersion != null
+                          ? 'Generate ${nextSpecVersion(args.priorSpecVersion!)} Spec'
+                          : 'Generate Spec'),
                       onPressed: () {
                         final interviewState =
                             ref.read(interviewProvider(args)).valueOrNull;
                         if (interviewState == null) return;
+                        final targetVersion = args.priorSpecVersion != null
+                            ? nextSpecVersion(args.priorSpecVersion!)
+                            : 'v1';
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) => SpecGenerationScreen(
-                                interviewState: interviewState),
+                              interviewState: interviewState,
+                              targetSpecVersion: targetVersion,
+                            ),
                           ),
                         );
                       },
@@ -434,11 +449,13 @@ class _InterviewLayerStrip extends StatelessWidget {
     required this.currentLayer,
     required this.allComplete,
     required this.pulseOpacity,
+    this.priorVersion,
   });
 
   final String currentLayer;
   final bool allComplete;
   final Animation<double> pulseOpacity;
+  final String? priorVersion;
 
   @override
   Widget build(BuildContext context) {
@@ -446,6 +463,9 @@ class _InterviewLayerStrip extends StatelessWidget {
     const labels = ['Outcome', 'Decomposition', 'PoC', 'Critical Path'];
     final idx = layers.indexOf(currentLayer);
     final completed = idx > 0 ? layers.sublist(0, idx) : <String>[];
+    final label = priorVersion != null
+        ? '${nextSpecVersion(priorVersion!).toUpperCase()} FUNNEL'
+        : 'FUNNEL';
 
     return Container(
       width: double.infinity,
@@ -458,9 +478,9 @@ class _InterviewLayerStrip extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Text(
-            'FUNNEL',
-            style: TextStyle(
+          Text(
+            label,
+            style: const TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.5,
@@ -564,6 +584,146 @@ class _LayerIndicator extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _V1BuiltHeader extends StatelessWidget {
+  const _V1BuiltHeader({
+    required this.featureContext,
+    required this.priorVersion,
+  });
+
+  final String featureContext;
+  final String priorVersion;
+
+  List<String> _parseComponents() {
+    final lines = featureContext.split('\n');
+    bool inSection = false;
+    bool pastHeader = false;
+    final result = <String>[];
+    for (final line in lines) {
+      if (RegExp(r'##\s+\d*\.?\s*Component\s+(Map|List)', caseSensitive: false)
+          .hasMatch(line)) {
+        inSection = true;
+        pastHeader = false;
+        continue;
+      }
+      if (inSection) {
+        if (line.trim().startsWith('#')) break;
+        if (!line.trim().startsWith('|')) continue;
+        if (!pastHeader) {
+          if (line.contains('---')) pastHeader = true;
+          continue;
+        }
+        final cols = line
+            .split('|')
+            .map((c) => c.trim())
+            .where((c) => c.isNotEmpty)
+            .toList();
+        if (cols.isNotEmpty) {
+          final name = cols[0].replaceAll(RegExp(r'[`*_]'), '').trim();
+          if (name.isNotEmpty) result.add(name);
+        }
+      }
+    }
+    return result;
+  }
+
+  String? _parseGoal() {
+    final lines = featureContext.split('\n');
+    bool inSection = false;
+    for (final line in lines) {
+      if (RegExp(r'##\s+\d*\.?\s*(Immutable )?Goal Statement', caseSensitive: false)
+          .hasMatch(line)) {
+        inSection = true;
+        continue;
+      }
+      if (inSection) {
+        final t = line.trim();
+        if (t.isEmpty) continue;
+        if (t.startsWith('#')) break;
+        return t.replaceAll(RegExp(r'^\*+|\*+$'), '').trim();
+      }
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final components = _parseComponents();
+    final goal = _parseGoal();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0A1A0E),
+        border: Border(
+          bottom: BorderSide(color: Color(0xFF1A3324), width: 1),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 12),
+              const SizedBox(width: 6),
+              Text(
+                '${priorVersion.toUpperCase()} SHIPPED',
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.6,
+                  fontFamily: 'Menlo',
+                  color: Color(0xFF22C55E),
+                ),
+              ),
+            ],
+          ),
+          if (goal != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              goal,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
+                fontFamily: 'Menlo',
+                color: Color(0xFF6B7280),
+                height: 1.4,
+              ),
+            ),
+          ],
+          if (components.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                for (final c in components)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F2318),
+                      borderRadius: BorderRadius.circular(3),
+                      border: Border.all(color: const Color(0xFF1A3324)),
+                    ),
+                    child: Text(
+                      c,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontFamily: 'Menlo',
+                        color: Color(0xFF4ADE80),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

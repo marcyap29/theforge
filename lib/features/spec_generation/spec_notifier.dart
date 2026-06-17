@@ -27,11 +27,12 @@ class SpecNotifier extends AutoDisposeNotifier<SpecGenState> {
   @override
   SpecGenState build() => const SpecGenState();
 
-  Future<void> generate(InterviewState interviewState) async {
+  Future<void> generate(InterviewState interviewState,
+      {String targetSpecVersion = 'v1'}) async {
     if (state.status == SpecGenStatus.generating) return;
     state = const SpecGenState(status: SpecGenStatus.generating);
 
-    const specVersion = 'v1';
+    final specVersion = targetSpecVersion;
     final projectName = interviewState.projectName;
     final projectPath = interviewState.projectPath;
     final specFilename = '${projectName}_LockedSpec_$specVersion.md';
@@ -97,7 +98,7 @@ class SpecNotifier extends AutoDisposeNotifier<SpecGenState> {
       await repo.writeReadme(projectPath, updatedReadme);
 
       final db = ref.read(forgeDatabaseProvider);
-      await db.updateProjectPhase(projectName, 'v1_spec_locked', specVersion);
+      await db.updateProjectPhase(projectName, '${specVersion}_spec_locked', specVersion);
 
       await ref.read(projectListProvider.notifier).refresh();
 
@@ -120,7 +121,7 @@ class SpecNotifier extends AutoDisposeNotifier<SpecGenState> {
   String _updateReadme(String current, String specVersion) {
     return current
         .replaceFirst(RegExp(r'\*\*Current phase:\*\*.*'),
-            '**Current phase:** v1_spec_locked')
+            '**Current phase:** ${specVersion}_spec_locked')
         .replaceFirst(RegExp(r'\*\*Spec version:\*\*.*'),
             '**Spec version:** $specVersion')
         .replaceFirst(
