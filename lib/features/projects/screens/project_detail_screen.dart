@@ -31,7 +31,6 @@ class ProjectDetailScreen extends ConsumerWidget {
     );
 
     final active = ref.watch(activeProjectProvider);
-    final isBuild = live.mode == 'build';
     final sv = live.specVersion ?? 'v1';
     final mode = ProjectMode.values.firstWhere(
       (m) => m.name == live.mode,
@@ -64,33 +63,7 @@ class ProjectDetailScreen extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
               children: [
-                // Mode badge
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: isBuild
-                        ? const Color(0x33E8A04C)
-                        : const Color(0x3364748B),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    isBuild
-                        ? 'BUILD INTERVIEW${_versionOf(live.phase) == 'v1' ? '' : ' — ${_versionOf(live.phase).toUpperCase()}'}'
-                        : 'AUDIT INTERVIEW',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.6,
-                      fontFamily: 'Menlo',
-                      color: isBuild
-                          ? const Color(0xFFE8A04C)
-                          : const Color(0xFF94A3B8),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Phase timeline
+                _VersionHistoryLane(phase: live.phase),
                 _PhaseTimeline(project: live),
                 const SizedBox(height: 24),
                 const _SectionHeader('Project State'),
@@ -243,6 +216,89 @@ class ProjectDetailScreen extends ConsumerWidget {
           ),
         ),
     };
+  }
+}
+
+// ── Version history lane ──────────────────────────────────────────────────────
+
+class _VersionHistoryLane extends StatelessWidget {
+  const _VersionHistoryLane({required this.phase});
+  final String phase;
+
+  List<String> _completedVersions() {
+    final current = _versionOf(phase);
+    if (current.startsWith('v')) {
+      final n = int.tryParse(current.substring(1));
+      if (n != null && n > 1) {
+        return List.generate(n - 1, (i) => 'v${i + 1}');
+      }
+    }
+    return const [];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final completed = _completedVersions();
+    if (completed.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final v in completed)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0A1A0E),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFF1A3324)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 13),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${v.toUpperCase()} SHIPPED',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                      fontFamily: 'Menlo',
+                      color: Color(0xFF22C55E),
+                    ),
+                  ),
+                  const Spacer(),
+                  const Text(
+                    'complete',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontFamily: 'Menlo',
+                      color: Color(0xFF4ADE80),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          // Current version label
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text(
+              '${_versionOf(phase).toUpperCase()} — IN PROGRESS',
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5,
+                fontFamily: 'Menlo',
+                color: Color(0xFFE8A04C),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
