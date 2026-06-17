@@ -63,7 +63,11 @@ class ProjectDetailScreen extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
               children: [
-                _VersionHistoryLane(phase: live.phase),
+                _VersionHistoryLane(
+                  phase: live.phase,
+                  projectPath: live.path,
+                  projectName: live.name,
+                ),
                 _PhaseTimeline(project: live),
                 const SizedBox(height: 24),
                 const _SectionHeader('Project State'),
@@ -221,19 +225,109 @@ class ProjectDetailScreen extends ConsumerWidget {
 
 // ── Version history lane ──────────────────────────────────────────────────────
 
-class _VersionHistoryLane extends StatelessWidget {
-  const _VersionHistoryLane({required this.phase});
-  final String phase;
+typedef _SpecSummary = ({String? goal, List<String> components});
 
+class _VersionHistoryLane extends StatefulWidget {
+  const _VersionHistoryLane({
+    required this.phase,
+    required this.projectPath,
+    required this.projectName,
+  });
+  final String phase;
+  final String projectPath;
+  final String projectName;
+
+  @override
+  State<_VersionHistoryLane> createState() => _VersionHistoryLaneState();
+}
+
+class _VersionHistoryLaneState extends State<_VersionHistoryLane> {
+  final Map<String, _SpecSummary> _specData = {};
+
+  /// Versions that are fully complete (worksheet_complete for that version).
   List<String> _completedVersions() {
-    final current = _versionOf(phase);
-    if (current.startsWith('v')) {
-      final n = int.tryParse(current.substring(1));
-      if (n != null && n > 1) {
-        return List.generate(n - 1, (i) => 'v${i + 1}');
+    final version = _versionOf(widget.phase);
+    final stage = _stageOf(widget.phase);
+    final n = int.tryParse(version.substring(1)) ?? 1;
+    // If current stage is worksheet_complete, current version is also done.
+    final completedCount = (stage == 'worksheet_complete') ? n : n - 1;
+    if (completedCount <= 0) return const [];
+    return List.generate(completedCount, (i) => 'v${i + 1}');
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSpecs();
+  }
+
+  Future<void> _loadSpecs() async {
+    for (final v in _completedVersions()) {
+      final summary = await _loadSpec(v);
+      if (mounted) setState(() => _specData[v] = summary);
+    }
+  }
+
+  Future<_SpecSummary> _loadSpec(String version) async {
+    try {
+      final file = File(p.join(
+        widget.projectPath, 'specs',
+        '${widget.projectName}_LockedSpec_$version.md',
+      ));
+      if (!file.existsSync()) return (goal: null, components: <String>[]);
+      final content = await file.readAsString();
+      return (goal: _parseGoal(content), components: _parseComponents(content));
+    } catch (_) {
+      return (goal: null, components: <String>[]);
+    }
+  }
+
+  String? _parseGoal(String spec) {
+    final lines = spec.split('\n');
+    bool inSection = false;
+    for (final line in lines) {
+      if (RegExp(r'##\s+\d*\.?\s*(Immutable )?Goal Statement', caseSensitive: false)
+          .hasMatch(line)) {
+        inSection = true;
+        continue;
+      }
+      if (inSection) {
+        final t = line.trim();
+        if (t.isEmpty) continue;
+        if (t.startsWith('#')) break;
+        return t.replaceAll(RegExp(r'^\*+|\*+$'), '').trim();
       }
     }
-    return const [];
+    return null;
+  }
+
+  List<String> _parseComponents(String spec) {
+    final lines = spec.split('\n');
+    bool inSection = false;
+    bool pastHeader = false;
+    final result = <String>[];
+    for (final line in lines) {
+      if (RegExp(r'##\s+\d*\.?\s*Component\s+(Map|List)', caseSensitive: false)
+          .hasMatch(line)) {
+        inSection = true;
+        pastHeader = false;
+        continue;
+      }
+      if (inSection) {
+        if (line.trim().startsWith('#')) break;
+        if (!line.trim().startsWith('|')) continue;
+        if (!pastHeader) {
+          if (line.contains('---')) pastHeader = true;
+          continue;
+        }
+        final cols = line.split('|').map((c) => c.trim()).where((c) => c.isNotEmpty).toList();
+        if (cols.isNotEmpty) {
+          final name = cols[0].replaceAll(RegExp(r'[`*_]'), '').trim();
+          if (name.isNotEmpty) result.add(name);
+        }
+      }
+    }
+    return result;
   }
 
   @override
@@ -246,56 +340,101 @@ class _VersionHistoryLane extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (final v in completed)
-            Container(
-              width: double.infinity,
-              margin: const EdgeInsets.only(bottom: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0A1A0E),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: const Color(0xFF1A3324)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 13),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${v.toUpperCase()} SHIPPED',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                      fontFamily: 'Menlo',
-                      color: Color(0xFF22C55E),
-                    ),
-                  ),
-                  const Spacer(),
-                  const Text(
-                    'complete',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontFamily: 'Menlo',
-                      color: Color(0xFF4ADE80),
-                    ),
-                  ),
-                ],
+          for (final v in completed) _buildShippedPanel(v),
+          // Show "V2 — IN PROGRESS" label only when there are prior completed versions
+          // and current version is not itself complete (i.e., v2 spec locked but not yet worksheeted)
+          if (_stageOf(widget.phase) != 'worksheet_complete')
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                '${_versionOf(widget.phase).toUpperCase()} — IN PROGRESS',
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
+                  fontFamily: 'Menlo',
+                  color: Color(0xFFE8A04C),
+                ),
               ),
             ),
-          // Current version label
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Text(
-              '${_versionOf(phase).toUpperCase()} — IN PROGRESS',
-              style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-                fontFamily: 'Menlo',
-                color: Color(0xFFE8A04C),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShippedPanel(String version) {
+    final data = _specData[version];
+    final goal = data?.goal;
+    final components = data?.components ?? [];
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A1A0E),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFF1A3324)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 12),
+              const SizedBox(width: 6),
+              Text(
+                '${version.toUpperCase()} SHIPPED',
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                  fontFamily: 'Menlo',
+                  color: Color(0xFF22C55E),
+                ),
               ),
-            ),
+            ],
           ),
+          if (goal != null) ...[
+            const SizedBox(height: 5),
+            Text(
+              goal,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
+                fontFamily: 'Menlo',
+                color: Color(0xFF6B7280),
+                height: 1.4,
+              ),
+            ),
+          ],
+          if (components.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 5,
+              runSpacing: 4,
+              children: [
+                for (final c in components)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F2318),
+                      borderRadius: BorderRadius.circular(3),
+                      border: Border.all(color: const Color(0xFF1A3324)),
+                    ),
+                    child: Text(
+                      c,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontFamily: 'Menlo',
+                        color: Color(0xFF4ADE80),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );
