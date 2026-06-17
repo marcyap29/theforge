@@ -670,177 +670,88 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
     final worksheetDone = stage == 'worksheet_complete';
     final worksheetCurrent = stage == 'spec_locked';
 
+    final latestVersion = _versionOf(pj.phase);
+    final latestN = int.tryParse(latestVersion.substring(1)) ?? 1;
+    final priorVersions = worksheetDone
+        ? List.generate(latestN - 1, (i) => 'v${i + 1}')
+        : <String>[];
+    final latestChips = _allComponents[latestVersion] ?? [];
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Step 1: Interview
-          // When worksheet is complete: show "V1 SHIPPED" + chips + "Interview L1–L4" row
-          // Otherwise: standard "Interview" label + L1–L4 below
-          Column(
+          // ── Main timeline row: compact dots + connectors ──────────────────
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
             children: [
-              if (worksheetDone) ...[
-                // Checkmark dot + "V1 SHIPPED" label
-                MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  child: GestureDetector(
-                    onTap: () => _openArtifact(
-                        context, 'specs', '${pj.name}_LockedSpec_$sv.md',
-                        ArtifactViewMode.spec),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.check_circle,
-                            color: Color(0xFF22C55E), size: 20),
-                        const SizedBox(height: 5),
-                        Text(
-                          '${_versionOf(pj.phase).toUpperCase()} SHIPPED',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontFamily: 'Menlo',
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.4,
-                            color: Color(0xFF22C55E),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                // Latest version: expanded chips
-                if ((_allComponents[_versionOf(pj.phase)] ?? []).isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 5),
-                    child: Wrap(
-                      spacing: 4,
-                      runSpacing: 3,
-                      children: [
-                        for (final c in _allComponents[_versionOf(pj.phase)]!)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF0F2318),
-                              borderRadius: BorderRadius.circular(3),
-                              border: Border.all(
-                                  color: const Color(0xFF1A3324)),
-                            ),
-                            child: Text(c,
-                                style: const TextStyle(
-                                  fontSize: 9,
-                                  fontFamily: 'Menlo',
-                                  color: Color(0xFF4ADE80),
-                                )),
-                          ),
-                      ],
-                    ),
-                  ),
-                // Prior versions: collapsed pills on one row (V1 ✓  V2 ✓ ...)
-                Builder(builder: (_) {
-                  final latestN =
-                      int.tryParse(_versionOf(pj.phase).substring(1)) ?? 1;
-                  final priorVersions = List.generate(
-                      latestN - 1, (i) => 'v${i + 1}');
-                  if (priorVersions.isEmpty) return const SizedBox.shrink();
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 5),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        for (final v in priorVersions) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF0A1A0E),
-                              borderRadius: BorderRadius.circular(3),
-                              border: Border.all(
-                                  color: const Color(0xFF1A3324)),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.check_circle,
-                                    color: Color(0xFF22C55E), size: 9),
-                                const SizedBox(width: 3),
-                                Text(v.toUpperCase(),
-                                    style: const TextStyle(
-                                      fontSize: 9,
-                                      fontFamily: 'Menlo',
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF22C55E),
-                                    )),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                        ],
-                      ],
-                    ),
-                  );
-                }),
-                // "Interview" label + L1–L4 on the same row
-                if (mode == ProjectMode.build)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 5),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        const Text(
-                          'Interview',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontFamily: 'Menlo',
-                            letterSpacing: 0.3,
-                            color: Color(0xFF4B5563),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        _LayerSubRow(
-                          progress: _progress,
-                          interviewDone: true,
-                          pulseOpacity: _pulseOpacity,
-                        ),
-                      ],
-                    ),
-                  ),
-              ] else ...[
-                _TimelineStep(
-                  label: 'Interview',
-                  isDone: interviewDone,
-                  isCurrent: !interviewDone,
-                  pulseOpacity: _pulseOpacity,
-                  onTap: interviewDone
-                      ? () => _openArtifact(
-                          context, 'specs',
-                          '${pj.name}_LockedSpec_$sv.md',
-                          ArtifactViewMode.spec)
-                      : () => Navigator.of(context).push(MaterialPageRoute(
-                            builder: (_) => InterviewScreen(
-                              args: InterviewArgs(
-                                path: pj.path,
-                                name: pj.name,
-                                mode: mode,
+              // Interview dot — compact, never widens the row
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (worksheetDone)
+                    MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        onTap: () => _openArtifact(
+                            context, 'specs',
+                            '${pj.name}_LockedSpec_$sv.md',
+                            ArtifactViewMode.spec),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.check_circle,
+                                color: Color(0xFF22C55E), size: 20),
+                            const SizedBox(height: 5),
+                            Text(
+                              '${latestVersion.toUpperCase()} SHIPPED',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontFamily: 'Menlo',
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.4,
+                                color: Color(0xFF22C55E),
                               ),
                             ),
-                          )),
-                ),
-                if (mode == ProjectMode.build &&
-                    (!interviewDone || _progress != null))
-                  _LayerSubRow(
-                    progress: _progress,
-                    interviewDone: interviewDone,
-                    pulseOpacity: _pulseOpacity,
-                  ),
-              ],
-            ],
-          ),
-          Expanded(child: _TimelineConnector(done: interviewDone)),
+                          ],
+                        ),
+                      ),
+                    )
+                  else ...[
+                    _TimelineStep(
+                      label: 'Interview',
+                      isDone: interviewDone,
+                      isCurrent: !interviewDone,
+                      pulseOpacity: _pulseOpacity,
+                      onTap: interviewDone
+                          ? () => _openArtifact(
+                              context, 'specs',
+                              '${pj.name}_LockedSpec_$sv.md',
+                              ArtifactViewMode.spec)
+                          : () => Navigator.of(context).push(MaterialPageRoute(
+                                builder: (_) => InterviewScreen(
+                                  args: InterviewArgs(
+                                    path: pj.path,
+                                    name: pj.name,
+                                    mode: mode,
+                                  ),
+                                ),
+                              )),
+                    ),
+                    if (mode == ProjectMode.build &&
+                        (!interviewDone || _progress != null))
+                      _LayerSubRow(
+                        progress: _progress,
+                        interviewDone: interviewDone,
+                        pulseOpacity: _pulseOpacity,
+                      ),
+                  ],
+                ],
+              ),
+              Expanded(child: _TimelineConnector(done: interviewDone)),
           // Step 2: Worksheet → opens worksheet when done, generates when current
           _TimelineStep(
             label: 'Worksheet',
@@ -880,7 +791,101 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
           ),
         ],
       ),
-    );
+      // ── Below timeline: version detail (worksheetDone, Build mode only) ──
+      if (worksheetDone && mode == ProjectMode.build) ...[
+        // Latest version component chips
+        if (latestChips.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Wrap(
+              spacing: 4,
+              runSpacing: 3,
+              children: [
+                for (final c in latestChips)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F2318),
+                      borderRadius: BorderRadius.circular(3),
+                      border: Border.all(color: const Color(0xFF1A3324)),
+                    ),
+                    child: Text(c,
+                        style: const TextStyle(
+                          fontSize: 9,
+                          fontFamily: 'Menlo',
+                          color: Color(0xFF4ADE80),
+                        )),
+                  ),
+              ],
+            ),
+          ),
+        // Prior versions: collapsed pills (only shown when v2+)
+        if (priorVersions.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final v in priorVersions) ...[
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0A1A0E),
+                      borderRadius: BorderRadius.circular(3),
+                      border: Border.all(color: const Color(0xFF1A3324)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.check_circle,
+                            color: Color(0xFF22C55E), size: 9),
+                        const SizedBox(width: 3),
+                        Text(v.toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 9,
+                              fontFamily: 'Menlo',
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF22C55E),
+                            )),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                ],
+              ],
+            ),
+          ),
+        // "Interview" label + L1–L4 on the same row
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Text(
+                'Interview',
+                style: TextStyle(
+                  fontSize: 9,
+                  fontFamily: 'Menlo',
+                  letterSpacing: 0.3,
+                  color: Color(0xFF4B5563),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _LayerSubRow(
+                progress: _progress,
+                interviewDone: true,
+                pulseOpacity: _pulseOpacity,
+              ),
+            ],
+          ),
+        ),
+      ],
+    ],
+  ),
+);
   }
 }
 
