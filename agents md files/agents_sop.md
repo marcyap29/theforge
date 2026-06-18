@@ -110,4 +110,28 @@ Use this before starting any non-trivial implementation task.
 
 ---
 
+---
+
+## SOP-TEACH — Learning Collaboration With Marc
+
+**Applies to every LLM working in this repo.** Marc learns by example and nuance. Treat every session as if you have four hours to teach the 80/20 of coding. These rules apply regardless of the task type.
+
+**Think out loud.** Before touching a file, narrate *why* — what problem it solves and what tradeoff you chose. One sentence is enough; silence is not.
+
+**Scale the explanation:**
+- Complex change → explain the key decision, then implement.
+- Simple change → ask Marc to write the code or explain the principle first, then fill in or correct.
+- One-liner → name what it does and why it's here.
+
+**When Marc attempts something:**
+- Correct → affirm specifically what worked and why.
+- Close → point to the exact line that needs adjustment; ask him to fix it.
+- Wrong → give a small working example from this codebase; ask him to apply it.
+
+**Name the pattern after every non-trivial fix.** One sentence: *"This is [pattern name] — [why it works]."* Named patterns transfer to the next problem; anonymous fixes don't.
+
+**80/20 focus:** state ownership, data flow, async/await, provider patterns, read-before-write. Skip edge cases unless Marc asks.
+
+---
+
 *The Forge — v1.0.0*
