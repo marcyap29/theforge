@@ -252,6 +252,12 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
               title: const Text('The Forge — Projects'),
               actions: [
                 IconButton(
+                  icon: const Icon(Icons.monitor_heart_outlined),
+                  tooltip: 'Watch Mode',
+                  onPressed: () =>
+                      Navigator.of(context).pushNamed('/watch'),
+                ),
+                IconButton(
                   icon: const Icon(Icons.settings),
                   tooltip: 'Settings',
                   onPressed: () =>

@@ -4,6 +4,7 @@ import '../features/interview/providers/interview_providers.dart';
 import '../features/interview/ui/interview_screen.dart';
 import '../features/projects/screens/projects_list_screen.dart';
 import '../features/settings/settings_screen.dart';
+import '../features/watch/watch_dashboard_screen.dart';
 import 'theme/app_theme.dart';
 
 final routeObserver = RouteObserver<ModalRoute<dynamic>>();
@@ -31,6 +32,7 @@ class TheForgeApp extends StatelessWidget {
           return const _MissingInterviewArgs();
         },
         '/settings': (context) => const SettingsScreen(),
+        '/watch': (context) => const WatchDashboardScreen(),
       },
     );
   }
