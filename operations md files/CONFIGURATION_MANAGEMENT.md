@@ -73,12 +73,47 @@
 | usage_service.dart | lib/services/watch/ | 2026-06-17 | ✅ Synced |
 | usage_service_provider.dart | lib/services/watch/ | 2026-06-17 | ✅ Synced |
 | engineer_roster_notifier.dart | lib/features/settings/ | 2026-06-17 | ✅ Synced |
+| git_activity_provider.dart | lib/services/watch/ | 2026-06-17 | ✅ Synced |
+| github_git_provider.dart | lib/services/watch/providers/ | 2026-06-17 | ✅ Synced |
+| ci_outcome_provider.dart | lib/services/watch/ | 2026-06-17 | ✅ Synced |
+| github_ci_provider.dart | lib/services/watch/providers/ | 2026-06-17 | ✅ Synced |
+| ci_correlator.dart | lib/services/watch/ | 2026-06-17 | ✅ Synced |
+| git_activity_service.dart | lib/services/watch/ | 2026-06-17 | ✅ Synced |
+| github_config_notifier.dart | lib/features/settings/ | 2026-06-17 | ✅ Synced |
+| git_activity_service_provider.dart | lib/services/watch/ | 2026-06-17 | ✅ Synced |
 
 
 ---
 
 
 ## Change Log
+
+### 2026-06-17 — §W2 Watch Mode: Git Activity Engine + CI Outcome Correlator
+
+**Action:** GitHub GraphQL commit fetch + GitHub Actions REST CI run fetch + per-engineer correlation of token spend to CI outcomes via commit SHA. 8 new files, 0 modified, zero analyzer issues.
+
+**Files created:**
+- `lib/services/watch/git_activity_provider.dart` — `GitActivityProvider` abstract + `GitCommit`/`EngineerGitActivity` models
+- `lib/services/watch/providers/github_git_provider.dart` — GitHub GraphQL impl; `fetchCommits` + `fetchMergedPRCount`; `isAgentCommit()` heuristic
+- `lib/services/watch/ci_outcome_provider.dart` — `CIOutcomeProvider` abstract + `CIRun`/`CIOutcome`
+- `lib/services/watch/providers/github_ci_provider.dart` — GitHub Actions REST impl; conclusion mapping (success/failure/timed_out, skip cancelled/skipped/neutral)
+- `lib/services/watch/ci_correlator.dart` — `CICorrelator` joins §W1 usage + commits + CI runs by SHA; per-day `DailyCorrelation`; rolling 7d/30d `tokenToFailRatio`; commit-timestamp-proxy limitation documented
+- `lib/services/watch/git_activity_service.dart` — `fetchCorrelations()` parallel fetch+correlate+PR-enrich
+- `lib/features/settings/github_config_notifier.dart` — `GitHubConfig` + `AsyncNotifier` persisting to `forge_config.json` key `watch_github_config`; `isConfigured` guard
+- `lib/services/watch/git_activity_service_provider.dart` — `Provider<GitActivityService?>` nullable when unconfigured
+
+**Verification:** `dart analyze lib/` → No issues found; `grep -ri firebase lib/` → zero matches; `grep -rn "class GitActivityProvider" lib/` → 1; `grep -rn "class CIRun" lib/` → 1; `grep -rn "class EngineerCorrelation" lib/` → 1; `grep -rn "CORRELATION PROXY" lib/` → 1 (proxy comment present); `git diff --stat HEAD` → 8 new files, 843 insertions
+
+**Key design choices:**
+- v1 correlation proxy: commit timestamp = token session timestamp (same calendar day) — Anthropic API returns daily aggregates, not sub-hour sessions; 4h window from SuperSpec not possible at v1. Upgrade path documented in `ci_correlator.dart`.
+- Agent attribution: commit-message substring heuristic (Claude/Copilot/OpenHands/🤖/[ai]/[claude]) — cheap, upgradeable to git-trailer parsing later
+- CI conclusion: success→pass, failure→fail, timed_out→timeout; cancelled/skipped/neutral skipped entirely (not counted as fails — would inflate token-to-fail ratio)
+- `GitHubConfig.isConfigured` is the single guard used everywhere — no inline `token.isEmpty` checks
+- Per-repo/per-engineer error isolation: `Future.wait` + catch → empty/0, never crashes the batch
+- PR count enrichment is supplementary: one extra GraphQL call per engineer after correlate, default 0 on failure
+- Config file reuse: `GitHubConfigNotifier` writes to same `forge_config.json` under key `watch_github_config`
+
+**Commit:** `feat(§W2): git activity engine + CI outcome correlator — GitHub GraphQL + Actions REST + commit-timestamp-proxy correlation`
 
 ### 2026-06-17 — §W1 Watch Mode: Token Ingestion Engine
 

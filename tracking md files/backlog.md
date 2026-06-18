@@ -27,8 +27,8 @@ Long-term feature pool. Active sprint work lives in `planner.md`.
   → §EX1 Executor Timeline (parse spec §3 Component Map → LLM-narrated build sequence) ✅
        ↓
    → §W1 Watch Mode: Token Ingestion Engine ✅
-   → §W2 Watch Mode: Git Activity Engine + CI Outcome Correlator
-  → §W3 Watch Mode: Failure Signal Engine + Alert Engine
+   → §W2 Watch Mode: Git Activity Engine + CI Outcome Correlator ✅
+   → §W3 Watch Mode: Failure Signal Engine + Alert Engine
   → §W4 Watch Mode: Dashboard UI Shell
   → §W5 Watch Mode: SwarmSpace Briefing + Decision Simulation
   → §W6 Watch Mode: Spec Compliance Monitor + Drift Detector (requires spec)
@@ -637,7 +637,7 @@ EngineerUsage {
 
 **Dependencies:** §W1 (token sessions required for correlation)
 
-**Status:** Not started
+**Status:** ✅ Complete 2026-06-17 — 8 new files; `GitActivityProvider` abstract + `GitCommit`/`EngineerGitActivity`; `CIOutcomeProvider` abstract + `CIRun`/`CIOutcome`; GitHub GraphQL impl (`fetchCommits` + `fetchMergedPRCount`) with `isAgentCommit` heuristic; GitHub Actions REST impl (`fetchRuns` with conclusion mapping, skip cancelled/skipped/neutral); `CICorrelator` correlates per-engineer daily token spend → commits → CI runs by SHA, computes `tokenPerPass`/`tokenPerFail`/`passRate` + rolling 7d/30d `tokenToFailRatio`; commit-timestamp-proxy limitation documented in `ci_correlator.dart`; `GitActivityService.fetchCorrelations()` orchestrates parallel fetch + correlate, per-engineer PR count enrichment (default 0 on failure); `GitHubConfigNotifier` persists to `forge_config.json` key `watch_github_config`; `dart analyze lib/` zero issues; zero Firebase
 
 ---
 
@@ -779,6 +779,9 @@ EngineerUsage {
 
 ### §W1 — Token Ingestion Engine
 ✅ Complete 2026-06-17 — 9 new files; `UsageProvider` abstract + `EngineerUsage`/`DailyUsage` immutable models; 4 provider impls (Anthropic HTTP /v1/usage, OpenAI HTTP /v1/usage per-day, Gemini stub `api_unsupported`, Ollama stub `local_model_unsupported`); `DemoUsageProvider` (4 profiles: runaway 9×/ghost 0.1×/highperformer 1.5×/self 1.0×, `Random(42)` deterministic, ±20% variance, spend_threshold >$200 + runaway_session >$100/day flags); `UsageService.fetchAllUsage()` resolves handle→provider, isolates failures to `fetch_error` entry; `EngineerRosterNotifier` persists to `forge_config.json` key `watch_engineer_roster`, default `demo` entry auto-present on first launch; `usageServiceProvider` nullable when roster loading; `dart analyze lib/` zero issues; zero Firebase
+
+### §W2 — Git Activity Engine + CI Outcome Correlator
+✅ Complete 2026-06-17 — 8 new files; `GitActivityProvider` abstract + `GitCommit`/`EngineerGitActivity`; `CIOutcomeProvider` abstract + `CIRun`/`CIOutcome` enum; GitHub GraphQL provider (`fetchCommits` per-repo parallel + `fetchMergedPRCount`, `isAgentCommit` heuristic scans for Claude/Copilot/OpenHands/🤖/[ai]/[claude] markers); GitHub Actions REST provider (`fetchRuns` maps `conclusion` → pass/fail/timeout, skips cancelled/skipped/neutral); `CICorrelator` joins §W1 `EngineerUsage` + commits + CI runs by SHA, per-day per-engineer `DailyCorrelation` with `tokenPerPass`/`tokenPerFail`/`passRate` + rolling 7d/30d `tokenToFailRatio`; commit-timestamp-proxy limitation documented at top of `ci_correlator.dart` (v1 uses commit-date = token-date; upgrade path to time-window when session-level data exists); `GitActivityService.fetchCorrelations()` parallel-fetches git+CI then correlates then enriches per-engineer PR counts (default 0 on failure); `GitHubConfigNotifier` persists org/repos/token/mappings to `forge_config.json` key `watch_github_config`, `isConfigured` guard; `gitActivityServiceProvider` nullable when unconfigured; `dart analyze lib/` zero issues; zero Firebase
 
 ---
 

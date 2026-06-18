@@ -387,7 +387,34 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 
 ---
 
-## Next Up — §W2: Watch Mode Git Activity Engine + CI Outcome Correlator
+## §W2 — Watch Mode: Git Activity Engine + CI Outcome Correlator — COMPLETE ✅
 
-**Status:** Not started — next on critical path (requires §W1 ✅)
-- See `backlog.md` §W2 for scope
+**Completed:** 2026-06-17
+
+- [x] `lib/services/watch/git_activity_provider.dart` — `GitActivityProvider` abstract + `GitCommit`/`EngineerGitActivity` immutable models
+- [x] `lib/services/watch/providers/github_git_provider.dart` — GitHub GraphQL impl; `fetchCommits` per-repo `Future.wait` parallel, `fetchMergedPRCount`; module-level `isAgentCommit()` heuristic (Claude/Copilot/OpenHands/🤖/[ai]/[claude]); defensive parse (statusCode != 200 → empty, FormatException + TypeError → empty)
+- [x] `lib/services/watch/ci_outcome_provider.dart` — `CIOutcomeProvider` abstract + `CIRun`/`CIOutcome` enum
+- [x] `lib/services/watch/providers/github_ci_provider.dart` — GitHub Actions REST impl; `fetchRuns` per-repo `Future.wait` parallel; `conclusion` → pass/fail/timeout, skips cancelled/skipped/neutral; per-repo failure isolation
+- [x] `lib/services/watch/ci_correlator.dart` — `CICorrelator.correlate()` joins §W1 `EngineerUsage` + commits + CI runs by SHA; per-engineer per-day `DailyCorrelation` (`tokenPerPass`/`tokenPerFail`/`passRate`); rolling 7d/30d `tokenToFailRatio`; commit-timestamp-proxy limitation documented at top
+- [x] `lib/services/watch/git_activity_service.dart` — `fetchCorrelations()` parallel-fetches git+CI (`Future.wait`), correlates, enriches per-engineer PR counts (default 0 on failure); `isConfigured` guard
+- [x] `lib/features/settings/github_config_notifier.dart` — `GitHubConfig` + `GitHubEngineerMapping` + `AsyncNotifier` persisting to `forge_config.json` key `watch_github_config`; `isConfigured` getter guards token+org+repos
+- [x] `lib/services/watch/git_activity_service_provider.dart` — `Provider<GitActivityService?>` watching `githubConfigProvider` + `engineerRosterProvider`, nullable when unconfigured
+- [x] `dart analyze lib/` — zero issues
+- [x] `grep -ri firebase lib/` — zero matches
+- [x] `grep -rn "commit timestamp as proxy\|CORRELATION PROXY" lib/` — proxy comment present
+- [x] Committed: `feat(§W2): git activity engine + CI outcome correlator — GitHub GraphQL + Actions REST + commit-timestamp-proxy correlation`
+
+### Notes
+- v1 correlation proxy: commit timestamp = token session timestamp (same calendar day). The Anthropic usage API returns daily aggregates, not sub-hour sessions, so the SuperSpec's 4-hour window isn't possible. Documented in `ci_correlator.dart` with upgrade path.
+- Agent attribution heuristic (`isAgentCommit`) is a commit-message substring scan — case-insensitive match for Claude/Copilot/OpenHands signatures + 🤖 emoji + `[ai]`/`[claude]` tags. Imperfect but cheap; upgradeable to git-trailer parsing or `.author` email heuristics later.
+- CI conclusion mapping: `success`→pass, `failure`→fail, `timed_out`→timeout, everything else (cancelled/skipped/neutral) skipped entirely — not counted as fails. These aren't real failures; counting them would inflate the token-to-fail ratio.
+- `GitHubConfig.isConfigured` is the single guard — `token.isNotEmpty && org.isNotEmpty && repos.isNotEmpty`. Used everywhere instead of repeating the inline check.
+- PR count enrichment is supplementary: one extra GraphQL call per engineer, default 0 on any failure. Keeps the main path fast; PRs aren't load-bearing for §W3 signals.
+- Per-repo/per-engineer error isolation throughout: `Future.wait` + catch → empty/0, never crashes the batch. Same pattern as §W1 `fetchAllUsage()`.
+
+---
+
+## Next Up — §W3: Watch Mode Failure Signal Engine + Alert Engine
+
+**Status:** Not started — next on critical path (requires §W2 ✅)
+- See `backlog.md` §W3 for scope
