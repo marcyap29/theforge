@@ -475,7 +475,9 @@ LlmProvider.complete({
 
 ### §ORCH1 — Smart Routing + Multi-Model Orchestration (Token Economy Mode)
 
-**What it is:** An automated orchestration layer that routes each phase of a coding task to the right model, minimising cost without sacrificing quality. Three phases: Architect (expensive model generates the scoped plan + constraints), Executor (one or more cheap models implement), Reviewer (expensive model grades and either approves or loops back with a fix list). Optionally runs N executors in parallel and M reviewers in parallel, with an arbiter that scores and selects the winning implementation.
+**What it is:** An automated orchestration layer that routes each phase of a coding task to the right model, minimising cost without sacrificing quality. Three phases: Architect (expensive model generates the scoped plan + constraints), Executor (**single** cheap model implements), Reviewer (expensive model grades and either approves or loops back with a fix list).
+
+**Why single executor, not Monte Carlo:** Monte Carlo parallel execution is valuable for specs (high ambiguity, human picks between interpretations) but weak for code. A tight architect plan constrains the solution space — exact file paths, method signatures, invariants — so N executors produce N near-identical implementations at N× the cost. Quality in code comes from the plan and the review, not from running the execution multiple times. Multi-executor is supported as an optional **benchmarking mode** only (comparing different models against each other to build the agent registry), not the default production flow.
 
 **Why it matters:** Right now the Architect→Executor→Reviewer flow is manual — Marc writes the executor prompt, pastes it into GLM, pastes the output back, and Claude reviews. §ORCH1 automates that loop end-to-end. At scale (§W2–§W6, Iterix, SwarmSpace Builder) this compounds: architect+reviewer calls are ~8k tokens at Opus rates; executor calls are ~20k tokens at cheap-model rates. The savings are real and the quality ceiling is maintained by the expensive model bookending the flow.
 
