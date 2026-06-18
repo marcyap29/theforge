@@ -4,6 +4,55 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-06-17 — Claude Code [§W3 Watch Mode: Failure Signal Engine + Alert Engine]
+
+**Branch:** main
+
+### Done
+- **§W3 — Watch Mode Failure Signal Engine + Alert Engine — shipped:** 6 new files implementing the pure-computation signal/alert/status layer over §W1+§W2 data. Unlike §W1/§W2, §W3 does NO HTTP fetching — it's pure derivation. `WatchSignalService` is `const`-constructible and always non-null (no config deps).
+  - `lib/services/watch/failure_signal_engine.dart` — `FailureSignal` model + `FailureSignalEngine` deriving 6 signal types:
+    - `highTokenToFailRatio` (warning >30, critical >100, emit one severity only)
+    - `loopDetected` (warning when ≥2 consecutive days with spend>$15 + zero CI output; tracks longest run + longest-run spend)
+    - `churnDetected` (info 1–2 reverts, warning 3+; counts `revert`-prefixed commit messages)
+    - `spendThreshold` (warning >threshold, critical >2×threshold, one severity only; re-derives from `EngineerUsage` + roster for formal signal pipeline)
+    - `runawayDay` (critical when any day >$100; emits ONE signal per engineer — the worst day, to avoid flooding)
+    - `stalledWorkspace` (workspace-level, handle=`'workspace'` literal; fires when no commits in 7+ days AND workspace 30d spend >$10; `stalledDays=999` for empty commit list)
+  - `lib/services/watch/alert_engine.dart` — `AlertEntry` model (`toJson`/`fromJson`/`copyWithDismissed`) + `AlertEngine.evaluate()` deduplicates against existing log (24h window, same handle+signalType; dismissed alerts still dedup so a dismissed condition doesn't re-alert); id format `${handle}_${signalType.name}_${millisEpoch}`
+  - `lib/services/watch/alert_log_notifier.dart` — `AlertLogNotifier` extends `AsyncNotifier<List<AlertEntry>>` persisting to `forge_config.json` key `watch_alert_log`; `build()` reads+parses (returns [] on missing/error), `appendAlerts()` prepends newest-first, `dismissAlert(id)` replaces with dismissed copy, `clearDismissed()` removes dismissed entries; mirrors `EngineerRosterNotifier` pattern
+  - `lib/services/watch/project_status_aggregator.dart` — `WorkspaceStatus` + `ProjectStatusAggregator.aggregate()`; commits 7d vs prior 7d (days 8–14), ±20% velocity trend (`improving`/`stable`/`declining`/`stalled`), stall detection 7d (`stalledDays=999` for empty commit list so `isStalled=true` is correct), CI pass rate; per-repo upgrade-path comment (v1 aggregates across all repos combined — `GitCommit.repo` not in §W2)
+  - `lib/services/watch/watch_signal_service.dart` — `WatchSignalResult` (signals + newAlerts + workspaceStatus) + `WatchSignalService.evaluate()` orchestrating all three engines; single call site for §W4 — imports nothing from §W4
+  - `lib/services/watch/watch_signal_service_provider.dart` — `Provider<WatchSignalService>` non-nullable (pure computation, no config deps — inverse of §W1/§W2 nullable providers)
+- **Committed:** `feat(§W3): failure signal engine + alert engine + workspace status — pure computation layer over §W1+§W2 data` (6 files, 586 insertions)
+
+### Key Technical Findings
+- **Pure-computation layering:** §W3 is the first Watch Mode subsystem with no HTTP. `WatchSignalService` is `const`-constructible and always non-null — the provider is `Provider<WatchSignalService>`, not `Provider<WatchSignalService?>`. This is the inverse of §W1 (`UsageService?`) and §W2 (`GitActivityService?`) where services were nullable when unconfigured. The pattern: fetching services are nullable (config-gated), computation services are not.
+- **Severity escalation rule — emit one, not both:** For `highTokenToFailRatio` and `spendThreshold`, the engine emits critical OR warning, never both. Implemented by testing the critical threshold first and using else-if for warning. If both were emitted, the alert log would have two entries for the same condition, inflating the count and confusing the dashboard.
+- **Loop detection — longest run, not first run:** The engine scans sorted `DailyCorrelation` for the longest consecutive run of "loop days" (spend>$15 + zero CI output). If ≥2, emits one warning. Tracks `longestSpend` (the spend during the longest run, not total across all loops — the longest run is the most actionable signal). This is a sliding-window count, not a simple counter — the current run resets when a non-loop day is hit.
+- **Runaway day — one signal per engineer, worst day:** A naive implementation would emit one signal per $100+ day, flooding the alert log for an engineer with multiple runaway days. The engine emits ONE signal per engineer — the worst day by `tokenSpend`. The metadata records the peak day's date and spend so the dashboard can show "worst day was $X on Y" without flooding.
+- **Stalled workspace is workspace-level, not per-engineer:** The handle is the literal string `'workspace'`, not an engineer handle. This distinguishes workspace-level signals from per-engineer signals in the alert log. `stalledDays=999` for an empty commit list ensures `isStalled=true` is correct for a workspace with no commits at all (the alternative — `stalledDays=0` — would incorrectly report "not stalled").
+- **Alert dedup window is 24h, not "ever":** The same handle+signalType within 24h is skipped. After 24h, the same condition can re-alert (e.g. a runaway spend that persists across days should surface again). Dismissed alerts still dedup — a dismissed condition shouldn't re-alert within the window, but *should* re-alert after 24h if it persists (the dismissal is "I saw this," not "this is resolved").
+- **Bug introduction rate explicitly out of scope:** Requires GitHub Issues API + issue-to-commit attribution, which §W2 didn't add. No stub signal added — the spec was explicit: "Do not attempt to implement it. Do not add a stub signal for it either." A stub would suggest the signal exists when it doesn't.
+- **Field access bug caught by analyzer:** First draft of `_runawayDay` used a `DailyUsage? peak` temporary but accessed `.tokenSpend` (which is on `DailyCorrelation`, not `DailyUsage`). Analyzer caught it. Fix: iterate `DailyCorrelation` directly, store peak as `DailyCorrelation?`. Lesson: when two models have similar fields (`DailyUsage.costUSD` vs `DailyCorrelation.tokenSpend`), the wrong type can slip in — the analyzer is the safety net.
+
+### Next
+- §W4 — Watch Mode Dashboard UI Shell (next on critical path; requires §W3 ✅)
+- Manual smoke test: instantiate `WatchSignalService()`, call `evaluate()` with §W1 demo usage + §W2 demo correlations + empty commits (or demo commits), verify `WatchSignalResult` returns correct signals (runaway profile should trigger `spendThreshold` + `runawayDay`; ghost profile should trigger neither; stalled workspace should fire when commits empty + spend >$10)
+
+### Modified
+- `lib/services/watch/failure_signal_engine.dart` — NEW
+- `lib/services/watch/alert_engine.dart` — NEW
+- `lib/services/watch/alert_log_notifier.dart` — NEW
+- `lib/services/watch/project_status_aggregator.dart` — NEW
+- `lib/services/watch/watch_signal_service.dart` — NEW
+- `lib/services/watch/watch_signal_service_provider.dart` — NEW
+- `tracking md files/context.md` — this block
+- `tracking md files/planner.md` — §W3 COMPLETE block + §W4 next-up
+- `tracking md files/backlog.md` — §W3 ✅ in critical path + status line + Completed section
+- `operations md files/CONFIGURATION_MANAGEMENT.md` — inventory + changelog
+- `DOCS/Coding Lessons/FOR_MARC_watch-mode-signal-engine.md` — NEW
+
+---
+
 ## Session: 2026-06-17 — Claude Code [§W2 Watch Mode: Git Activity Engine + CI Outcome Correlator]
 
 **Branch:** main

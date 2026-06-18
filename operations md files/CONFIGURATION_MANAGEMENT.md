@@ -81,12 +81,44 @@
 | git_activity_service.dart | lib/services/watch/ | 2026-06-17 | ✅ Synced |
 | github_config_notifier.dart | lib/features/settings/ | 2026-06-17 | ✅ Synced |
 | git_activity_service_provider.dart | lib/services/watch/ | 2026-06-17 | ✅ Synced |
+| failure_signal_engine.dart | lib/services/watch/ | 2026-06-17 | ✅ Synced |
+| alert_engine.dart | lib/services/watch/ | 2026-06-17 | ✅ Synced |
+| alert_log_notifier.dart | lib/services/watch/ | 2026-06-17 | ✅ Synced |
+| project_status_aggregator.dart | lib/services/watch/ | 2026-06-17 | ✅ Synced |
+| watch_signal_service.dart | lib/services/watch/ | 2026-06-17 | ✅ Synced |
+| watch_signal_service_provider.dart | lib/services/watch/ | 2026-06-17 | ✅ Synced |
 
 
 ---
 
 
 ## Change Log
+
+### 2026-06-17 — §W3 Watch Mode: Failure Signal Engine + Alert Engine
+
+**Action:** Pure-computation signal/alert/status layer over §W1+§W2 data. 6 new files, 0 modified, zero analyzer issues, zero HTTP imports in §W3 files.
+
+**Files created:**
+- `lib/services/watch/failure_signal_engine.dart` — `FailureSignal` model + `FailureSignalEngine` deriving 6 signal types with severity escalation
+- `lib/services/watch/alert_engine.dart` — `AlertEntry` model + `AlertEngine.evaluate()` with 24h dedup
+- `lib/services/watch/alert_log_notifier.dart` — `AlertLogNotifier` persisting to `forge_config.json` key `watch_alert_log`; append/dismiss/clearDismissed
+- `lib/services/watch/project_status_aggregator.dart` — `WorkspaceStatus` + `ProjectStatusAggregator`; velocity trend ±20%, stall detection 7d, CI pass rate
+- `lib/services/watch/watch_signal_service.dart` — `WatchSignalResult` + `WatchSignalService.evaluate()` orchestrating all three engines
+- `lib/services/watch/watch_signal_service_provider.dart` — `Provider<WatchSignalService>` non-nullable (pure computation, no config deps)
+
+**Verification:** `dart analyze lib/` → No issues found; `grep -ri firebase lib/` → zero matches; `grep -rn "class FailureSignal" lib/` → 1; `grep -rn "class AlertEntry" lib/` → 1; `grep -rn "class WorkspaceStatus" lib/` → 1; `grep -rn "class WatchSignalResult" lib/` → 1; `grep -rn "v1 aggregates across ALL repos" lib/` → comment present; `git diff --stat HEAD` → 6 new files, 586 insertions
+
+**Key design choices:**
+- Pure-computation layering: `WatchSignalService` is `const`-constructible, always non-null (inverse of §W1/§W2 nullable providers) — fetching services are config-gated, computation services are not
+- Severity escalation: emit critical OR warning, never both (for highTokenToFailRatio/spendThreshold) — tested critical first, else-if for warning
+- Loop detection: longest consecutive run of "loop days" (spend>$15 + zero CI output), one warning if ≥2
+- Runaway day: ONE signal per engineer (worst day), avoids alert flooding
+- Stalled workspace: workspace-level (handle=`'workspace'` literal), `stalledDays=999` for empty commit list
+- Alert dedup: 24h window, same handle+signalType, dismissed alerts still dedup
+- Bug introduction rate explicitly out of scope (no stub) — requires GitHub Issues API not in §W2
+- Per-repo breakdown explicitly out of scope — upgrade path documented in `project_status_aggregator.dart`
+
+**Commit:** `feat(§W3): failure signal engine + alert engine + workspace status — pure computation layer over §W1+§W2 data`
 
 ### 2026-06-17 — §W2 Watch Mode: Git Activity Engine + CI Outcome Correlator
 

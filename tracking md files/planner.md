@@ -414,7 +414,35 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 
 ---
 
-## Next Up — §W3: Watch Mode Failure Signal Engine + Alert Engine
+## §W3 — Watch Mode Failure Signal Engine + Alert Engine — COMPLETE ✅
 
-**Status:** Not started — next on critical path (requires §W2 ✅)
-- See `backlog.md` §W3 for scope
+**Completed:** 2026-06-17
+
+- [x] `lib/services/watch/failure_signal_engine.dart` — `FailureSignal` model + `FailureSignalEngine` deriving 6 signal types (highTokenToFailRatio, loopDetected, churnDetected, spendThreshold, runawayDay, stalledWorkspace); severity escalation (critical-only emit for highTokenToFailRatio/spendThreshold); loop detection scans `DailyCorrelation` for consecutive days (spend>$15 + zero CI output); churn counts `revert`-prefixed commits (info 1–2, warning 3+); runaway emits ONE signal per engineer (worst day); stalled uses literal `'workspace'` handle + `stalledDays=999` for empty commit list
+- [x] `lib/services/watch/alert_engine.dart` — `AlertEntry` model (`toJson`/`fromJson`/`copyWithDismissed`) + `AlertEngine.evaluate()` deduplicates against existing log (24h window, same handle+signalType, dismissed alerts still dedup); id format `${handle}_${signalType.name}_${millisEpoch}`
+- [x] `lib/services/watch/alert_log_notifier.dart` — `AlertLogNotifier` extends `AsyncNotifier<List<AlertEntry>>` persisting to `forge_config.json` key `watch_alert_log`; `build`/`appendAlerts` (prepend newest-first)/`dismissAlert`/`clearDismissed`; mirrors `EngineerRosterNotifier` pattern
+- [x] `lib/services/watch/project_status_aggregator.dart` — `WorkspaceStatus` + `ProjectStatusAggregator.aggregate()`; commits 7d vs prior 7d, ±20% velocity trend (`improving`/`stable`/`declining`/`stalled`), stall detection 7d (`stalledDays=999` for empty), CI pass rate; per-repo upgrade-path comment
+- [x] `lib/services/watch/watch_signal_service.dart` — `WatchSignalResult` + `WatchSignalService.evaluate()` orchestrating FailureSignalEngine + AlertEngine + ProjectStatusAggregator; single call site for §W4
+- [x] `lib/services/watch/watch_signal_service_provider.dart` — `Provider<WatchSignalService>` non-nullable (pure computation, no config deps)
+- [x] `dart analyze lib/` — zero issues
+- [x] `grep -ri firebase lib/` — zero matches
+- [x] `grep -rn "class FailureSignal\|class AlertEntry\|class WorkspaceStatus\|class WatchSignalResult" lib/` — 1 match each
+- [x] `grep -rn "v1 aggregates across ALL repos" lib/` — comment present
+- [x] Committed: `feat(§W3): failure signal engine + alert engine + workspace status — pure computation layer over §W1+§W2 data`
+
+### Notes
+- §W3 is pure computation — no HTTP, no config deps. `WatchSignalService` is `const`-constructible and always non-null. This is the inverse of §W1/§W2 where services were nullable when unconfigured. The provider reflects this: `Provider<WatchSignalService>` not `Provider<WatchSignalService?>`.
+- Severity escalation rule: for highTokenToFailRatio and spendThreshold, emit critical OR warning, never both — checked by testing the critical threshold first and using else-if for warning.
+- Loop detection scans sorted `DailyCorrelation` for the longest run of consecutive "loop days" (spend>$15 + zero CI output). If ≥2, emit one warning signal. Tracks `longestSpend` (the spend during the longest loop run, not total across all loops).
+- Runaway day emits ONE signal per engineer — the worst day by `tokenSpend`. Avoids alert flooding when an engineer has multiple $100+ days.
+- Stalled workspace is workspace-level (handle=`'workspace'` literal). Fires when no commits in 7+ days AND workspace 30d spend >$10. Empty commit list → `stalledDays=999` (so `isStalled=true` is correct for an empty workspace).
+- `AlertEngine` dedup window is 24h — same handle+signalType within 24h is skipped regardless of dismissed status. Dismissed alerts still dedup (prevents re-alerting on a dismissed condition).
+- Bug introduction rate explicitly out of scope (requires GitHub Issues API — not in §W2). No stub added.
+- Per-repo breakdown explicitly out of scope (requires `GitCommit.repo` — not in §W2 data model). Upgrade path documented in `project_status_aggregator.dart`.
+
+---
+
+## Next Up — §W4: Watch Mode Dashboard UI Shell
+
+**Status:** Not started — next on critical path (requires §W3 ✅)
+- See `backlog.md` §W4 for scope

@@ -28,8 +28,8 @@ Long-term feature pool. Active sprint work lives in `planner.md`.
        ↓
    → §W1 Watch Mode: Token Ingestion Engine ✅
    → §W2 Watch Mode: Git Activity Engine + CI Outcome Correlator ✅
-   → §W3 Watch Mode: Failure Signal Engine + Alert Engine
-  → §W4 Watch Mode: Dashboard UI Shell
+   → §W3 Watch Mode: Failure Signal Engine + Alert Engine ✅
+   → §W4 Watch Mode: Dashboard UI Shell
   → §W5 Watch Mode: SwarmSpace Briefing + Decision Simulation
   → §W6 Watch Mode: Spec Compliance Monitor + Drift Detector (requires spec)
        ↓
@@ -651,7 +651,7 @@ EngineerUsage {
 
 **Dependencies:** §W2 (correlated data required)
 
-**Status:** Not started
+**Status:** ✅ Complete 2026-06-17 — 6 new files; `FailureSignalEngine` derives 6 signal types (highTokenToFailRatio, loopDetected, churnDetected, spendThreshold, runawayDay, stalledWorkspace) with severity escalation rules (critical-only emit, no double-emit); `AlertEngine` deduplicates against existing log (24h window, same handle+signalType); `AlertLogNotifier` persists to `forge_config.json` key `watch_alert_log` with append/dismiss/clearDismissed; `ProjectStatusAggregator` computes `WorkspaceStatus` (velocity trend ±20%, stall detection 7d, CI pass rate); `WatchSignalService` orchestrates all three → `WatchSignalResult`; pure computation (zero HTTP imports in §W3 files); `dart analyze lib/` zero issues; zero Firebase
 
 ---
 
@@ -782,6 +782,9 @@ EngineerUsage {
 
 ### §W2 — Git Activity Engine + CI Outcome Correlator
 ✅ Complete 2026-06-17 — 8 new files; `GitActivityProvider` abstract + `GitCommit`/`EngineerGitActivity`; `CIOutcomeProvider` abstract + `CIRun`/`CIOutcome` enum; GitHub GraphQL provider (`fetchCommits` per-repo parallel + `fetchMergedPRCount`, `isAgentCommit` heuristic scans for Claude/Copilot/OpenHands/🤖/[ai]/[claude] markers); GitHub Actions REST provider (`fetchRuns` maps `conclusion` → pass/fail/timeout, skips cancelled/skipped/neutral); `CICorrelator` joins §W1 `EngineerUsage` + commits + CI runs by SHA, per-day per-engineer `DailyCorrelation` with `tokenPerPass`/`tokenPerFail`/`passRate` + rolling 7d/30d `tokenToFailRatio`; commit-timestamp-proxy limitation documented at top of `ci_correlator.dart` (v1 uses commit-date = token-date; upgrade path to time-window when session-level data exists); `GitActivityService.fetchCorrelations()` parallel-fetches git+CI then correlates then enriches per-engineer PR counts (default 0 on failure); `GitHubConfigNotifier` persists org/repos/token/mappings to `forge_config.json` key `watch_github_config`, `isConfigured` guard; `gitActivityServiceProvider` nullable when unconfigured; `dart analyze lib/` zero issues; zero Firebase
+
+### §W3 — Failure Signal Engine + Alert Engine
+✅ Complete 2026-06-17 — 6 new files; `FailureSignalEngine` derives 6 signal types (highTokenToFailRatio, loopDetected, churnDetected, spendThreshold, runawayDay, stalledWorkspace) with severity escalation (critical-only emit, no double-emit for highTokenToFailRatio/spendThreshold); loop detection scans `DailyCorrelation` for consecutive days (spend>$15 + zero CI output); churn detection counts `revert`-prefixed commits (info 1–2, warning 3+); runaway day emits ONE signal per engineer (worst day only); stalled workspace uses literal `'workspace'` handle + `stalledDays=999` for empty commit list; `AlertEngine` deduplicates against existing log (24h window, same handle+signalType, dismissed alerts still dedup); `AlertLogNotifier` persists to `forge_config.json` key `watch_alert_log` with `appendAlerts`/`dismissAlert`/`clearDismissed`; `ProjectStatusAggregator` computes `WorkspaceStatus` (commits 7d vs prior 7d, ±20% velocity trend, stall detection 7d, CI pass rate); `WatchSignalService` orchestrates all three → `WatchSignalResult`; pure computation (zero HTTP in §W3 files); `dart analyze lib/` zero issues; zero Firebase
 
 ---
 
