@@ -473,6 +473,72 @@ LlmProvider.complete({
 
 ---
 
+### §ORCH1 — Smart Routing + Multi-Model Orchestration (Token Economy Mode)
+
+**What it is:** An automated orchestration layer that routes each phase of a coding task to the right model, minimising cost without sacrificing quality. Three phases: Architect (expensive model generates the scoped plan + constraints), Executor (one or more cheap models implement), Reviewer (expensive model grades and either approves or loops back with a fix list). Optionally runs N executors in parallel and M reviewers in parallel, with an arbiter that scores and selects the winning implementation.
+
+**Why it matters:** Right now the Architect→Executor→Reviewer flow is manual — Marc writes the executor prompt, pastes it into GLM, pastes the output back, and Claude reviews. §ORCH1 automates that loop end-to-end. At scale (§W2–§W6, Iterix, SwarmSpace Builder) this compounds: architect+reviewer calls are ~8k tokens at Opus rates; executor calls are ~20k tokens at cheap-model rates. The savings are real and the quality ceiling is maintained by the expensive model bookending the flow.
+
+**Architecture — four phases:**
+
+```
+Phase 1 — ARCHITECT (1 model: e.g. Claude Opus)
+  Input:  task description + codebase context
+  Output: scoped executor plan (file list, interfaces, invariants, 
+          verification checklist) — same format as the GLM-5.2 
+          prompts already written manually
+
+Phase 2 — EXECUTOR(S) (N models, parallel)
+  Input:  architect's plan
+  Each:   implements the plan, commits to a temp branch
+  Output: N diffs, one per model
+
+Phase 3 — REVIEWER(S) (M models, parallel)
+  Input:  all N diffs + original plan
+  Each:   scores on: linter-clean (binary), scope discipline 
+          (files touched vs files specified), correctness (vs plan)
+  Output: M score vectors, one per reviewer per diff
+
+Phase 4 — ARBITER (deterministic or 1 model)
+  Input:  N×M score matrix
+  Logic:  weighted sum (linter 40%, scope 30%, correctness 30%)
+  Output: winning diff selected; or fix list if no diff passes 
+          threshold → loop back to Phase 2 with fix list
+```
+
+**Key design decisions:**
+- N=1 executor (default) reduces to the current manual flow, automated
+- N>1 executors = Monte Carlo for code — same concept as §14 for specs
+- M=1 reviewer (default) is the existing Claude review step
+- M>1 reviewers = consensus scoring — reduces single-model blind spots
+- Arbiter can be deterministic (weighted score) or delegate to Opus for tie-breaking
+- Max loop count: 2 review cycles before escalating to user
+
+**Existing foundation to build on:**
+- `LlmRole.architect` / `LlmRole.executor` already in `llm_provider.dart`
+- `LlmService` already resolves role → model → provider
+- Add `LlmRole.reviewer` and `LlmRole.arbiter`
+- New `OrchestratorService` wraps the 4-phase loop
+- Uses existing worktree pattern (Phase 2 each executor gets its own `wt/orch-<id>-<model>`)
+
+**Token economy (illustrative):**
+
+| Phase | Model tier | Typical tokens | Cost at $15/MTok |
+|---|---|---|---|
+| Architect | Opus | ~3,000 | $0.045 |
+| Executor ×1 | Cheap | ~20,000 | $0.020 |
+| Reviewer ×1 | Opus | ~5,000 | $0.075 |
+| **Total** | | ~28,000 | **$0.14** |
+| vs. all-Opus | Opus | ~28,000 | $0.42 |
+
+3× cost reduction per task. Compounds across every executor assignment.
+
+**Dependencies:** §4 (LlmProvider layer ✅), §W1 (Watch Mode — real cost data needed to validate the savings estimate before building the UI)
+
+**Status:** Future / not started — add to roadmap after §W1–§W4 ship and real cost data is available
+
+---
+
 ### §15 — Open Source Executor Path
 
 **What it is:** The locked spec is tool-agnostic JSON. A manifest mapping layer that allows any executor agent (open source runtimes, self-hosted) to consume a Forge spec without routing through commercial APIs.
