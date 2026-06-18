@@ -72,6 +72,33 @@ Every §N that brings The Forge closer to a working interview-to-spec run unbloc
 
 ---
 
+### §IF1 — Interview Funnel Redesign (4-Layer Deductive Funnel)
+✅ Complete 2026-06-12 — `interview_dimension.dart` NEW (LayerDef + buildLayers L1–L4); `interview_state.dart` (currentLayer, extracted, parseDegraded); `interview_notifier.dart` (Build system prompt rewrite, forge-state JSON contract, parseForgeState, content-driven confidence, stub demoted, v2 seed write at L3, loop fix); `spec_generator.dart` (funnel data block); `project_file_repository.dart` (writeIngestedFile); `workflow_template.md` Stage 1A rewritten; BUG-INTERVIEW-001/002/003 fixed; `dart analyze lib/` zero issues
+
+---
+
+### §UI1 — Layer Sub-Timeline UI
+✅ Complete 2026-06-12 — stacked L1–L4 dot sub-row in `_PhaseTimeline` on `project_detail_screen.dart`; compact FUNNEL strip above confidence meter in `interview_screen.dart`; both read from `currentLayer` in InterviewState; `dart analyze lib/` zero issues
+
+---
+
+### §FM1 — Feature Interview Mode (V2+)
+
+**What it is:** Lets a completed V1 project run a V2, V3, … interview against the same project folder. Uses the same 4-layer Build funnel but pre-loads the prior locked spec and V2 seeds as system prompt context. Each version produces its own artifacts with the correct version number. A "Start V2 Interview →" button appears on the project detail screen once V1 is complete.
+
+**Why it matters:** Without this, The Forge is a one-shot tool. Feature Mode makes it a continuous build instrument — the same project can be iterated version by version through the same workflow.
+
+**Architecture:** `priorSpecVersion: String?` added to `InterviewArgs` (null = V1, non-null = Feature); `featureContext` loaded from disk in `InterviewNotifier.build()`; `_featureInterviewSystemPrompt` injects prior spec + V2 seeds; phase strings version-prefixed (`v2_interview`, `v2_spec_locked`, `v2_worksheet_complete`); `_stageOf`/`_versionOf` helpers replace hardcoded phase string checks throughout `project_detail_screen.dart`; no new `ProjectMode` enum value.
+
+**Plan:** `DOCS/forge/feature_mode_executor_plan_v1.md` — 9 files, full executor prompt
+**Worktree:** `wt/feature-mode` at `/Volumes/Marc Working Drive/Development/the-forge-feature-mode`
+
+**Dependencies:** §IF1 ✅, §UI1 ✅
+
+**Status:** ✅ Complete 2026-06-17 — 10 files, 1097 insertions; merged to main + pushed to origin
+
+---
+
 ### §PERSIST — Interview State Persistence (Survive Spec Gen Failure)
 
 **What it is:** If spec generation fails and the user presses "Back to Projects", the interview state (`AutoDisposeNotifier`) is disposed and all responses are lost. Persist the raw interview turns to disk (JSON in `audit/`) at each phase completion so they can be reloaded.

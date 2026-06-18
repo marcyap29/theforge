@@ -4,6 +4,148 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-06-17 — Claude Code [§FM1 Implementation + UX Iteration + Merge]
+
+**Branch:** main (merged from `wt/feature-mode`)
+
+### Done
+- **§FM1 — Feature Interview Mode — COMPLETE:** V2+ interviews implemented and merged. 10 files, 1097 insertions. Full feature working on Forkit (v1_worksheet_complete → Start V2 Interview → V2 funnel with V1 context).
+- **Core architecture:** `InterviewArgs.priorSpecVersion` → `InterviewNotifier.build()` loads prior spec + V2 seeds from disk → `_featureInterviewSystemPrompt` (present-first L1, scope enforcement referencing V1 goal, L2 from V2 seeds, incremental L4)
+- **Interview screen UX:** `_V1BuiltHeader` (dark green panel, goal + chips); "V2 FUNNEL" label on layer strip; "Generate V2 Spec" button label; `targetSpecVersion` threaded through to `SpecGenerationScreen` → `spec_notifier` → `worksheet_notifier`
+- **Version-aware phase strings:** `_stageOf`/`_versionOf`/`_nextVersion` helpers replace all hardcoded `v1_*` checks throughout project_detail_screen; `spec_notifier` writes `${specVersion}_spec_locked`; `worksheet_notifier` writes `${specVersion}_worksheet_complete`
+- **Project detail screen UX (iterated):**
+  - Removed BUILD INTERVIEW badge (redundant with V2+)
+  - V1 SHIPPED integrated INTO `_PhaseTimeline` dot: checkmark stays, "V1 SHIPPED" replaces "Interview" label, chips + "Interview L1-L4" row below timeline row (not inside it — key fix for connector alignment)
+  - Collapsed strip for prior versions: V1 ✓ pills appear when V2+ ships; latest version chips always expanded
+  - `_allComponents: Map<String, List<String>>` loads component map from each completed version's spec async on initState
+  - **BUG fixed mid-session:** Chips inside Interview Column (inside timeline Row) made the column ~350px wide, breaking connector alignment. Fix: moved chips + pills + Interview+L1-L4 to a `Column` below the timeline `Row`.
+- **Projects list:** Goal statement between project name and phase row; loaded async from locked spec per project row; omitted when no spec exists
+- **Project detail AppBar:** Goal statement as subtitle under project name; loaded async from locked spec; maxLines: 1, truncated
+- **`readFeatureContext()`** added to `ProjectFileRepository` — reads prior spec + V2Seeds.md, returns formatted context block for the feature prompt
+- **`nextSpecVersion()` public helper** — `v1 → v2`, `v2 → v3` etc; used in interview notifier + interview screen
+- **Worktree `wt/feature-mode` merged → main → pushed to origin**
+
+### Key Technical Findings
+- Chips and wide widgets must NOT live inside a Column that is itself inside a horizontal timeline Row — they make the column wide, shifting the connector far from the dot. Always render timeline-adjacent detail in a separate Column below the Row.
+- `_VersionHistoryLane` (separate panel approach) was wrong UX — integrating version history INTO the timeline step is cleaner than a floating panel above it.
+- Goal statement parsing: look for `## \d*\.?\s*(Immutable )?Goal Statement` heading, take first non-empty non-heading line. Component map: look for `## \d*\.?\s*Component\s+(Map|List)`, parse first column of table rows past the separator.
+- `ConsumerWidget → ConsumerStatefulWidget` conversion: all widget fields become `widget.field` in state; `ref` is still available; callbacks like `onRename` need `widget.onRename()` not direct call.
+
+### Next
+- §W1: Watch Mode Token Ingestion Engine (next on critical path)
+- Or: continue testing V2 interview end-to-end (generate V2 spec, verify v2_spec_locked phase, Start V3 button appears)
+
+### Modified
+- `lib/data/filesystem/project_file_repository.dart` — `readFeatureContext()`
+- `lib/features/interview/providers/interview_providers.dart` — `priorSpecVersion` on `InterviewArgs`
+- `lib/features/interview/state/interview_notifier.dart` — feature prompt + helpers + scope guard
+- `lib/features/interview/state/interview_state.dart` — `featureContext` field
+- `lib/features/interview/ui/interview_screen.dart` — `_V1BuiltHeader`, V2 FUNNEL label, targetSpecVersion
+- `lib/features/projects/screens/project_detail_screen.dart` — major rewrite of `_PhaseTimeline` + helpers + AppBar title + projects list goal
+- `lib/features/projects/screens/projects_list_screen.dart` — goal text in project rows
+- `lib/features/spec_generation/spec_generation_screen.dart` — `targetSpecVersion` param
+- `lib/features/spec_generation/spec_notifier.dart` — version-aware phase strings
+- `lib/features/spec_generation/worksheet_notifier.dart` — version-aware phase string
+- `tracking md files/context.md` — this block
+
+---
+
+## Session: 2026-06-13 — Claude Code [§FM1 Plan + UX Polish + Bug Fixes + Sidebar Fix]
+
+**Branch:** main
+
+### Done
+- **§FM1 plan written:** `DOCS/forge/feature_mode_executor_plan_v1.md` — full 9-file executor prompt for DeepSeek V4 Pro. Feature Interview mode lets a completed V1 project run V2, V3, … interviews against the same folder with the prior spec and V2 seeds injected into the system prompt. Worktree `wt/feature-mode` created, ready for implementation.
+- **BUG-INTERVIEW-001 (layerComplete gate):** Flutter side is now authoritative for layer advancement. Models copied the hardcoded `false` in the system prompt literally — layerComplete was never true. Fix: advance when Flutter's own gate conditions pass, ignore `parse.layerComplete`.
+- **BUG-INTERVIEW-002 (specGenEnabled gate):** `specGenEnabled` was also gated on `parse.layerComplete`. Simplified to `allResolved && newConflicts.isEmpty`.
+- **BUG-INTERVIEW-003 (forge-state regex):** Lenient regex now handles trailing whitespace before closing fence — was causing `parseDegraded` every turn.
+- **Interview loop fix:** Three root causes — (1) LLM received only the current message, not full history; every turn it saw `extracted={outcome:null}` and re-asked L1. Now all prior turns are prepended. (2) `parseDegraded` froze state instead of falling back to stub + `_layerFromConfidence`. (3) `llmUnavailable` stuck true after one failure; now resets on each successful call.
+- **Bugtracker:** BUG-INTERVIEW-001/002/003 records filed; `BUG_PREVENTION.md` updated.
+- **UX — generation screens:** `generation_widgets.dart` NEW (`GenerationPhaseBar` with amber-pulse on current step, `ArtifactInfoCard`, `TipRotator` with 5s crossfade, 6–7 tips each); `spec_generation_screen.dart` + `worksheet_generation_screen.dart` both updated with phase bar, artifact cards, rotating tip strip in generating state.
+- **Sidebar fix:** `writeHandoffPackage` was writing to project root (invisible). Now writes to `handoffs/`. `ingested/` folder added to sidebar so V2Seeds.md and reference_context.md are visible.
+
+### Key Technical Findings
+- Flutter-side authority over LLM-side flags: when a model is given a hardcoded example value (`layerComplete: false`) in a system prompt, it will often reproduce it literally every turn — never setting true. Gate logic for state advancement must live in Flutter, not be delegated to the LLM's JSON output.
+- Full conversation history must be passed every turn for stateless LLM calls. Without it, every turn looks like the first turn to the model.
+- `parseDegraded` must degrade gracefully — fall back to stub inference + derive state from what's resolvable — never freeze.
+
+### Next
+- §FM1 implementation in `wt/feature-mode` — 9 files, DeepSeek V4 Pro
+
+### Modified
+- `lib/features/interview/state/interview_notifier.dart` — loop fix (3), gate fix (BUG-001/002/003)
+- `lib/features/spec_generation/generation_widgets.dart` — NEW
+- `lib/features/spec_generation/spec_generation_screen.dart` — phase bar + artifact cards
+- `lib/features/spec_generation/worksheet_generation_screen.dart` — phase bar + cards
+- `lib/data/filesystem/project_file_repository.dart` — writeHandoffPackage path fix
+- `lib/features/projects/screens/project_detail_screen.dart` — ingested/ sidebar folder
+- `bugtracker/bug_tracker.md` — BUG-INTERVIEW-001/002/003
+- `bugtracker/records/BUG-INTERVIEW-001-layercomplete-gate.md` — NEW
+- `bugtracker/records/BUG-INTERVIEW-002-specgen-layercomplete.md` — NEW
+- `bugtracker/records/BUG-INTERVIEW-003-forgestate-regex.md` — NEW
+- `bugtracker/BUG_PREVENTION.md` — interview gate + history rules added
+- `DOCS/forge/feature_mode_executor_plan_v1.md` — NEW
+- `tracking md files/context.md` — this block
+
+---
+
+## Session: 2026-06-12 — DeepSeek/Claude Code [§UI1 Layer Sub-Timeline]
+
+**Branch:** main (merged from `wt/layer-timeline`)
+
+### Done
+- **§UI1 — project detail sub-timeline:** Stacked L1–L4 dot row added under the Interview step in `_PhaseTimeline` on `project_detail_screen.dart`. Dots: gray (future), amber-pulse (current), green (done). Connected by a thin vertical line; connector alignment fixed post-merge. Layer state persists across navigation via `currentLayer` in `InterviewState`.
+- **§UI1 — interview screen funnel strip:** Compact FUNNEL strip (L1 Outcome → L2 Decomposition → L3 PoC → L4 Critical Path) added above the confidence meter in `interview_screen.dart`. Matching dot style. Build mode only; Audit interviews unchanged.
+- **Plan doc:** `DOCS/forge/layer_timeline_executor_plan_v1.md` NEW.
+
+### Key Technical Findings
+- The `currentLayer` field on `InterviewState` (added in §IF1) is the single source of truth for which dot is lit. Both the project detail sub-row and the interview screen funnel strip read from the same provider — no separate state needed.
+- Connector alignment: the vertical line between dots is a `Container` inside a `Column`; must be wrapped in a sized box to prevent overflow when dot sizes differ.
+
+### Next
+- Bug fixes for IF1 gate issues (resolved in same day — see session above)
+
+### Modified
+- `lib/features/projects/screens/project_detail_screen.dart` — L1–L4 sub-row in `_PhaseTimeline`
+- `lib/features/interview/ui/interview_screen.dart` — FUNNEL strip (163 insertions)
+- `DOCS/forge/layer_timeline_executor_plan_v1.md` — NEW
+- `tracking md files/context.md` — this block
+
+---
+
+## Session: 2026-06-11/12 — DeepSeek [§IF1 Interview Funnel Redesign — Implementation]
+
+**Branch:** main (merged from `wt/interview-funnel`)
+
+### Done
+- **§IF1 implemented:** Converted Build Interview from flat 8-dimension list to 4-layer deductive funnel (L1 Outcome → L2 Decomposition → L3 PoC reduction → L4 Critical Path). The 8 dimensions survive as spec invariants; confidence resolution is now content-driven, not stub-driven.
+- **`interview_dimension.dart`** NEW — `LayerDef` data class + `buildLayers` (L1–L4 definitions with exit conditions).
+- **`interview_state.dart`** — added `currentLayer` (`LayerDef`), `extracted` (`Map<String, dynamic>` cumulative map), `parseDegraded` (`bool`) fields and `copyWith` updates.
+- **`interview_notifier.dart`** — full Build system prompt rewritten to 4-layer funnel with forge-state JSON contract; `parseForgeState` parser added; stub demoted to LLM-unavailable fallback only (scripted conflict deleted); confidence resolution now content-driven from `extracted` map; v2 seed file written to `ingested/` at L3→L4 transition.
+- **`spec_generator.dart`** — funnel data block (layers + extracted map) injected into spec prompt; L3 demo script seeds Completion Criteria.
+- **`project_file_repository.dart`** — `writeIngestedFile()` added for V2Seeds.md (and future per-doc files).
+- **`workflow_template.md`** — Stage 1A fully rewritten to 4-layer funnel + new invariants (one question per turn, forge-state mandatory every response).
+- **parseForgeState fixes:** Catches `TypeError` in addition to `FormatException`; lenient regex for trailing whitespace (fixed post-merge).
+
+### Key Technical Findings
+- `parseForgeState` must catch `TypeError` not just `FormatException` — Dart's `json.decode` can succeed on malformed LLM output but subsequent map access throws `TypeError` when a field's type doesn't match the expected shape.
+- The `forge-state` fenced block regex must be lenient about whitespace before the closing ` ``` ` — models sometimes emit trailing spaces or newlines that a strict pattern won't match, causing every turn to fall through to `parseDegraded`.
+- `writeIngestedFile` is a general-purpose write to `ingested/`; it's not limited to V2Seeds — the same method will serve any future per-doc ingestion artifacts.
+
+### Next
+- §UI1: Layer sub-timeline to visualize L1–L4 progress (see session above)
+
+### Modified
+- `lib/features/interview/state/interview_dimension.dart` — NEW
+- `lib/features/interview/state/interview_notifier.dart` — 493-line delta (system prompt rewrite, forge-state parser, content-driven confidence)
+- `lib/features/interview/state/interview_state.dart` — `currentLayer`, `extracted`, `parseDegraded` added
+- `lib/features/spec_generation/spec_generator.dart` — funnel data block in spec prompt
+- `lib/data/filesystem/project_file_repository.dart` — `writeIngestedFile()`
+- `DOCS/forge/workflow_template.md` — Stage 1A rewritten
+- `tracking md files/context.md` — this block
+
+---
+
 ## Session: 2026-06-11 — Cowork [Interview Funnel Redesign Plan]
 
 **Branch:** main (docs only, no code)

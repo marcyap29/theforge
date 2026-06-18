@@ -302,6 +302,67 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 
 ---
 
+## §IF1 — Interview Funnel Redesign (4-Layer Deductive Funnel) — COMPLETE ✅
+
+**Completed:** 2026-06-11/12 (DeepSeek + Claude Code review)
+
+- [x] `lib/features/interview/state/interview_dimension.dart` — NEW: `LayerDef` + `buildLayers` (L1–L4 with exit conditions)
+- [x] `lib/features/interview/state/interview_state.dart` — added `currentLayer`, `extracted`, `parseDegraded`
+- [x] `lib/features/interview/state/interview_notifier.dart` — Build system prompt rewritten to 4-layer funnel + forge-state JSON contract; `parseForgeState` parser; stub demoted to LLM-unavailable fallback; content-driven confidence; v2 seed write at L3→L4; loop fix (full history per turn; parseDegraded graceful fallback; llmUnavailable auto-reset)
+- [x] `lib/features/spec_generation/spec_generator.dart` — funnel data block injected into spec prompt
+- [x] `lib/data/filesystem/project_file_repository.dart` — `writeIngestedFile()` for V2Seeds.md
+- [x] `DOCS/forge/workflow_template.md` — Stage 1A rewritten to 4-layer funnel + invariants
+- [x] BUG-INTERVIEW-001/002/003 filed and fixed (layerComplete gate, specGenEnabled gate, forge-state regex)
+- [x] `dart analyze lib/` — zero issues
+
+### Notes
+- Flutter side is authoritative for layer advancement — never delegate gate logic to LLM JSON output
+- Full conversation history must be prepended every turn for stateless LLM calls
+- `parseForgeState` catches `TypeError` + `FormatException`; regex lenient for trailing whitespace before closing fence
+
+---
+
+## §UI1 — Layer Sub-Timeline UI — COMPLETE ✅
+
+**Completed:** 2026-06-12 (DeepSeek + Claude Code)
+
+- [x] `lib/features/projects/screens/project_detail_screen.dart` — stacked L1–L4 dot sub-row under Interview step in `_PhaseTimeline`; gray/amber-pulse/green; connector alignment fixed
+- [x] `lib/features/interview/ui/interview_screen.dart` — compact FUNNEL strip above confidence meter; Build mode only
+- [x] `DOCS/forge/layer_timeline_executor_plan_v1.md` — NEW (plan doc)
+- [x] `dart analyze lib/` — zero issues
+
+### Notes
+- Both the project detail sub-row and interview funnel strip read from `currentLayer` in `InterviewState` — single source of truth, no separate state
+- Connector vertical line must be inside a `SizedBox` to avoid overflow when dot sizes differ
+
+---
+
+## §FM1 — Feature Interview Mode (V2+) — COMPLETE ✅
+
+**Completed:** 2026-06-17 · **Merged + pushed:** main → origin
+
+- [x] `lib/features/interview/providers/interview_providers.dart` — `priorSpecVersion: String?` on `InterviewArgs`
+- [x] `lib/features/interview/state/interview_state.dart` — `featureContext: String?`
+- [x] `lib/features/interview/state/interview_notifier.dart` — `readFeatureContext()` in `build()`; `_featureInterviewSystemPrompt` (present-first L1, scope guard, V2 seeds as L2 menu, incremental L4); `nextSpecVersion()` public helper; `_extractGoalStatement`/`_extractComponents`
+- [x] `lib/features/interview/ui/interview_screen.dart` — `_V1BuiltHeader` panel; "V2 FUNNEL" label; "Generate V2 Spec" button; `targetSpecVersion` passed to SpecGenerationScreen
+- [x] `lib/features/spec_generation/spec_generation_screen.dart` — `targetSpecVersion` param (default `'v1'`)
+- [x] `lib/features/spec_generation/spec_notifier.dart` — version-aware phase strings
+- [x] `lib/features/spec_generation/worksheet_notifier.dart` — version-aware phase string
+- [x] `lib/features/projects/screens/project_detail_screen.dart` — `_stageOf`/`_versionOf`/`_nextVersion` helpers; V1 SHIPPED in `_PhaseTimeline` dot; chips + Interview+L1-L4 below timeline row; collapsed prior-version pills; AppBar goal subtitle; "Start V2 Interview" button
+- [x] `lib/features/projects/screens/projects_list_screen.dart` — goal text in project rows (async, spec-gated)
+- [x] `lib/data/filesystem/project_file_repository.dart` — `readFeatureContext()`
+- [x] `dart analyze lib/` — zero issues
+
+### Notes
+- Chips/wide widgets must be placed BELOW the timeline Row, never inside a Column that is part of the horizontal Row — breaks connector alignment
+- `_allComponents: Map<String, List<String>>` loads each completed version's component map on mount; latest version chips expanded, prior versions collapsed to "V1 ✓" pills
+- Goal statement + component parsing uses regex section matching on the locked spec markdown
+
+---
+
 ## Next Up — §W1: Watch Mode Token Ingestion Engine
 
-**Status:** Not started — next on critical path after §EX1 ✅
+**Status:** Not started — next on critical path
+- [ ] `lib/features/spec_generation/worksheet_notifier.dart` — version-aware phase strings (`${specVersion}_worksheet_complete`)
+- [ ] `lib/features/projects/screens/project_detail_screen.dart` — `_stageOf`/`_versionOf`/`_nextVersion` helpers; version-aware `_buildCta` + "Start V2 Interview" button; `_PhaseTimeline` stage checks
+- [ ] `lib/data/filesystem/project_file_repository.dart` — `readFeatureContext()`
