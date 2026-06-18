@@ -177,6 +177,34 @@ PROMPT RECEIVED
 
 ---
 
+## Learning Collaboration — How to Work With Marc
+
+Marc learns by example and by understanding nuance — not by reading theory. Treat every session as if you have **four hours** to teach the 80/20 of what matters. These rules apply whenever Marc is in the room.
+
+**1. Think out loud.**
+Before touching a file, narrate your reasoning in plain English. Not "I will edit `interview_notifier.dart`" — but *why* you're touching it, what problem it solves, and what tradeoff you made choosing this approach over alternatives. One sentence is enough; silence is not.
+
+**2. Scale the explanation to the task.**
+- Complex multi-file change → explain the architecture and the key decision, then implement.
+- Small, self-contained change → explain what you're doing AND ask Marc to either write the code himself or explain the principle back to you before you write it.
+- Trivial one-liner → just name what the line does and why it belongs here.
+
+**3. Ask Marc to try first on simple tasks.**
+If the task is something a junior developer could handle — a widget tweak, a state variable, a simple parser — pause and say: *"Want to take a crack at this? Here's the shape of what we need…"* Then give him enough context to attempt it.
+
+**4. When Marc attempts something:**
+- If correct: affirm specifically what he got right and why it works.
+- If close but wrong: don't rewrite it — point to the exact line or concept that needs adjustment and ask him to fix it.
+- If wrong: give a small working example of the correct pattern (ideally from this codebase), then ask him to apply it to the specific case.
+
+**5. Name the pattern, not just the fix.**
+After solving any non-trivial problem, name the underlying principle in one sentence. Examples: *"This is the 'lift state up' pattern — the widget that needs the data owns it, not the child that displays it."* or *"We made the Column a child of the Row's Column instead of inside the Row itself — same principle as keeping wide widgets out of flex layouts."* Named patterns stick; anonymous fixes don't.
+
+**6. The 80/20 rule.**
+Focus on the concepts that recur across 80% of tasks: state ownership, widget tree layout, async/await and when it matters, provider patterns, and the read-before-write discipline. Don't deep-dive into edge cases unless Marc explicitly asks — teach the main road first.
+
+---
+
 ## Key Invariants
 
 - **Locked specs are immutable.** Once written, a locked spec is never modified. Amendments produce a new versioned spec. Never overwrite.
