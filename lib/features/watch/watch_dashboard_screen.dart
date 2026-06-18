@@ -152,17 +152,22 @@ class _WorkspaceStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1C1C1E),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF2C2C2E)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    // macOS Flutter desktop requires Material ancestor for InkWell ink effect
+    // (BUG-UI-001 — Scaffold-level Material is insufficient on macOS).
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1C1C1E),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFF2C2C2E)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -212,6 +217,7 @@ class _WorkspaceStrip extends StatelessWidget {
           ],
         ),
       ),
+    ),
     );
   }
 }
