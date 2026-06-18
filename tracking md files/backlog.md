@@ -26,8 +26,8 @@ Long-term feature pool. Active sprint work lives in `planner.md`.
        ↓
   → §EX1 Executor Timeline (parse spec §3 Component Map → LLM-narrated build sequence) ✅
        ↓
-  → §W1 Watch Mode: Token Ingestion Engine
-  → §W2 Watch Mode: Git Activity Engine + CI Outcome Correlator
+   → §W1 Watch Mode: Token Ingestion Engine ✅
+   → §W2 Watch Mode: Git Activity Engine + CI Outcome Correlator
   → §W3 Watch Mode: Failure Signal Engine + Alert Engine
   → §W4 Watch Mode: Dashboard UI Shell
   → §W5 Watch Mode: SwarmSpace Briefing + Decision Simulation
@@ -619,7 +619,7 @@ EngineerUsage {
 
 **Dependencies:** §W0 — Workspace Config extension: per-engineer `{ handle, providerType, apiKey, alertThreshold }` roster added to existing Settings schema from §10.
 
-**Status:** Not started — next on critical path after §EX1 ✅
+**Status:** ✅ Complete 2026-06-17 — 9 new files (`lib/services/watch/` × 7 + `lib/features/settings/engineer_roster_notifier.dart` + `usage_service_provider.dart`); `UsageProvider` abstract + `EngineerUsage`/`DailyUsage` models; 4 provider impls (Anthropic/OpenAI/Gemini-stub/Ollama-stub); `DemoUsageProvider` with 4 profiles + `Random(42)`; `UsageService.fetchAllUsage()` with error isolation; `EngineerRosterNotifier` persists to `forge_config.json` under `watch_engineer_roster`, default demo entry on first launch; `dart analyze lib/` zero issues; zero Firebase
 
 ---
 
@@ -776,6 +776,9 @@ EngineerUsage {
 
 ### §EX1 — Executor Timeline
 ✅ Complete 2026-06-11 — `buildExecutorTimelinePrompt()` in `spec_generator.dart`; `executor_timeline_notifier.dart` (AutoDisposeFamilyAsyncNotifier by projectPath, disk-backed); `_BuildSequenceSection` inline widget in `ProjectDetailScreen` behind `phase == v1_worksheet_complete` gate; all 4 states; `dart analyze lib/` zero issues
+
+### §W1 — Token Ingestion Engine
+✅ Complete 2026-06-17 — 9 new files; `UsageProvider` abstract + `EngineerUsage`/`DailyUsage` immutable models; 4 provider impls (Anthropic HTTP /v1/usage, OpenAI HTTP /v1/usage per-day, Gemini stub `api_unsupported`, Ollama stub `local_model_unsupported`); `DemoUsageProvider` (4 profiles: runaway 9×/ghost 0.1×/highperformer 1.5×/self 1.0×, `Random(42)` deterministic, ±20% variance, spend_threshold >$200 + runaway_session >$100/day flags); `UsageService.fetchAllUsage()` resolves handle→provider, isolates failures to `fetch_error` entry; `EngineerRosterNotifier` persists to `forge_config.json` key `watch_engineer_roster`, default `demo` entry auto-present on first launch; `usageServiceProvider` nullable when roster loading; `dart analyze lib/` zero issues; zero Firebase
 
 ---
 

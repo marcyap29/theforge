@@ -4,6 +4,53 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-06-17 — Claude Code [§W1 Watch Mode: Token Ingestion Engine]
+
+**Branch:** main
+
+### Done
+- **§W1 — Watch Mode Token Ingestion Engine — shipped:** 9 new files implementing the abstract `UsageProvider` layer + 4 provider implementations + demo profiles + engineer roster. This is the foundation data source for all Watch Mode signals (§W2–§W6 consume `EngineerUsage` only, never a provider directly).
+  - `lib/services/watch/usage_provider.dart` — `UsageProvider` abstract + `EngineerUsage`/`DailyUsage` `@immutable` models
+  - `lib/services/watch/providers/anthropic_usage_provider.dart` — HTTP GET `api.anthropic.com/v1/usage` with `start_date`/`end_date` query; blended $9/MTok (`$0.000009/token`); defensive parse catches `FormatException` + `TypeError` → returns empty `EngineerUsage` with `['api_error']` flag (never crashes)
+  - `lib/services/watch/providers/openai_usage_provider.dart` — HTTP GET `api.openai.com/v1/usage?date=YYYY-MM-DD` per day in lookback window, `Future.wait` parallel; blended $5/MTok; same defensive parse pattern
+  - `lib/services/watch/providers/gemini_usage_provider.dart` — stub returning `['api_unsupported']` (no reliable per-engineer usage API exists as of 2026; keeps code path alive without crashing)
+  - `lib/services/watch/providers/ollama_usage_provider.dart` — stub returning `['local_model_unsupported']` (local models have no central usage API; proxy/sidecar out of scope for v1)
+  - `lib/services/watch/demo_usage_provider.dart` — 4 synthetic profiles (runaway 9×=$135/day, ghost 0.1×=$1.50/day, highperformer 1.5×=$22.50/day, self 1.0×=$15/day); `Random(42)` fixed seed = deterministic output every run; ±20% variance per day; alert flags: `spend_threshold` when 30d total >$200, `runaway_session` when any day >$100; `sessionCount = dailyBreakdown.length`
+  - `lib/services/watch/usage_service.dart` — `UsageService.fetchAllUsage()` iterates roster, resolves each entry to a provider via `switch` on `providerType`, isolates failures to a `fetch_error` `EngineerUsage` (never crashes the whole batch)
+  - `lib/features/settings/engineer_roster_notifier.dart` — `EngineerRosterEntry` model (handle/providerType/apiKey/alertThreshold) + `AsyncNotifier` persisting to `forge_config.json` under key `watch_engineer_roster`; mirrors `SettingsNotifier`'s read/write pattern exactly; default `demo` entry auto-present on first launch so app never shows empty state before configuration
+  - `lib/services/watch/usage_service_provider.dart` — `Provider<UsageService?>` watching `engineerRosterProvider`; nullable so consumers can gate on loading state
+- **Committed:** `feat(§W1): token ingestion engine — UsageProvider layer + 4 providers + demo profiles + engineer roster` (9 files, 516 insertions)
+
+### Key Technical Findings
+- **Interface segregation:** `UsageProvider` is the single abstract surface; §W2–§W6 never touch a provider directly — they consume the normalized `EngineerUsage` shape only. Same pattern as `LlmProvider` → `LlmService` in §4. Keeps provider swap-cost at zero.
+- **Error isolation over propagation:** `UsageService.fetchAllUsage()` catches per-entry failures and returns an `EngineerUsage` with `alertFlags: ['fetch_error']` rather than throwing. One bad API key doesn't poison the whole batch — the dashboard can still render the other engineers. This is the right default for a telemetry ingestion layer (vs. a request-response layer where you want the error to surface).
+- **Defensive parse pattern for LLM-billable APIs:** HTTP usage APIs are inconsistent and under-documented. The Anthropic response shape (`data[].aggregation_key.date` + `input_tokens` + `output_tokens`) is approximate; the OpenAI shape (`data[].aggregation_timestamp` as Unix epoch + `n_context_tokens_total` + `n_generated_tokens_total`) differs. Both providers catch `FormatException` + `TypeError` and fall back to an `api_error` flag rather than crashing — models for these APIs will shift, and the parser must not be brittle.
+- **OpenAI `/v1/usage` takes a single `date`, not a range:** Unlike Anthropic's `start_date`/`end_date`, the OpenAI endpoint requires one `date` per call. Implementation loops over each day in the lookback window with `Future.wait` for parallelism. This is a real API constraint, not a design choice.
+- **Config-file reuse:** `EngineerRosterNotifier` writes to the same `forge_config.json` as `SettingsNotifier` under a new top-level key (`watch_engineer_roster`). One file, multiple concerns — matches the existing settings storage pattern. No new database table, no SharedPreferences for roster data (secrets stay in the same file as API keys for settings, by the existing convention).
+- **Default-entry-on-first-launch pattern:** `build()` returns `[_defaultEntry]` (handle=`demo`, providerType=`demo`, alertThreshold=200.0) when the config key is missing or empty. The app never shows an empty state before configuration — demo data is always available. This is the same "ship with synthetic data" principle as the 4 demo profiles themselves.
+- **`Random(42)` determinism is a feature, not a hack:** Same seed → same sequence → same 30-day breakdown every run. Demo dashboards (§W4) will render identical charts across launches, which is what you want for screenshots, demos, and regression tests. Changing the seed would change the output — the seed is part of the contract.
+
+### Next
+- §W2 — Watch Mode: Git Activity Engine + CI Outcome Correlator (next on critical path; requires §W1 ✅)
+- Manual smoke test: instantiate `UsageService` with the default demo roster, call `fetchAllUsage()`, verify 4 `EngineerUsage` entries return with correct alert flags (runaway should trigger both `spend_threshold` and `runaway_session`; ghost should trigger neither)
+
+### Modified
+- `lib/services/watch/usage_provider.dart` — NEW
+- `lib/services/watch/providers/anthropic_usage_provider.dart` — NEW
+- `lib/services/watch/providers/openai_usage_provider.dart` — NEW
+- `lib/services/watch/providers/gemini_usage_provider.dart` — NEW
+- `lib/services/watch/providers/ollama_usage_provider.dart` — NEW
+- `lib/services/watch/demo_usage_provider.dart` — NEW
+- `lib/services/watch/usage_service.dart` — NEW
+- `lib/features/settings/engineer_roster_notifier.dart` — NEW
+- `lib/services/watch/usage_service_provider.dart` — NEW
+- `tracking md files/context.md` — this block
+- `tracking md files/planner.md` — §W1 COMPLETE block + §W2 next-up
+- `tracking md files/backlog.md` — §W1 ✅ in critical path + status line + Completed section
+- `operations md files/CONFIGURATION_MANAGEMENT.md` — inventory + changelog
+
+---
+
 ## Session: 2026-06-17 — Claude Code [§FM1 Implementation + UX Iteration + Merge]
 
 **Branch:** main (merged from `wt/feature-mode`)

@@ -360,9 +360,34 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 
 ---
 
-## Next Up — §W1: Watch Mode Token Ingestion Engine
+## §W1 — Watch Mode: Token Ingestion Engine — COMPLETE ✅
 
-**Status:** Not started — next on critical path
-- [ ] `lib/features/spec_generation/worksheet_notifier.dart` — version-aware phase strings (`${specVersion}_worksheet_complete`)
-- [ ] `lib/features/projects/screens/project_detail_screen.dart` — `_stageOf`/`_versionOf`/`_nextVersion` helpers; version-aware `_buildCta` + "Start V2 Interview" button; `_PhaseTimeline` stage checks
-- [ ] `lib/data/filesystem/project_file_repository.dart` — `readFeatureContext()`
+**Completed:** 2026-06-17
+
+- [x] `lib/services/watch/usage_provider.dart` — `UsageProvider` abstract + `EngineerUsage`/`DailyUsage` immutable models
+- [x] `lib/services/watch/providers/anthropic_usage_provider.dart` — HTTP GET `/v1/usage` with `start_date`/`end_date`, blended $9/MTok, defensive parse (FormatException + TypeError → `api_error`)
+- [x] `lib/services/watch/providers/openai_usage_provider.dart` — HTTP GET `/v1/usage?date=` per day in lookback, `Future.wait` parallel, blended $5/MTok
+- [x] `lib/services/watch/providers/gemini_usage_provider.dart` — stub returning `['api_unsupported']` flag
+- [x] `lib/services/watch/providers/ollama_usage_provider.dart` — stub returning `['local_model_unsupported']` flag
+- [x] `lib/services/watch/demo_usage_provider.dart` — 4 profiles (runaway 9×/ghost 0.1×/highperformer 1.5×/self 1.0×), `Random(42)` deterministic, ±20% variance, alert flags
+- [x] `lib/services/watch/usage_service.dart` — `fetchAllUsage()` iterates roster, isolates failures to `fetch_error` entry
+- [x] `lib/features/settings/engineer_roster_notifier.dart` — `EngineerRosterEntry` + `AsyncNotifier` persisting to `forge_config.json` key `watch_engineer_roster`; default `demo` entry auto-present on first launch
+- [x] `lib/services/watch/usage_service_provider.dart` — nullable `UsageService?` provider watching roster
+- [x] `dart analyze lib/` — zero issues
+- [x] `grep -ri firebase lib/` — zero matches
+- [x] `grep -rn "Random(42)" lib/` — 1 match in demo provider
+- [x] Committed: `feat(§W1): token ingestion engine — UsageProvider layer + 4 providers + demo profiles + engineer roster`
+
+### Notes
+- Provider impls use `implements UsageProvider` (not `extends`) — matches the existing `LlmProvider` abstract-class pattern but lets providers stay const-constructible where possible (Gemini/Ollama are `const`).
+- `UsageService` is the single call site for usage data in the app — §W2–§W6 consume `EngineerUsage` only, never a provider directly. Error isolation: any provider throw → `fetch_error` flag, never a crash.
+- `EngineerRosterNotifier` mirrors `SettingsNotifier`'s `forge_config.json` read/write pattern exactly (same file, different key). No new database table, no SharedPreferences for roster data.
+- Default `demo` roster entry (handle=`demo`, providerType=`demo`, alertThreshold=$200) is returned from `build()` when the config key is missing or empty — app never shows empty state before configuration.
+- Demo cost rate derived from the spec's $9/MTok blended Anthropic rate (`dailyCost / 0.000009`) so demo tokens are consistent with real Anthropic provider math.
+
+---
+
+## Next Up — §W2: Watch Mode Git Activity Engine + CI Outcome Correlator
+
+**Status:** Not started — next on critical path (requires §W1 ✅)
+- See `backlog.md` §W2 for scope

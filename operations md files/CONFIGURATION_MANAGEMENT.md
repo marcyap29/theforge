@@ -64,12 +64,48 @@
 | DebugProfile.entitlements | macos/Runner/ | 2026-06-05 | ✅ Synced |
 | Release.entitlements | macos/Runner/ | 2026-06-05 | ✅ Synced |
 | BUG_PREVENTION.md | bugtracker/ | 2026-06-05 | ✅ Synced |
+| usage_provider.dart | lib/services/watch/ | 2026-06-17 | ✅ Synced |
+| anthropic_usage_provider.dart | lib/services/watch/providers/ | 2026-06-17 | ✅ Synced |
+| openai_usage_provider.dart | lib/services/watch/providers/ | 2026-06-17 | ✅ Synced |
+| gemini_usage_provider.dart | lib/services/watch/providers/ | 2026-06-17 | ✅ Synced |
+| ollama_usage_provider.dart | lib/services/watch/providers/ | 2026-06-17 | ✅ Synced |
+| demo_usage_provider.dart | lib/services/watch/ | 2026-06-17 | ✅ Synced |
+| usage_service.dart | lib/services/watch/ | 2026-06-17 | ✅ Synced |
+| usage_service_provider.dart | lib/services/watch/ | 2026-06-17 | ✅ Synced |
+| engineer_roster_notifier.dart | lib/features/settings/ | 2026-06-17 | ✅ Synced |
 
 
 ---
 
 
 ## Change Log
+
+### 2026-06-17 — §W1 Watch Mode: Token Ingestion Engine
+
+**Action:** Abstract `UsageProvider` layer + 4 provider implementations + demo profiles + engineer roster notifier. 9 new files, 0 modified, zero analyzer issues.
+
+**Files created:**
+- `lib/services/watch/usage_provider.dart` — `UsageProvider` abstract + `EngineerUsage`/`DailyUsage` `@immutable` models
+- `lib/services/watch/providers/anthropic_usage_provider.dart` — HTTP GET `/v1/usage`, blended $9/MTok, defensive parse
+- `lib/services/watch/providers/openai_usage_provider.dart` — HTTP GET `/v1/usage` per-day parallel, blended $5/MTok
+- `lib/services/watch/providers/gemini_usage_provider.dart` — stub, `['api_unsupported']`
+- `lib/services/watch/providers/ollama_usage_provider.dart` — stub, `['local_model_unsupported']`
+- `lib/services/watch/demo_usage_provider.dart` — 4 profiles, `Random(42)` deterministic, alert flags
+- `lib/services/watch/usage_service.dart` — `fetchAllUsage()` with per-entry error isolation
+- `lib/features/settings/engineer_roster_notifier.dart` — `EngineerRosterEntry` + `AsyncNotifier` persisting to `forge_config.json` key `watch_engineer_roster`; default demo entry on first launch
+- `lib/services/watch/usage_service_provider.dart` — `Provider<UsageService?>` watching roster
+
+**Verification:** `dart analyze lib/` → No issues found; `grep -ri firebase lib/` → zero matches; `grep -rn "Random(42)" lib/` → 1 match in demo provider; `git diff --stat HEAD` → 9 new files, 516 insertions
+
+**Key design choices:**
+- Interface segregation: §W2–§W6 consume `EngineerUsage` only, never a provider directly — same pattern as `LlmProvider` → `LlmService`
+- Error isolation: `fetchAllUsage()` catches per-entry failures → `fetch_error` flag, never crashes the batch
+- Defensive parse: HTTP usage APIs are inconsistent — catch `FormatException` + `TypeError`, fall back to `api_error` flag
+- Config-file reuse: `EngineerRosterNotifier` writes to same `forge_config.json` as `SettingsNotifier` under new key `watch_engineer_roster`
+- Default-entry-on-first-launch: `build()` returns `[_defaultEntry]` when key missing — app never shows empty state before configuration
+- `Random(42)` determinism is a contract — same seed → same demo data every run (screenshots, demos, regression tests)
+
+**Commit:** `feat(§W1): token ingestion engine — UsageProvider layer + 4 providers + demo profiles + engineer roster`
 
 ### 2026-06-05 — §9.5 + Plan Mode v1 Complete + UX Polish
 
