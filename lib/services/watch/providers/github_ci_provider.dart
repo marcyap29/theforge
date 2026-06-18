@@ -70,8 +70,10 @@ class GitHubCIProvider implements CIOutcomeProvider {
       final id = map['id'];
       final runId = id == null ? '' : id.toString();
       final headSha = (map['head_sha'] as String?) ?? '';
-      final headCommit = map['head_commit'] as Map<String, dynamic>?;
-      final authorEmail = (headCommit?['author']?['email'] as String?) ?? '';
+      // Use actor.login (GitHub username) not head_commit.author.email (git email).
+      // actor is the GitHub user who triggered the run — correct field for authorLogin.
+      final actor = map['actor'] as Map<String, dynamic>?;
+      final authorLogin = (actor?['login'] as String?) ?? '';
       final createdAtStr = map['created_at'] as String?;
       final updatedAtStr = map['updated_at'] as String?;
       if (createdAtStr == null || updatedAtStr == null) continue;
@@ -82,7 +84,7 @@ class GitHubCIProvider implements CIOutcomeProvider {
       out.add(CIRun(
         runId: runId,
         triggeringCommitSha: headSha,
-        authorLogin: authorEmail,
+        authorLogin: authorLogin,
         outcome: outcome,
         triggeredAt: createdAt,
         durationSeconds: duration,
