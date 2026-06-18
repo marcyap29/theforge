@@ -18,12 +18,30 @@ class UsageService {
     for (final entry in roster) {
       final provider = _resolveProvider(entry);
       try {
-        final usage = await provider.fetchUsage(
+        final raw = await provider.fetchUsage(
           engineerHandle: entry.handle,
           apiKey: entry.apiKey,
           lookbackDays: lookbackDays,
         );
-        results.add(usage);
+        // Evaluate alert flags here using the per-engineer threshold from the
+        // roster — providers return raw data; the service owns flag logic.
+        final flags = List<String>.from(raw.alertFlags);
+        if (raw.totalCostUSD30d > entry.alertThreshold &&
+            !flags.contains('spend_threshold')) {
+          flags.add('spend_threshold');
+        }
+        if (raw.dailyBreakdown.any((d) => d.costUSD > 100) &&
+            !flags.contains('runaway_session')) {
+          flags.add('runaway_session');
+        }
+        results.add(EngineerUsage(
+          engineerHandle: raw.engineerHandle,
+          providerName: raw.providerName,
+          dailyBreakdown: raw.dailyBreakdown,
+          totalCostUSD30d: raw.totalCostUSD30d,
+          sessionCount: raw.sessionCount,
+          alertFlags: flags,
+        ));
       } catch (_) {
         results.add(
           EngineerUsage(
@@ -43,9 +61,9 @@ class UsageService {
   UsageProvider _resolveProvider(EngineerRosterEntry entry) {
     switch (entry.providerType) {
       case 'anthropic':
-        return AnthropicUsageProvider(apiKey: entry.apiKey);
+        return const AnthropicUsageProvider();
       case 'openai':
-        return OpenAiUsageProvider(apiKey: entry.apiKey);
+        return const OpenAiUsageProvider();
       case 'gemini':
         return const GeminiUsageProvider();
       case 'demo':

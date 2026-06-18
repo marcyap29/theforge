@@ -5,8 +5,7 @@ import 'package:http/http.dart' as http;
 import '../usage_provider.dart';
 
 class OpenAiUsageProvider implements UsageProvider {
-  OpenAiUsageProvider({required this.apiKey});
-  final String apiKey;
+  const OpenAiUsageProvider();
 
   static const double _blendedCostPerToken = 0.000005; // $5/MTok blended
 

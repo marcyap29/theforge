@@ -43,10 +43,6 @@ class DemoUsageProvider implements UsageProvider {
     }
 
     final total = breakdown.fold<double>(0, (s, d) => s + d.costUSD);
-    final anyRunawayDay = breakdown.any((d) => d.costUSD > 100);
-    final flags = <String>[];
-    if (total > 200) flags.add('spend_threshold');
-    if (anyRunawayDay) flags.add('runaway_session');
 
     return EngineerUsage(
       engineerHandle: engineerHandle,
@@ -54,7 +50,6 @@ class DemoUsageProvider implements UsageProvider {
       dailyBreakdown: breakdown,
       totalCostUSD30d: total,
       sessionCount: breakdown.length,
-      alertFlags: flags,
     );
   }
 }

@@ -5,8 +5,7 @@ import 'package:http/http.dart' as http;
 import '../usage_provider.dart';
 
 class AnthropicUsageProvider implements UsageProvider {
-  AnthropicUsageProvider({required this.apiKey});
-  final String apiKey;
+  const AnthropicUsageProvider();
 
   static const double _blendedCostPerToken = 0.000009; // $9/MTok blended
 
