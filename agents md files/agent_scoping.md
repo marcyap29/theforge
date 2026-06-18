@@ -11,6 +11,7 @@ The Forge-specific agent registry will be populated here as external agents are 
 | Agent | Model | Rank | Strengths | Weaknesses | Last used |
 |---|---|---|---|---|---|
 | DeepSeek v4 Pro | deepseek-v4-pro | **1 — Executor** | Linter separation, scope discipline, invariant accuracy | Needs invariants spelled out in prompt; leaves dead deps | 2026-05-31 |
+| GLM-5.2 | glm-5.2 | **1 — Executor** | Ran full STEP 6 close-out unprompted; thorough coding lesson; proactive self-correction; inferred API constraints from behaviour | Design-level gaps when spec is ambiguous (alert flag ownership, redundant constructor fields) | 2026-06-17 |
 
 ---
 
@@ -40,3 +41,31 @@ The Forge-specific agent registry will be populated here as external agents are 
 - Always include: key invariants inline (write patterns, atomic operations, error cases)
 - Always include: verification checklist — runs it reliably
 - Do not assign without: explicit file paths and method signatures for any contracts it must honour
+
+---
+
+### GLM-5.2 (via GLM API)
+
+**Rank: 1 — Executor**
+
+| Assignment | Test Type | Scores (Spec / Integration / Self-correct / Scope / Prompt-dep) | Overall | Notes |
+|---|---|---|---|---|
+| §W1 Token Ingestion Engine — UsageProvider abstract + 4 providers + demo profiles + engineer roster | T2 | 5 / 4 / 5 / 5 / 4 | **4.6 → Rank 1** | Ran full STEP 6 close-out (tracking docs + coding lesson) unprompted. Caught and fixed import path bug after first linter run. Inferred OpenAI per-day loop from API behaviour. Two reviewer fixes: constructor `apiKey` shadowed by method param (redundant stored field); alert flag evaluation was in DemoUsageProvider instead of UsageService (wrong layer — should use entry.alertThreshold). |
+
+**Calibrated rank:** Rank 1 — equivalent to DeepSeek v4 Pro. Slightly stronger on STEP 6 close-out discipline; slightly weaker on design-layer decisions when spec is ambiguous.
+
+**Observed strengths:**
+- STEP 6 discipline: ran context, planner, backlog, CONFIGURATION_MANAGEMENT, and coding lesson updates without being prompted — no other agent has done this
+- Self-correction: caught import path bug (`../usage_provider.dart` → `usage_provider.dart`) immediately after first `dart analyze` run; also deleted an unnecessary `copyWith` extension unprompted
+- API inference: correctly deduced that OpenAI's `/v1/usage` takes a single `date` and built a `Future.wait` loop — this was not in the spec
+- Coding lesson quality: 9-step format lesson was thorough and genuinely useful
+
+**Observed weaknesses:**
+- Design ambiguity: when the spec is unclear about which layer owns a responsibility (alert flag evaluation), picks the closer/more obvious layer (provider) rather than the architecturally correct one (service)
+- Constructor field shadowing: didn't notice that storing `apiKey` in the constructor is dead when the interface also passes it as a method param
+
+**Assignment rules for GLM-5.2:**
+- Use Rank 1 template for: service layer, data ingestion, multi-file Flutter tasks requiring STEP 6 close-out
+- Always include: explicit ownership rules when a responsibility could live in multiple layers (e.g. "flag evaluation belongs in UsageService, not providers")
+- Always include: verification checklist — runs it reliably
+- Do not assign without: explicit interface contracts and which layer owns each business rule
