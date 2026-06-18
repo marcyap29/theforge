@@ -4,6 +4,53 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-06-17 — Claude Code [§W4 Watch Mode: Dashboard UI Shell]
+
+**Branch:** main
+
+### Done
+- **§W4 — Watch Mode Dashboard UI Shell — shipped:** 5 new files + 3 modifications implementing the full Watch Mode dashboard. The UI reads §W1/§W2/§W3 data via a single orchestrating `WatchDataNotifier` and displays engineer cards, a spend chart, workspace health, and an alert log. Read-only except for alert dismissal.
+  - `lib/features/watch/watch_data_notifier.dart` — `WatchData` model (usage, correlations, signalResult, hasGitHubConfig) + `WatchDataNotifier` AsyncNotifier; `_fetch()` reads §W1+§W2 services + roster + alertLog → runs `watchSignalService.evaluate()` → auto-appends new alerts → returns WatchData; convenience getters `allCommits`, `signalsFor(handle)`, `workspaceSignals`; `refresh()` pattern (AsyncLoading → AsyncValue.guard)
+  - `lib/features/watch/watch_dashboard_screen.dart` — main screen; workspace strip (total 30d spend + active alert count + git connected/not-configured status, tappable → WorkspaceHealthScreen) + critical alert banner (red, shown only when non-dismissed critical alerts exist, tappable → AlertLogScreen) + ENGINEERS section + `_EngineerCard` per usage entry sorted by 30d spend descending (handle in white Menlo + provider chip amber/gray + first signal detail line in severity color + $total 16px + CI pass rate colored green>70%/amber 30–70%/red<30%) + VIEW WORKSPACE HEALTH OutlinedButton; AppBar refresh + notifications icons
+  - `lib/features/watch/engineer_detail_screen.dart` — per-engineer drill-down; summary row (30d spend, CI pass %, AI %, PRs merged) + fl_chart `BarChart` (30d daily spend, bars colored per-day by that day's pass rate green/amber/red, date axis M/D interval 7, $ axis, grid horizontal lines, no border, dark background) + git activity 4-chip row (COMMITS/REVERTS/PRs MERGED/AI) + active signals list with severity icons (error/warning_amber/info_outline); "No data yet" placeholder when daily empty
+  - `lib/features/watch/workspace_health_screen.dart` — velocity trend card (IMPROVING green / STABLE white / DECLINING amber / STALLED red, large 22px label + commits 7d vs prior 7d + change % colored green/red) + last commit row (red if stalled, "never" for stalledDays≥999) + CI stats row (total runs + pass rate) + workspace signals list
+  - `lib/features/watch/alert_log_screen.dart` — alert log; active entries first with Dismiss TextButton, "— N dismissed —" divider (only when dismissed exist), dismissed entries (opacity 0.4 + strikethrough + no button); Clear Dismissed AppBar action; empty state "No alerts"; severity icons + handle chip + MM/DD HH:mm timestamp + 2-line detail
+  - `pubspec.yaml` — `fl_chart: ^0.70.0` added (flutter pub get run by executor)
+  - `lib/core/app.dart` — `/watch` route → `WatchDashboardScreen`
+  - `lib/features/projects/screens/projects_list_screen.dart` — `Icons.monitor_heart_outlined` Watch Mode button before Settings in non-selecting AppBar
+- **Committed:** `feat(§W4): Watch Mode dashboard UI — engineer cards, spend chart, workspace health, alert log` (9 files including pubspec.lock, 1458 insertions)
+
+### Key Technical Findings
+- **Single orchestrating provider pattern:** `WatchDataNotifier` is the only provider the watch screens watch. It fetches §W1+§W2, runs §W3, auto-appends alerts, and returns a `WatchData` bundle. The UI never imports `usageServiceProvider` or `gitActivityServiceProvider` directly — it reads `watchDataProvider`. This keeps the UI layer decoupled from the fetch+signal pipeline. If the fetch pipeline changes (e.g. add caching, add polling), only `WatchDataNotifier` changes; the screens don't.
+- **Auto-append alerts on fetch:** `_fetch()` calls `alertLogProvider.notifier.appendAlerts(signalResult.newAlerts)` after signal evaluation. Opening the dashboard triggers a fetch→evaluate→persist cycle — the first open populates the log, subsequent opens see persisted state + new alerts. The alert log is the persistence layer; the dashboard reads it for the active-alert count via `ref.watch(alertLogProvider)`.
+- **v1 limitation — ciRuns not exposed post-correlation:** `GitActivityService.fetchCorrelations()` consumes `ciRuns` internally for correlation but doesn't return them. `WatchDataNotifier` passes `ciRuns: const []` to `watchSignalService.evaluate()`, so `WorkspaceStatus.ciPassRate30d` is 0 in v1. Velocity trend and stall detection (commit-based) still work. Upgrade path documented in `watch_data_notifier.dart`: expose `ciRuns` from `fetchCorrelations()` so `ProjectStatusAggregator` can compute the real pass rate.
+- **fl_chart bar coloring per-day by pass rate:** Each bar's color reflects that day's pass rate (green >70%, amber 30–70%, red <30%), not a single color for the whole chart. This makes the chart a "spend + quality" view — a tall red bar is "high spend, low pass rate" (the worst case); a tall green bar is "high spend, high pass rate" (the best case). Single-color bars would show spend but not quality.
+- **`.length` is a getter, not a method:** First dashboard draft used `.length()` on `List.where(...)` result — analyzer caught `invocation_of_non_function_expression`. `List.length` is a property, not a method. Fix: `.length` (no parens). This is the kind of mistake that happens when switching between languages (Python's `len()` is a function; Dart's `.length` is a getter). The analyzer is the safety net.
+- **`firstWhere(orElse: () => null as dynamic)` anti-pattern tempted again:** First dashboard draft had `_passRateFor` using the broken cast pattern. Caught it, replaced with `.where(...).firstOrNull` (Dart 3). This is the third time this anti-pattern has tempted in §W1-§W4 — the pattern is now documented in BUG_PREVENTION (via the §W2 coding lesson). The fix is always the same: `firstOrNull`.
+- **Import ordering matters to the linter:** `directives_ordering` info fires when imports aren't alphabetically sorted within their section. The fix is mechanical (sort the lines), but it's worth knowing: the analyzer treats `package:` imports and relative imports as separate sections, and within each section, alphabetical order is required.
+
+### Next
+- §W5 — Watch Mode: SwarmSpace Briefing + Decision Simulation (next on critical path; requires §W4 ✅)
+- Manual smoke test: run the app, tap the Watch Mode icon in the projects list AppBar → dashboard renders with demo data (default roster has one `demo` entry) → tap an engineer card → detail screen with bar chart → tap VIEW WORKSPACE HEALTH → workspace screen → tap notifications icon → alert log (empty initially, populates after first fetch+evaluate)
+
+### Modified
+- `lib/features/watch/watch_data_notifier.dart` — NEW
+- `lib/features/watch/watch_dashboard_screen.dart` — NEW
+- `lib/features/watch/engineer_detail_screen.dart` — NEW
+- `lib/features/watch/workspace_health_screen.dart` — NEW
+- `lib/features/watch/alert_log_screen.dart` — NEW
+- `pubspec.yaml` — fl_chart added
+- `pubspec.lock` — updated by flutter pub get
+- `lib/core/app.dart` — /watch route added
+- `lib/features/projects/screens/projects_list_screen.dart` — Watch Mode AppBar button
+- `tracking md files/context.md` — this block
+- `tracking md files/planner.md` — §W4 COMPLETE block + §W5 next-up
+- `tracking md files/backlog.md` — §W4 ✅ in critical path + status line + Completed section
+- `operations md files/CONFIGURATION_MANAGEMENT.md` — inventory + changelog
+- `DOCS/Coding Lessons/FOR_MARC_watch-mode-dashboard-ui.md` — NEW
+
+---
+
 ## Session: 2026-06-17 — Claude Code [§W3 Watch Mode: Failure Signal Engine + Alert Engine]
 
 **Branch:** main

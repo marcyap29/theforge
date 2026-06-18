@@ -442,7 +442,37 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 
 ---
 
-## Next Up — §W4: Watch Mode Dashboard UI Shell
+## §W4 — Watch Mode Dashboard UI Shell — COMPLETE ✅
 
-**Status:** Not started — next on critical path (requires §W3 ✅)
-- See `backlog.md` §W4 for scope
+**Completed:** 2026-06-17
+
+- [x] `lib/features/watch/watch_data_notifier.dart` — `WatchData` model (usage, correlations, signalResult, hasGitHubConfig) + `WatchDataNotifier` AsyncNotifier; `_fetch()` reads §W1+§W2 services + roster + alertLog → runs `watchSignalService.evaluate()` → auto-appends new alerts → returns WatchData; `refresh()` sets AsyncLoading then AsyncValue.guard
+- [x] `lib/features/watch/watch_dashboard_screen.dart` — main screen; workspace strip (total 30d spend + active alert count + git status) + critical alert banner (amber/red, tappable) + ENGINEERS section + `_EngineerCard` per usage entry sorted by 30d spend descending (handle + provider chip + first signal detail + $total + CI pass rate colored) + VIEW WORKSPACE HEALTH button; AppBar refresh + notifications icons
+- [x] `lib/features/watch/engineer_detail_screen.dart` — per-engineer drill-down; summary row (30d spend, CI pass, AI %, PRs) + fl_chart `BarChart` (30d daily spend, bars colored by day's pass rate green/amber/red, date axis M/D, $ axis) + git activity 4-chip row (COMMITS/REVERTS/PRs MERGED/AI) + active signals list with severity icons; "No data yet" placeholder when daily empty
+- [x] `lib/features/watch/workspace_health_screen.dart` — velocity trend card (IMPROVING/STABLE/DECLINING/STALLED colored, commits 7d vs prior 7d, change % colored) + last commit row (red if stalled, "never" for stalledDays≥999) + CI stats row + workspace signals list
+- [x] `lib/features/watch/alert_log_screen.dart` — alert log; active entries first, "— N dismissed —" divider, dismissed entries (opacity 0.4 + strikethrough), Dismiss TextButton per active entry, Clear Dismissed AppBar action; empty state "No alerts"
+- [x] `pubspec.yaml` — `fl_chart: ^0.70.0` added
+- [x] `lib/core/app.dart` — `/watch` route → `WatchDashboardScreen`
+- [x] `lib/features/projects/screens/projects_list_screen.dart` — `Icons.monitor_heart_outlined` Watch Mode button before Settings in non-selecting AppBar
+- [x] `dart analyze lib/` — zero issues
+- [x] `grep -ri firebase lib/` — zero matches
+- [x] `grep -rn "class WatchData" lib/` — 1 match
+- [x] `grep -rn "watchDataProvider" lib/` — 4 matches (notifier, dashboard, detail, plus import)
+- [x] `grep -rn "'/watch'" lib/` — 1 in app.dart, 1 in projects_list_screen.dart
+- [x] Committed: `feat(§W4): Watch Mode dashboard UI — engineer cards, spend chart, workspace health, alert log`
+
+### Notes
+- `WatchDataNotifier` is the single orchestrating provider — all watch screens watch `watchDataProvider`, not the individual §W1/§W2/§W3 providers directly. This keeps the UI layer decoupled from the fetch+signal pipeline; the UI never knows that §W1 fetches tokens, §W2 fetches git, §W3 derives signals — it just reads `WatchData`.
+- `_fetch()` auto-appends new alerts to `alertLogProvider` after signal evaluation. The alert log is the persistence layer; the dashboard reads it for the active-alert count. This means opening the dashboard triggers a fetch+evaluate+persist cycle — the first open populates the log, subsequent opens see the persisted state + new alerts.
+- v1 limitation: `WorkspaceStatus.ciPassRate30d` is 0 because `GitActivityService.fetchCorrelations()` doesn't expose `ciRuns` (it consumes them internally for correlation but doesn't return them). Documented in `watch_data_notifier.dart` with upgrade path. Velocity trend and stall detection (commit-based) still work; only the CI pass rate is affected.
+- fl_chart `BarChart` bars colored per-day by that day's pass rate — a green bar = high pass rate that day, red bar = low pass rate. This makes the chart a "spend + quality" view, not just spend. Single-color bars would be less informative.
+- `_passRateFor` uses `.where(...).firstOrNull` (Dart 3) — same pattern as §W2, avoids the `firstWhere(orElse: () => null as dynamic)` anti-pattern.
+- Alert log screen separates active from dismissed with a divider — active entries are full-opacity with a Dismiss button; dismissed are 0.4 opacity with strikethrough and no button. The "— N dismissed —" divider only shows when there are dismissed entries.
+- `flutter pub get` was run by the executor (adds fl_chart) — `pubspec.lock` updated and committed alongside the code.
+
+---
+
+## Next Up — §W5: Watch Mode SwarmSpace Briefing + Decision Simulation
+
+**Status:** Not started — next on critical path (requires §W4 ✅)
+- See `backlog.md` §W5 for scope

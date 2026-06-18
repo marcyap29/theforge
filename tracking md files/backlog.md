@@ -29,8 +29,8 @@ Long-term feature pool. Active sprint work lives in `planner.md`.
    → §W1 Watch Mode: Token Ingestion Engine ✅
    → §W2 Watch Mode: Git Activity Engine + CI Outcome Correlator ✅
    → §W3 Watch Mode: Failure Signal Engine + Alert Engine ✅
-   → §W4 Watch Mode: Dashboard UI Shell
-  → §W5 Watch Mode: SwarmSpace Briefing + Decision Simulation
+   → §W4 Watch Mode: Dashboard UI Shell ✅
+   → §W5 Watch Mode: SwarmSpace Briefing + Decision Simulation
   → §W6 Watch Mode: Spec Compliance Monitor + Drift Detector (requires spec)
        ↓
   → §R1 Reverse Mode: Codebase Ingestion Engine
@@ -667,7 +667,7 @@ EngineerUsage {
 
 **Dependencies:** §W3 (signals and alerts), §W1/§W2 data providers
 
-**Status:** Not started
+**Status:** ✅ Complete 2026-06-17 — 5 new files + 3 modifications; `WatchDataNotifier` orchestrates §W1+§W2 fetch → §W3 evaluate → auto-append alerts; `WatchDashboardScreen` (workspace strip + critical alert banner + engineer cards sorted by 30d spend + CI pass rate colored); `EngineerDetailScreen` (summary row + fl_chart 30d spend bar chart colored by pass rate + git activity chips + active signals); `WorkspaceHealthScreen` (velocity trend card + last commit + CI stats + workspace signals); `AlertLogScreen` (active/dismissed sections with divider, dismiss button, clear-dismissed action); `fl_chart: ^0.70.0` added to pubspec; `/watch` route in app.dart; Watch Mode entry button in projects list AppBar; `dart analyze lib/` zero issues; zero Firebase
 
 ---
 
@@ -785,6 +785,9 @@ EngineerUsage {
 
 ### §W3 — Failure Signal Engine + Alert Engine
 ✅ Complete 2026-06-17 — 6 new files; `FailureSignalEngine` derives 6 signal types (highTokenToFailRatio, loopDetected, churnDetected, spendThreshold, runawayDay, stalledWorkspace) with severity escalation (critical-only emit, no double-emit for highTokenToFailRatio/spendThreshold); loop detection scans `DailyCorrelation` for consecutive days (spend>$15 + zero CI output); churn detection counts `revert`-prefixed commits (info 1–2, warning 3+); runaway day emits ONE signal per engineer (worst day only); stalled workspace uses literal `'workspace'` handle + `stalledDays=999` for empty commit list; `AlertEngine` deduplicates against existing log (24h window, same handle+signalType, dismissed alerts still dedup); `AlertLogNotifier` persists to `forge_config.json` key `watch_alert_log` with `appendAlerts`/`dismissAlert`/`clearDismissed`; `ProjectStatusAggregator` computes `WorkspaceStatus` (commits 7d vs prior 7d, ±20% velocity trend, stall detection 7d, CI pass rate); `WatchSignalService` orchestrates all three → `WatchSignalResult`; pure computation (zero HTTP in §W3 files); `dart analyze lib/` zero issues; zero Firebase
+
+### §W4 — Watch Mode Dashboard UI Shell
+✅ Complete 2026-06-17 — 5 new files + 3 modifications; `WatchDataNotifier` orchestrates §W1+§W2 fetch → §W3 evaluate → auto-append alerts (single provider all watch screens watch); `WatchDashboardScreen` (workspace strip with total spend/active alerts/git status + critical alert banner + engineer cards sorted by 30d spend descending + CI pass rate colored green>70%/amber 30–70%/red<30% + first signal detail line + workspace health button); `EngineerDetailScreen` (summary row 4 stats + fl_chart 30d spend bar chart with bars colored by day's pass rate + git activity chips COMMITS/REVERTS/PRs MERGED/AI + active signals list with severity icons); `WorkspaceHealthScreen` (velocity trend card IMPROVING/STABLE/DECLINING/STALLED colored + commits 7d vs prior 7d + change % + last commit row red if stalled + CI stats + workspace signals); `AlertLogScreen` (active entries first, dismissed section with divider, dismiss button, clear-dismissed AppBar action, dismissed entries opacity 0.4 + strikethrough); `fl_chart: ^0.70.0` added; `/watch` route in app.dart; Watch Mode `Icons.monitor_heart_outlined` button in projects list AppBar before settings; `dart analyze lib/` zero issues; zero Firebase
 
 ---
 

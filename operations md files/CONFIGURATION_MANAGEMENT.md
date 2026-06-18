@@ -87,12 +87,45 @@
 | project_status_aggregator.dart | lib/services/watch/ | 2026-06-17 | ✅ Synced |
 | watch_signal_service.dart | lib/services/watch/ | 2026-06-17 | ✅ Synced |
 | watch_signal_service_provider.dart | lib/services/watch/ | 2026-06-17 | ✅ Synced |
+| watch_data_notifier.dart | lib/features/watch/ | 2026-06-17 | ✅ Synced |
+| watch_dashboard_screen.dart | lib/features/watch/ | 2026-06-17 | ✅ Synced |
+| engineer_detail_screen.dart | lib/features/watch/ | 2026-06-17 | ✅ Synced |
+| workspace_health_screen.dart | lib/features/watch/ | 2026-06-17 | ✅ Synced |
+| alert_log_screen.dart | lib/features/watch/ | 2026-06-17 | ✅ Synced |
 
 
 ---
 
 
 ## Change Log
+
+### 2026-06-17 — §W4 Watch Mode: Dashboard UI Shell
+
+**Action:** Watch Mode dashboard — 5 new files + 3 modifications. Engineer cards, spend chart (fl_chart), workspace health, alert log. Read-only except alert dismiss.
+
+**Files created:**
+- `lib/features/watch/watch_data_notifier.dart` — `WatchData` + `WatchDataNotifier` orchestrating §W1+§W2 fetch → §W3 evaluate → auto-append alerts
+- `lib/features/watch/watch_dashboard_screen.dart` — main screen; workspace strip + critical alert banner + engineer cards sorted by 30d spend + workspace health button
+- `lib/features/watch/engineer_detail_screen.dart` — summary row + fl_chart 30d spend bar chart (bars colored by day's pass rate) + git activity chips + signals
+- `lib/features/watch/workspace_health_screen.dart` — velocity trend card + last commit + CI stats + workspace signals
+- `lib/features/watch/alert_log_screen.dart` — active/dismissed sections with divider, dismiss button, clear-dismissed action
+
+**Files modified:**
+- `pubspec.yaml` — `fl_chart: ^0.70.0` added
+- `pubspec.lock` — updated by `flutter pub get`
+- `lib/core/app.dart` — `/watch` route → `WatchDashboardScreen`
+- `lib/features/projects/screens/projects_list_screen.dart` — `Icons.monitor_heart_outlined` Watch Mode button in AppBar
+
+**Verification:** `dart analyze lib/` → No issues found; `grep -ri firebase lib/` → zero matches; `grep -rn "class WatchData" lib/` → 1; `grep -rn "watchDataProvider" lib/` → 4; `grep -rn "fl_chart" pubspec.yaml` → 1; `grep -rn "'/watch'" lib/` → 2 (app.dart + projects_list); `git diff --stat HEAD` → 9 files (5 new + 3 modified + pubspec.lock), 1458 insertions
+
+**Key design choices:**
+- Single orchestrating provider: all watch screens watch `watchDataProvider`, not §W1/§W2/§W3 providers directly — UI decoupled from fetch+signal pipeline
+- Auto-append alerts on fetch: opening dashboard triggers fetch→evaluate→persist cycle; alert log is the persistence layer
+- fl_chart bars colored per-day by pass rate — "spend + quality" view, not just spend
+- v1 limitation: `WorkspaceStatus.ciPassRate30d` is 0 (ciRuns not exposed from fetchCorrelations) — documented with upgrade path
+- Alert log: active first, dismissed section with divider, dismissed entries opacity 0.4 + strikethrough
+
+**Commit:** `feat(§W4): Watch Mode dashboard UI — engineer cards, spend chart, workspace health, alert log`
 
 ### 2026-06-17 — §W3 Watch Mode: Failure Signal Engine + Alert Engine
 
