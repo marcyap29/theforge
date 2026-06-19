@@ -193,6 +193,31 @@ class ProjectDetailScreen extends ConsumerWidget {
             ],
           ],
         ),
+      'interview_active' => FilledButton(
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => InterviewScreen(
+                args: InterviewArgs(
+                  path: live.path,
+                  name: live.name,
+                  mode: mode,
+                  priorSpecVersion:
+                      version != 'v1' ? _previousVersion(version) : null,
+                ),
+              ),
+            ),
+          ),
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(44),
+            backgroundColor: const Color(0xFFE8A04C),
+            foregroundColor: const Color(0xFF0F0F10),
+          ),
+          child: Text(
+            'Continue with ${version.toUpperCase()} Interview →',
+            style: const TextStyle(
+                fontWeight: FontWeight.w600, fontFamily: 'Menlo'),
+          ),
+        ),
       _ => FilledButton(
           onPressed: () => Navigator.of(context).push(
             MaterialPageRoute(
@@ -526,6 +551,14 @@ String _nextVersion(String current) {
     if (n != null) return 'v${n + 1}';
   }
   return 'v2';
+}
+
+String _previousVersion(String current) {
+  if (current.startsWith('v')) {
+    final n = int.tryParse(current.substring(1));
+    if (n != null && n > 1) return 'v${n - 1}';
+  }
+  return 'v1';
 }
 
 // ── Phase Timeline ────────────────────────────────────────────────────────────

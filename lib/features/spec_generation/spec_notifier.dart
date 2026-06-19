@@ -100,6 +100,9 @@ class SpecNotifier extends AutoDisposeNotifier<SpecGenState> {
       final db = ref.read(forgeDatabaseProvider);
       await db.updateProjectPhase(projectName, '${specVersion}_spec_locked', specVersion);
 
+      // Clear persisted interview state — spec is locked, interview is complete
+      await repo.clearInterviewProgress(projectPath, projectName);
+
       await ref.read(projectListProvider.notifier).refresh();
 
       state = SpecGenState(

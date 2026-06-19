@@ -540,13 +540,111 @@ String nextSpecVersion(String current) {
 
 class InterviewNotifier
     extends FamilyAsyncNotifier<InterviewState, InterviewArgs> {
+  // ── Opening message variations ───────────────────────────────────────────
+  // Picked deterministically by projectName.hashCode % length — zero token cost.
+  static const _buildOpeners = [
+    "Hi! Let's spec out {name}. I'll walk you through four layers — starting with the outcome. What should this product actually do? In one sentence: what changes for someone when they use it?",
+    "Welcome to the Build Interview for {name}. Let's start at the top — what outcome does this product create? Don't worry about features yet. What does the user walk away with?",
+    "Let's scope {name}. Four layers, starting with Outcome. What's the single thing this product should accomplish? Describe it from the user's side — what can they do or have that they couldn't before?",
+    "Ready to build the spec for {name}. First question: what problem does this solve, and what does success look like from the user's perspective? One or two sentences is perfect.",
+  ];
+
+  static const _featureOpeners = [
+    "{prior} is shipped — time to scope the next version of {name}. What's the most important thing we didn't build in {prior} that users need next?",
+    "Nice work on {prior}. Let's figure out what the next version of {name} should deliver. What was the biggest gap after {prior} shipped — the thing users needed that wasn't there?",
+    "Building on {prior} for {name}. Let's start with the outcome for the next version. What capability or result would make the biggest difference to users right now?",
+    "Let's scope the next version of {name}, building on {prior}. What's the one thing that would take this product from good to great for your users?",
+  ];
+
+  static const _auditOpeners = [
+    "Hi! Let's audit {name}. Start with the big picture — what is this project actually trying to accomplish? Set aside the backlog; describe the goal as you'd explain it to a new team member.",
+    "Welcome to the Audit Interview for {name}. First question: what's the real goal of this project? Not the features, not the roadmap — what outcome should it deliver?",
+    "Let's capture the current state of {name}. Start here: what is this project supposed to do, and how close is it to doing that right now?",
+    "Audit mode for {name}. Let's establish the baseline. What problem is this project solving, and what does 'done' look like from the team's perspective?",
+  ];
+
+  String _pickOpener(InterviewArgs args) {
+    final idx = args.name.hashCode.abs();
+    if (args.priorSpecVersion != null) {
+      const list = _featureOpeners;
+      return list[idx % list.length]
+          .replaceAll('{name}', args.name)
+          .replaceAll('{prior}', args.priorSpecVersion!.toUpperCase());
+    }
+    final isBuild = dimensionsFor(args.mode) == buildDimensions;
+    final list = isBuild ? _buildOpeners : _auditOpeners;
+    return list[idx % list.length].replaceAll('{name}', args.name);
+  }
+
+  InterviewState _withOpener(InterviewState state, InterviewArgs args) {
+    final opener = InterviewTurn(
+      role: 'interviewer',
+      content: _pickOpener(args),
+      timestamp: DateTime.now(),
+    );
+    return state.copyWith(turns: [opener]);
+  }
+
+  // ── Persistence helpers ───────────────────────────────────────────────────
+
+  Map<String, dynamic> _progressPayload(InterviewState s) => {
+        'currentLayer': s.currentLayer,
+        'completedLayers': _completedLayers(s.currentLayer),
+        'turns': s.turns
+            .map((t) => {
+                  'role': t.role,
+                  'content': t.content,
+                  'timestamp': t.timestamp.millisecondsSinceEpoch,
+                })
+            .toList(),
+        'confidenceMap':
+            s.confidenceMap.map((k, v) => MapEntry(k, v.name)),
+        'extracted': s.extracted,
+        'specGenEnabled': s.specGenEnabled,
+      };
+
+  InterviewState _restoreState(
+      InterviewState empty, Map<String, dynamic> saved) {
+    final turnsRaw = saved['turns'] as List<dynamic>? ?? [];
+    final turns = turnsRaw.map((t) {
+      final m = t as Map<String, dynamic>;
+      return InterviewTurn(
+        role: m['role'] as String? ?? 'interviewer',
+        content: m['content'] as String? ?? '',
+        timestamp: DateTime.fromMillisecondsSinceEpoch(
+            m['timestamp'] as int? ?? 0),
+      );
+    }).toList();
+
+    final confidenceRaw =
+        saved['confidenceMap'] as Map<String, dynamic>? ?? {};
+    final confidenceMap = <String, DimensionState>{};
+    for (final entry in confidenceRaw.entries) {
+      final ds = DimensionState.values
+          .where((d) => d.name == entry.value)
+          .firstOrNull;
+      if (ds != null) confidenceMap[entry.key] = ds;
+    }
+
+    return empty.copyWith(
+      turns: turns,
+      currentLayer:
+          saved['currentLayer'] as String? ?? empty.currentLayer,
+      extracted:
+          (saved['extracted'] as Map<String, dynamic>?) ?? empty.extracted,
+      confidenceMap:
+          confidenceMap.isNotEmpty ? confidenceMap : empty.confidenceMap,
+      specGenEnabled: saved['specGenEnabled'] as bool? ?? false,
+    );
+  }
+
   @override
   Future<InterviewState> build(InterviewArgs args) async {
     final dims = dimensionsFor(args.mode);
+    final repo = ref.read(projectFileRepositoryProvider);
 
     String? featureContext;
     if (args.priorSpecVersion != null) {
-      final repo = ref.read(projectFileRepositoryProvider);
       featureContext = await repo.readFeatureContext(
         args.path,
         args.name,
@@ -554,14 +652,39 @@ class InterviewNotifier
       );
     }
 
-    return InterviewState.empty(args.path, args.name, dims)
+    final empty = InterviewState.empty(args.path, args.name, dims)
         .copyWith(featureContext: featureContext);
+
+    // Restore persisted turns so closing/reopening the app resumes the interview
+    final saved = await repo.readInterviewProgress(args.path, args.name);
+    if (saved != null) {
+      final turnsRaw = saved['turns'] as List<dynamic>?;
+      if (turnsRaw != null && turnsRaw.isNotEmpty) {
+        return _restoreState(empty, saved);
+      }
+    }
+
+    return _withOpener(empty, args);
   }
 
   Future<void> addUserMessage(String text) async {
     final initial = state.valueOrNull;
     if (initial == null || initial.isLoading) return;
     if (text.trim().isEmpty) return;
+
+    // On first user message, write an "active" phase to DB so the project list
+    // CTA shows "Continue with VN Interview" if the user navigates away.
+    if (initial.turns.where((t) => t.isUser).isEmpty) {
+      final currentVersion = arg.priorSpecVersion != null
+          ? nextSpecVersion(arg.priorSpecVersion!)
+          : 'v1';
+      await ref.read(forgeDatabaseProvider).updateProjectPhase(
+        arg.name,
+        '${currentVersion}_interview_active',
+        currentVersion,
+      );
+      ref.read(projectListProvider.notifier).refresh();
+    }
 
     final userTurn = InterviewTurn(
       role: 'user',
@@ -619,15 +742,19 @@ class InterviewNotifier
       timestamp: DateTime.now(),
     );
 
-    state = AsyncData(
-      withUser.copyWith(
-        confidenceMap: newMap,
-        turns: [...withUser.turns, interviewerTurn],
-        openConflicts: newConflicts,
-        specGenEnabled: specGenEnabled,
-        isLoading: false,
-        llmUnavailable: withUser.llmUnavailable || llmFailed,
-      ),
+    final nextState = withUser.copyWith(
+      confidenceMap: newMap,
+      turns: [...withUser.turns, interviewerTurn],
+      openConflicts: newConflicts,
+      specGenEnabled: specGenEnabled,
+      isLoading: false,
+      llmUnavailable: withUser.llmUnavailable || llmFailed,
+    );
+    state = AsyncData(nextState);
+    await ref.read(projectFileRepositoryProvider).writeInterviewProgress(
+      nextState.projectPath,
+      nextState.projectName,
+      _progressPayload(nextState),
     );
   }
 
@@ -740,10 +867,7 @@ class InterviewNotifier
       await repo.writeInterviewProgress(
         withUser.projectPath,
         withUser.projectName,
-        {
-          'currentLayer': newLayerDegraded,
-          'completedLayers': _completedLayers(newLayerDegraded),
-        },
+        _progressPayload(state.requireValue),
       );
       return;
     }
@@ -808,10 +932,7 @@ class InterviewNotifier
     await repo.writeInterviewProgress(
       withUser.projectPath,
       withUser.projectName,
-      {
-        'currentLayer': newLayer,
-        'completedLayers': _completedLayers(newLayer),
-      },
+      _progressPayload(state.requireValue),
     );
   }
 
@@ -831,15 +952,34 @@ class InterviewNotifier
     );
   }
 
-  void reset() {
+  void rewindTo(int turnIndex) {
     final current = state.valueOrNull;
-    if (current == null) return;
+    if (current == null || turnIndex < 0 || turnIndex >= current.turns.length) return;
     state = AsyncData(
-      InterviewState.empty(
-        current.projectPath,
-        current.projectName,
-        current.dimensions,
+      current.copyWith(
+        turns: current.turns.sublist(0, turnIndex),
+        isLoading: false,
+        openConflicts: const [],
+        specGenEnabled: false,
+        // Reset layer to initial: 'L1' for build mode, '' for audit mode.
+        // The LLM will correct it on the next response via forge-state JSON.
+        currentLayer: current.currentLayer.isNotEmpty ? 'L1' : '',
       ),
     );
+  }
+
+  Future<void> reset() async {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    await ref.read(projectFileRepositoryProvider).clearInterviewProgress(
+      current.projectPath,
+      current.projectName,
+    );
+    final empty = InterviewState.empty(
+      current.projectPath,
+      current.projectName,
+      current.dimensions,
+    );
+    state = AsyncData(_withOpener(empty, arg));
   }
 }

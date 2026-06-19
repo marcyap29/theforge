@@ -275,6 +275,28 @@ class ProjectFileRepository {
     }
   }
 
+  Future<void> clearInterviewProgress(
+      String projectPath, String projectName) async {
+    final file = File(
+        p.join(projectPath, 'audit', '${projectName}_InterviewState.json'));
+    if (file.existsSync()) await file.delete();
+  }
+
+  Future<void> updateHandoffPackageField(String projectPath, String projectName,
+      String specVersion, Map<String, dynamic> updates) async {
+    final file = File(p.join(
+        projectPath, 'handoffs', '${projectName}_HandoffPackage_$specVersion.json'));
+    if (!await file.exists()) return;
+    try {
+      final data =
+          jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      data.addAll(updates);
+      await file.writeAsString(jsonEncode(data));
+    } on FormatException {
+      return;
+    }
+  }
+
   Future<String?> readFeatureContext(
       String projectPath, String projectName, String priorSpecVersion) async {
     final specFile = File(p.join(

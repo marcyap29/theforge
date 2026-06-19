@@ -258,7 +258,9 @@ List<String> parseComponentNames(String specContent) {
         .skip(1)
         .map((l) {
           final cols = l.split('|');
-          return cols.length > 1 ? cols[1].trim() : '';
+          return cols.length > 1
+              ? cols[1].trim().replaceAll(RegExp(r'\*+'), '').trim()
+              : '';
         })
         .where((s) => s.isNotEmpty)
         .toList();
@@ -363,7 +365,9 @@ Map<String, dynamic> buildHandoffPackage(
       'setupWorksheetComplete': false,
       'components': parseComponentNames(specContent),
       'contextFiles': buildContextFiles(state.projectName, specVersion),
-      'v2SeedItems': <String>[],
+      'v2SeedItems':
+          (state.extracted['v2Seeds'] as List<dynamic>?)?.cast<String>() ??
+              <String>[],
     };
   } else {
     return {

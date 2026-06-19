@@ -48,11 +48,16 @@ class WorksheetNotifier extends AutoDisposeNotifier<WorksheetGenState> {
 
       await repo.writeWorksheet(projectPath, worksheetFilename, rawWorksheet.trim());
 
+      await repo.updateHandoffPackageField(
+        projectPath, projectName, specVersion, {'setupWorksheetComplete': true});
+
       final currentReadme = await repo.readReadme(projectPath) ?? '';
-      final updatedReadme = currentReadme.replaceFirst(
-        '**Setup worksheet:** Incomplete',
-        '**Setup worksheet:** Complete',
-      );
+      final updatedReadme = currentReadme
+          .replaceFirst('**Setup worksheet:** Incomplete',
+              '**Setup worksheet:** Complete')
+          .replaceFirst(
+              '## What\'s Next\n- Review locked spec\n- Begin Setup Worksheet\n',
+              '## What\'s Next\n- Ready for executor — review build sequence\n');
       await repo.writeReadme(projectPath, updatedReadme);
 
       await repo.appendAuditLog(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/filesystem/project_file_repository.dart';
@@ -25,6 +26,8 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen>
   final _scrollController = ScrollController();
   late AnimationController _pulseCtrl;
   late Animation<double> _pulseOpacity;
+  late final FocusNode _composerFocus;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -36,6 +39,17 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen>
     _pulseOpacity = Tween(begin: 0.3, end: 1.0).animate(
       CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
     );
+    _composerFocus = FocusNode(onKeyEvent: (node, event) {
+      if (event is! KeyDownEvent) return KeyEventResult.ignored;
+      if (event.logicalKey != LogicalKeyboardKey.enter) return KeyEventResult.ignored;
+      if (HardwareKeyboard.instance.isShiftPressed) return KeyEventResult.ignored;
+      if (!_isLoading) _send();
+      return KeyEventResult.handled;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _composerFocus.requestFocus();
+      _scrollToBottom();
+    });
   }
 
   @override
@@ -43,6 +57,7 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen>
     _controller.dispose();
     _scrollController.dispose();
     _pulseCtrl.dispose();
+    _composerFocus.dispose();
     super.dispose();
   }
 
@@ -57,12 +72,32 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen>
     });
   }
 
+  Future<void> _send() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty || _isLoading) return;
+    _controller.clear();
+    _composerFocus.requestFocus();
+    _scrollToBottom();
+    await ref.read(interviewProvider(widget.args).notifier).addUserMessage(text);
+    _scrollToBottom();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _composerFocus.requestFocus();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final args = widget.args;
     final stateAsync = ref.watch(interviewProvider(args));
+    _isLoading = stateAsync.valueOrNull?.isLoading ?? false;
     final notifier = ref.read(interviewProvider(args).notifier);
     final modeLabel = args.mode == ProjectMode.build ? 'Build' : 'Audit';
+
+    ref.listen(interviewProvider(args), (prev, next) {
+      final prevLen = prev?.valueOrNull?.turns.length ?? 0;
+      final nextLen = next.valueOrNull?.turns.length ?? 0;
+      if (nextLen > prevLen) _scrollToBottom();
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -139,18 +174,26 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen>
                         controller: _scrollController,
                         padding: const EdgeInsets.all(16),
                         itemCount: state.turns.length,
-                        itemBuilder: (context, i) =>
-                            _TurnBubble(turn: state.turns[i]),
+                        itemBuilder: (context, i) {
+                          final turn = state.turns[i];
+                          return _TurnBubble(
+                            turn: turn,
+                            onEdit: turn.isUser
+                                ? () {
+                                    _controller.text = turn.content;
+                                    notifier.rewindTo(i);
+                                    _composerFocus.requestFocus();
+                                  }
+                                : null,
+                          );
+                        },
                       ),
               ),
               _Composer(
                 controller: _controller,
-                isLoading: state.isLoading,
-                onSend: (text) async {
-                  await notifier.addUserMessage(text);
-                  _controller.clear();
-                  _scrollToBottom();
-                },
+                focusNode: _composerFocus,
+                isLoading: _isLoading,
+                onSend: _send,
               ),
               if (state.specGenEnabled)
                 Padding(
@@ -215,8 +258,9 @@ class _EmptyChat extends StatelessWidget {
 }
 
 class _TurnBubble extends StatelessWidget {
-  const _TurnBubble({required this.turn});
+  const _TurnBubble({required this.turn, this.onEdit});
   final InterviewTurn turn;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -226,40 +270,70 @@ class _TurnBubble extends StatelessWidget {
 
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        constraints: const BoxConstraints(maxWidth: 640),
-        decoration: BoxDecoration(
-          color: bubbleColor,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: const Color(0xFF2C2C2E)),
-        ),
-        child: Column(
-          crossAxisAlignment:
-              isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Text(
-              isUser ? 'YOU' : 'INTERVIEWER',
-              style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-                color: Color(0xFF9CA3AF),
+      child: Column(
+        crossAxisAlignment:
+            isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(bottom: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            constraints: const BoxConstraints(maxWidth: 640),
+            decoration: BoxDecoration(
+              color: bubbleColor,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFF2C2C2E)),
+            ),
+            child: Column(
+              crossAxisAlignment:
+                  isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isUser ? 'YOU' : 'INTERVIEWER',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                    color: Color(0xFF9CA3AF),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  turn.content,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontFamily: 'Menlo',
+                    height: 1.4,
+                    color: Color(0xFFE5E5E7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (isUser && onEdit != null)
+            GestureDetector(
+              onTap: onEdit,
+              child: const Padding(
+                padding: EdgeInsets.only(bottom: 6, right: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.edit_outlined, size: 11,
+                        color: Color(0xFF4B5563)),
+                    SizedBox(width: 3),
+                    Text(
+                      'edit',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Color(0xFF4B5563),
+                        fontFamily: 'Menlo',
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              turn.content,
-              style: const TextStyle(
-                fontSize: 13,
-                fontFamily: 'Menlo',
-                height: 1.4,
-                color: Color(0xFFE5E5E7),
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -341,13 +415,15 @@ class _ConflictSurface extends StatelessWidget {
 class _Composer extends StatelessWidget {
   const _Composer({
     required this.controller,
+    required this.focusNode,
     required this.isLoading,
     required this.onSend,
   });
 
   final TextEditingController controller;
+  final FocusNode focusNode;
   final bool isLoading;
-  final Future<void> Function(String text) onSend;
+  final VoidCallback onSend;
 
   @override
   Widget build(BuildContext context) {
@@ -365,19 +441,25 @@ class _Composer extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Expanded(
-              child: TextField(
+              child: Semantics(
+                textField: true,
+                label: 'Interview response',
+                child: TextField(
                 controller: controller,
+                focusNode: focusNode,
                 enabled: !isLoading,
                 maxLines: 5,
                 minLines: 1,
-                textInputAction: TextInputAction.send,
+                keyboardType: TextInputType.multiline,
                 style: const TextStyle(
                   fontFamily: 'Menlo',
                   fontSize: 13,
                   color: Color(0xFFE5E5E7),
                 ),
                 decoration: InputDecoration(
-                  hintText: isLoading ? 'Thinking…' : 'Type your answer…',
+                  hintText: isLoading
+                      ? 'Thinking…'
+                      : 'Type your answer… (Shift+Enter for new line)',
                   hintStyle: const TextStyle(
                     color: Color(0xFF6B7280),
                     fontFamily: 'Menlo',
@@ -401,12 +483,7 @@ class _Composer extends StatelessWidget {
                     vertical: 10,
                   ),
                 ),
-                onSubmitted: isLoading
-                    ? null
-                    : (text) {
-                        if (text.trim().isEmpty) return;
-                        onSend(text);
-                      },
+              ),
               ),
             ),
             const SizedBox(width: 8),
@@ -414,12 +491,7 @@ class _Composer extends StatelessWidget {
               height: 44,
               width: 44,
               child: FilledButton(
-                onPressed: isLoading
-                    ? null
-                    : () {
-                        if (controller.text.trim().isEmpty) return;
-                        onSend(controller.text);
-                      },
+                onPressed: isLoading ? null : onSend,
                 style: FilledButton.styleFrom(
                   padding: EdgeInsets.zero,
                   backgroundColor: const Color(0xFFE8A04C),
