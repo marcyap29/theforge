@@ -135,6 +135,12 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen>
                   allComplete: state.specGenEnabled,
                   pulseOpacity: _pulseOpacity,
                   priorVersion: args.priorSpecVersion,
+                  onLayerTap: state.isLoading
+                      ? null
+                      : (layer) async {
+                          await notifier.rewindToLayer(layer);
+                          _composerFocus.requestFocus();
+                        },
                 ),
               ConfidenceMeter(
                 dimensions: state.dimensions,
@@ -560,12 +566,14 @@ class _InterviewLayerStrip extends StatelessWidget {
     required this.allComplete,
     required this.pulseOpacity,
     this.priorVersion,
+    this.onLayerTap,
   });
 
   final String currentLayer;
   final bool allComplete;
   final Animation<double> pulseOpacity;
   final String? priorVersion;
+  final void Function(String layer)? onLayerTap;
 
   @override
   Widget build(BuildContext context) {
@@ -606,6 +614,10 @@ class _InterviewLayerStrip extends StatelessWidget {
               isDone: allComplete || completed.contains(layers[i]),
               isCurrent: !allComplete && currentLayer == layers[i],
               pulseOpacity: pulseOpacity,
+              onTap: (allComplete || completed.contains(layers[i])) &&
+                      onLayerTap != null
+                  ? () => onLayerTap!(layers[i])
+                  : null,
             ),
             if (i < layers.length - 1)
               Container(
@@ -630,6 +642,7 @@ class _LayerIndicator extends StatelessWidget {
     required this.isDone,
     required this.isCurrent,
     required this.pulseOpacity,
+    this.onTap,
   });
 
   final String id;
@@ -637,6 +650,7 @@ class _LayerIndicator extends StatelessWidget {
   final bool isDone;
   final bool isCurrent;
   final Animation<double> pulseOpacity;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -671,7 +685,7 @@ class _LayerIndicator extends StatelessWidget {
       textColor = const Color(0xFF4B5563);
     }
 
-    return Column(
+    final column = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         dot,
@@ -694,6 +708,19 @@ class _LayerIndicator extends StatelessWidget {
           ),
         ),
       ],
+    );
+
+    if (onTap == null) return column;
+
+    return Tooltip(
+      message: 'Go back to $id',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: onTap,
+          child: column,
+        ),
+      ),
     );
   }
 }

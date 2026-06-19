@@ -52,6 +52,9 @@ class InterviewState {
   final Map<String, dynamic> extracted;
   final bool parseDegraded;
   final String? featureContext;
+  // Turn index where each layer started — used by rewindToLayer().
+  // Key = layer id ('L1','L2','L3','L4'), value = turns.length at entry.
+  final Map<String, int> layerBoundaries;
 
   const InterviewState({
     required this.projectPath,
@@ -67,6 +70,7 @@ class InterviewState {
     this.llmUnavailable = false,
     this.parseDegraded = false,
     this.featureContext,
+    this.layerBoundaries = const {},
   });
 
   factory InterviewState.empty(
@@ -118,6 +122,7 @@ class InterviewState {
     Map<String, dynamic>? extracted,
     bool? parseDegraded,
     String? featureContext,
+    Map<String, int>? layerBoundaries,
   }) {
     return InterviewState(
       projectPath: projectPath ?? this.projectPath,
@@ -133,6 +138,7 @@ class InterviewState {
       extracted: extracted ?? this.extracted,
       parseDegraded: parseDegraded ?? this.parseDegraded,
       featureContext: featureContext ?? this.featureContext,
+      layerBoundaries: layerBoundaries ?? this.layerBoundaries,
     );
   }
 }

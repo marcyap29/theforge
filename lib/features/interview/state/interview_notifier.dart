@@ -541,6 +541,34 @@ Map<String, DimensionState> _confidenceFromExtracted(
   return updates;
 }
 
+// Returns a copy of `current` extracted map with all fields from `targetLayer`
+// onward reset to their initial empty values, so only prior-layer data remains.
+Map<String, dynamic> _extractedAtLayerStart(
+    String targetLayer, Map<String, dynamic> current) {
+  const order = ['L1', 'L2', 'L3', 'L4'];
+  final idx = order.indexOf(targetLayer);
+  final base = Map<String, dynamic>.from(current);
+  // Clear fields belonging to the target layer and all later layers.
+  if (idx <= 0) {
+    base['outcome'] = null;
+    base['primaryUser'] = null;
+  }
+  if (idx <= 1) base['capabilities'] = <String>[];
+  if (idx <= 2) {
+    base['chosenCapability'] = null;
+    base['demoScript'] = <String>[];
+    base['v2Seeds'] = <String>[];
+  }
+  if (idx <= 3) {
+    base['platform'] = null;
+    base['identityModel'] = null;
+    base['inputModel'] = null;
+    base['outputModel'] = null;
+    base['externalServices'] = <Map<String, dynamic>>[];
+  }
+  return base;
+}
+
 String nextSpecVersion(String current) {
   if (current.startsWith('v')) {
     final n = int.tryParse(current.substring(1));
@@ -601,6 +629,7 @@ class InterviewNotifier
   Map<String, dynamic> _progressPayload(InterviewState s) => {
         'currentLayer': s.currentLayer,
         'completedLayers': _completedLayers(s.currentLayer),
+        'layerBoundaries': s.layerBoundaries,
         'turns': s.turns
             .map((t) => {
                   'role': t.role,
@@ -637,6 +666,11 @@ class InterviewNotifier
       if (ds != null) confidenceMap[entry.key] = ds;
     }
 
+    final boundariesRaw =
+        saved['layerBoundaries'] as Map<String, dynamic>? ?? {};
+    final layerBoundaries = boundariesRaw
+        .map((k, v) => MapEntry(k, v as int));
+
     return empty.copyWith(
       turns: turns,
       currentLayer:
@@ -646,6 +680,7 @@ class InterviewNotifier
       confidenceMap:
           confidenceMap.isNotEmpty ? confidenceMap : empty.confidenceMap,
       specGenEnabled: saved['specGenEnabled'] as bool? ?? false,
+      layerBoundaries: layerBoundaries,
     );
   }
 
@@ -926,6 +961,14 @@ class InterviewNotifier
       timestamp: DateTime.now(),
     );
 
+    // Record layer boundary when the layer advances.
+    // Value = total turn count after this AI response — that's where the NEW
+    // layer begins (next user message). rewindToLayer uses this to truncate.
+    final newBoundaries = Map<String, int>.from(withUser.layerBoundaries);
+    if (newLayer != withUser.currentLayer) {
+      newBoundaries[newLayer] = withUser.turns.length + 1;
+    }
+
     state = AsyncData(
       withUser.copyWith(
         confidenceMap: newMap,
@@ -937,6 +980,7 @@ class InterviewNotifier
         currentLayer: newLayer,
         extracted: mergedExtracted,
         parseDegraded: false,
+        layerBoundaries: newBoundaries,
       ),
     );
 
@@ -960,6 +1004,54 @@ class InterviewNotifier
         openConflicts: updated,
         specGenEnabled: allResolved && updated.isEmpty,
       ),
+    );
+  }
+
+  Future<void> rewindToLayer(String layer) async {
+    final current = state.valueOrNull;
+    if (current == null) return;
+
+    // Turn index to truncate to: keep everything before this layer started.
+    // L1 always starts at turn 1 (index 0 = opener). All others use the
+    // recorded boundary, defaulting to 1 if the layer was never reached.
+    final truncateTo = layer == 'L1'
+        ? 1
+        : (current.layerBoundaries[layer] ?? 1);
+    final truncatedTurns = current.turns
+        .sublist(0, truncateTo.clamp(0, current.turns.length));
+
+    // Clear extracted data for target layer and later.
+    final clearedExtracted = _extractedAtLayerStart(layer, current.extracted);
+
+    // Re-derive confidence from the remaining data so the meter is accurate.
+    final freshConfidence = <String, DimensionState>{
+      for (final d in current.dimensions) d.id: DimensionState.unknown,
+    };
+    freshConfidence.addAll(_confidenceFromExtracted(clearedExtracted));
+
+    // Drop boundaries for layers we're rewinding through.
+    const order = ['L1', 'L2', 'L3', 'L4'];
+    final targetIdx = order.indexOf(layer);
+    final updatedBoundaries = Map<String, int>.from(current.layerBoundaries)
+      ..removeWhere((k, _) => order.indexOf(k) >= targetIdx);
+
+    final rewound = current.copyWith(
+      turns: truncatedTurns,
+      currentLayer: layer,
+      extracted: clearedExtracted,
+      confidenceMap: freshConfidence,
+      openConflicts: const [],
+      specGenEnabled: false,
+      isLoading: false,
+      layerBoundaries: updatedBoundaries,
+    );
+    state = AsyncData(rewound);
+
+    // Persist the rewound state so it survives an app restart.
+    await ref.read(projectFileRepositoryProvider).writeInterviewProgress(
+      current.projectPath,
+      current.projectName,
+      _progressPayload(rewound),
     );
   }
 
