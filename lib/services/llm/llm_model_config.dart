@@ -18,15 +18,15 @@ const claudeModels = <ModelInfo>[
 ];
 
 const openAiModels = <ModelInfo>[
+  ModelInfo(id: 'gpt-4.1', displayName: 'GPT-4.1'),
   ModelInfo(id: 'gpt-4o', displayName: 'GPT-4o'),
   ModelInfo(id: 'gpt-4o-mini', displayName: 'GPT-4o mini'),
-  ModelInfo(id: 'gpt-4-turbo', displayName: 'GPT-4 Turbo'),
 ];
 
 const geminiModels = <ModelInfo>[
   ModelInfo(id: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash'),
   ModelInfo(id: 'gemini-2.5-pro', displayName: 'Gemini 2.5 Pro'),
-  ModelInfo(id: 'gemini-1.5-flash', displayName: 'Gemini 1.5 Flash'),
+  ModelInfo(id: 'gemini-2.0-flash', displayName: 'Gemini 2.0 Flash'),
 ];
 
 List<ModelInfo> modelsFor(LlmProviderType type) {

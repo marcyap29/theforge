@@ -674,15 +674,24 @@ class InterviewNotifier
     final layerBoundaries = boundariesRaw
         .map((k, v) => MapEntry(k, v as int));
 
+    final restoredExtracted =
+        (saved['extracted'] as Map<String, dynamic>?) ?? empty.extracted;
+
+    // Re-evaluate specGenEnabled from extracted data rather than trusting the
+    // saved boolean — interviews completed with older code saved false even
+    // when the funnel was actually complete (externalServices TypeError bug).
+    final savedSpecGen = saved['specGenEnabled'] as bool? ?? false;
+    final specGenEnabled =
+        savedSpecGen || _layerGateMet('L4', restoredExtracted);
+
     return empty.copyWith(
       turns: turns,
       currentLayer:
           saved['currentLayer'] as String? ?? empty.currentLayer,
-      extracted:
-          (saved['extracted'] as Map<String, dynamic>?) ?? empty.extracted,
+      extracted: restoredExtracted,
       confidenceMap:
           confidenceMap.isNotEmpty ? confidenceMap : empty.confidenceMap,
-      specGenEnabled: saved['specGenEnabled'] as bool? ?? false,
+      specGenEnabled: specGenEnabled,
       layerBoundaries: layerBoundaries,
     );
   }

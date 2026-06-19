@@ -97,8 +97,19 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
               (p) => p.name == providerStr,
               orElse: () => LlmProviderType.gemini,
             );
-      final modelId = savedModelId ??
-          (isFirstRun ? 'gemini-2.5-flash' : '');
+      // Validate stored model ID against the current catalog. Retired or
+      // misspelled IDs (e.g. gemini-3.5-flash, gpt-4-turbo) fall back to
+      // the first valid model for that provider so the app never starts
+      // with a model that the API will reject.
+      final validIds = modelsFor(providerType).map((m) => m.id).toSet();
+      final fallbackId =
+          modelsFor(providerType).firstOrNull?.id ?? 'gemini-2.5-flash';
+      final modelId = (savedModelId != null &&
+              savedModelId.isNotEmpty &&
+              (providerType == LlmProviderType.ollama ||
+                  validIds.contains(savedModelId)))
+          ? savedModelId
+          : (isFirstRun ? 'gemini-2.5-flash' : fallbackId);
       assignments[role] = ModelAssignment(
         providerType: providerType,
         modelId: modelId,
