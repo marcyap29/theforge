@@ -89,16 +89,19 @@ ForgeStateParse parseForgeState(String llmRaw) {
     final extracted = <String, dynamic>{
       'outcome': extractedRaw['outcome'] as String?,
       'primaryUser': extractedRaw['primaryUser'] as String?,
-      'capabilities':
-          (extractedRaw['capabilities'] as List<dynamic>?)?.cast<String>() ??
-              <String>[],
+      // Safe list parsing: LLMs sometimes emit strings ("none", "TBD") for
+      // list fields. Hard cast as List<dynamic>? throws TypeError → degrades
+      // the entire parse. Use 'is' check and normalize to empty list.
+      'capabilities': extractedRaw['capabilities'] is List<dynamic>
+          ? (extractedRaw['capabilities'] as List<dynamic>).cast<String>()
+          : <String>[],
       'chosenCapability': extractedRaw['chosenCapability'] as String?,
-      'demoScript':
-          (extractedRaw['demoScript'] as List<dynamic>?)?.cast<String>() ??
-              <String>[],
-      'v2Seeds':
-          (extractedRaw['v2Seeds'] as List<dynamic>?)?.cast<String>() ??
-              <String>[],
+      'demoScript': extractedRaw['demoScript'] is List<dynamic>
+          ? (extractedRaw['demoScript'] as List<dynamic>).cast<String>()
+          : <String>[],
+      'v2Seeds': extractedRaw['v2Seeds'] is List<dynamic>
+          ? (extractedRaw['v2Seeds'] as List<dynamic>).cast<String>()
+          : <String>[],
       'platform': extractedRaw['platform'] as String?,
       'identityModel': extractedRaw['identityModel'] as String?,
       'inputModel': extractedRaw['inputModel'] as String?,
@@ -943,7 +946,12 @@ class InterviewNotifier
 
     final allResolved =
         newMap.values.every((s) => s == DimensionState.resolved);
-    final specGenEnabled = allResolved && newConflicts.isEmpty;
+    // Also enable when L4 gate is met — the completed funnel is the real
+    // signal. Individual dimension tracking can fail when the LLM emits
+    // unexpected formats, so treat funnel completion as sufficient.
+    final l4GateMet = _layerGateMet('L4', mergedExtracted);
+    final specGenEnabled =
+        (allResolved || l4GateMet) && newConflicts.isEmpty;
 
     // Write v2 seeds when we advance out of L3 (gate just passed).
     if (withUser.currentLayer == 'L3' && newLayer == 'L4') {

@@ -201,12 +201,13 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen>
                 isLoading: _isLoading,
                 onSend: _send,
               ),
-              // Escape hatch: if the LLM completed L4 but the gate didn't fire
-              // (e.g. externalServices parsed as a string instead of a list),
-              // surface a manual override after enough turns.
+              // Escape hatch: if parsing issues or dimension tracking failures
+              // prevent the gate from firing, surface a manual override after
+              // enough turns at L3 or L4 (6 user turns total is a full funnel).
               if (!state.specGenEnabled &&
-                  state.currentLayer == 'L4' &&
-                  state.turns.where((t) => t.isUser).length >= 4)
+                  (state.currentLayer == 'L3' ||
+                      state.currentLayer == 'L4') &&
+                  state.turns.where((t) => t.isUser).length >= 6)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
                   child: SizedBox(
