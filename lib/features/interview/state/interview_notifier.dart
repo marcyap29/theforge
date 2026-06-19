@@ -103,11 +103,14 @@ ForgeStateParse parseForgeState(String llmRaw) {
       'identityModel': extractedRaw['identityModel'] as String?,
       'inputModel': extractedRaw['inputModel'] as String?,
       'outputModel': extractedRaw['outputModel'] as String?,
-      'externalServices':
-          (extractedRaw['externalServices'] as List<dynamic>?)
-                  ?.map((e) => e as Map<String, dynamic>)
-                  .toList() ??
-              <Map<String, dynamic>>[],
+      // Safe parse: LLMs often output "None" or a string for no external
+      // services. Hard-casting as List throws TypeError → degrades the whole
+      // parse. Use 'is' check and normalize non-list values to an empty list.
+      'externalServices': extractedRaw['externalServices'] is List<dynamic>
+          ? (extractedRaw['externalServices'] as List<dynamic>)
+              .whereType<Map<String, dynamic>>()
+              .toList()
+          : <Map<String, dynamic>>[],
     };
 
     final layer = parsed['layer'] as String?;
@@ -524,7 +527,15 @@ Map<String, DimensionState> _confidenceFromExtracted(
   if (v2Seeds.isNotEmpty && demoScript.isNotEmpty) {
     updates['scopeBoundary'] = DimensionState.resolved;
   }
-  if (extracted['externalServices'] is List) {
+  // externalServices resolves when the other L4 fields are present.
+  // Checking the list type is unreliable — LLMs often emit "None" (string)
+  // for projects with no external services. Instead: L4 completion (all
+  // other platform/identity/input/output fields populated) implies the
+  // external services question was answered, even if the answer is "none".
+  if (extracted['platform'] != null &&
+      extracted['identityModel'] != null &&
+      extracted['inputModel'] != null &&
+      extracted['outputModel'] != null) {
     updates['externalServices'] = DimensionState.resolved;
   }
   return updates;

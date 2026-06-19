@@ -195,6 +195,44 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen>
                 isLoading: _isLoading,
                 onSend: _send,
               ),
+              // Escape hatch: if the LLM completed L4 but the gate didn't fire
+              // (e.g. externalServices parsed as a string instead of a list),
+              // surface a manual override after enough turns.
+              if (!state.specGenEnabled &&
+                  state.currentLayer == 'L4' &&
+                  state.turns.where((t) => t.isUser).length >= 4)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: () {
+                        final interviewState =
+                            ref.read(interviewProvider(args)).valueOrNull;
+                        if (interviewState == null) return;
+                        final targetVersion = args.priorSpecVersion != null
+                            ? nextSpecVersion(args.priorSpecVersion!)
+                            : 'v1';
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => SpecGenerationScreen(
+                              interviewState: interviewState,
+                              targetSpecVersion: targetVersion,
+                            ),
+                          ),
+                        );
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF6B7280),
+                      ),
+                      child: const Text(
+                        'Interview finished but button not appearing? → Generate spec with current data',
+                        style: TextStyle(fontSize: 11, fontFamily: 'Menlo'),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ),
               if (state.specGenEnabled)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
