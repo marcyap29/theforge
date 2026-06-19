@@ -212,7 +212,7 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen>
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
                   child: SizedBox(
                     width: double.infinity,
-                    child: TextButton(
+                    child: OutlinedButton(
                       onPressed: () {
                         final interviewState =
                             ref.read(interviewProvider(args)).valueOrNull;
@@ -229,13 +229,18 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen>
                           ),
                         );
                       },
-                      style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFF6B7280),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFE8A04C),
+                        side: const BorderSide(color: Color(0xFFE8A04C)),
+                        minimumSize: const Size.fromHeight(44),
                       ),
                       child: const Text(
-                        'Interview finished but button not appearing? → Generate spec with current data',
-                        style: TextStyle(fontSize: 11, fontFamily: 'Menlo'),
-                        textAlign: TextAlign.center,
+                        'Generate Spec with current data →',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontFamily: 'Menlo',
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
