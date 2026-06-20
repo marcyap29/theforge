@@ -1,6 +1,6 @@
 # Configuration Management — The Forge
 
-**Last Updated:** 2026-06-05
+**Last Updated:** 2026-06-20
 **Status:** ✅ Synced
 
 ---
@@ -92,12 +92,44 @@
 | engineer_detail_screen.dart | lib/features/watch/ | 2026-06-17 | ✅ Synced |
 | workspace_health_screen.dart | lib/features/watch/ | 2026-06-17 | ✅ Synced |
 | alert_log_screen.dart | lib/features/watch/ | 2026-06-17 | ✅ Synced |
+| interview_dimension.dart | lib/features/interview/state/ | 2026-06-18 | ✅ Synced |
+| interview_state.dart | lib/features/interview/state/ | 2026-06-18 | ✅ Synced |
+| interview_notifier.dart | lib/features/interview/state/ | 2026-06-20 | ✅ Synced |
+| interview_screen.dart | lib/features/interview/ui/ | 2026-06-20 | ✅ Synced |
+| project_detail_screen.dart | lib/features/projects/screens/ | 2026-06-18 | ✅ Synced |
+| projects_list_screen.dart | lib/features/projects/screens/ | 2026-06-18 | ✅ Synced |
+| spec_generator.dart | lib/features/spec_generation/ | 2026-06-19 | ✅ Synced |
+| spec_notifier.dart | lib/features/spec_generation/ | 2026-06-19 | ✅ Synced |
+| worksheet_notifier.dart | lib/features/spec_generation/ | 2026-06-19 | ✅ Synced |
+| settings_notifier.dart | lib/features/settings/ | 2026-06-20 | ✅ Synced |
+| llm_model_config.dart | lib/services/llm/ | 2026-06-20 | ✅ Synced |
+| project_file_repository.dart | lib/data/filesystem/ | 2026-06-19 | ✅ Synced |
 
 
 ---
 
 
 ## Change Log
+
+### 2026-06-18/20 — Interview UX + Bug Fixes + Model Catalog
+
+**Action:** Interview UX overhaul, full state persistence, layer rewind, interview gate fixes, handoff output fixes, model catalog update. 6 commits, 9 files changed.
+
+**Key changes:**
+- `interview_state.dart` — `layerBoundaries: Map<String,int>` field added
+- `interview_notifier.dart` — full disk persistence (turns+confidence+extracted+specGenEnabled+layerBoundaries after every LLM response); auto-opener (4 variations per mode, zero tokens); `rewindToLayer()`; `rewindTo(i)` turn rewind; parse TypeError fix for all 4 list fields (`capabilities`, `demoScript`, `v2Seeds`, `externalServices`); `specGenEnabled` gate relaxed to `allResolved || l4GateMet`; `_restoreState` re-evaluates `specGenEnabled` from extracted data
+- `interview_screen.dart` — Enter=send / Shift+Enter=newline (`FocusNode.onKeyEvent`); auto-scroll on AI response (`ref.listen`); auto-focus on load+send; "edit" rewind link on user bubbles; tappable layer dots (`_LayerIndicator` + `Tooltip` + `MouseRegion`); amber outlined escape hatch button at L3/L4 ≥6 turns
+- `project_detail_screen.dart` — "Continue with V1/V2 Interview →" CTA (detects `interview_active` DB phase); `_previousVersion()` helper
+- `spec_generator.dart` — `v2SeedItems` populated from extracted data; `parseComponentNames` strips `**` markdown bold
+- `spec_notifier.dart` — clears `InterviewState.json` after spec is locked
+- `worksheet_notifier.dart` — calls `updateHandoffPackageField(setupWorksheetComplete: true)`; updates README "What's Next" to "Ready for executor"
+- `settings_notifier.dart` — validates stored model IDs against current catalog on load; stale IDs fall back to first valid model
+- `llm_model_config.dart` — retired `gpt-4-turbo` → `gpt-4.1`; retired `gemini-1.5-flash` → `gemini-2.0-flash`
+- `project_file_repository.dart` — `clearInterviewProgress()`, `updateHandoffPackageField()`
+
+**Bugs fixed:** BUG-INTERVIEW-004, BUG-INTERVIEW-005, BUG-SETTINGS-001, BUG-SPECGEN-001
+
+**Commits:** `f4c106c` `7390568` `716e475` `0c2f4b1` `3721a29` `a8062bc`
 
 ### 2026-06-17 — §W4 Watch Mode: Dashboard UI Shell
 

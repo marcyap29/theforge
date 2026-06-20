@@ -24,19 +24,26 @@ Can be changed in Settings. The app scans this folder for project directories on
 ```
 ~/Documents/The Forge Projects/
 └── {ProjectName}/
-    ├── README.md
+    ├── README.md                                    — phase state, always current
     ├── specs/
-    │   ├── {ProjectName}_LockedSpec_v1.md
-    │   └── {ProjectName}_LockedSpec_v2.md        ← added on phase 2
+    │   ├── {ProjectName}_LockedSpec_v1.md           — immutable after creation
+    │   └── {ProjectName}_LockedSpec_v2.md           — added on V2 interview
     ├── handoffs/
     │   ├── {ProjectName}_BulletHandoff_v1_Interview.md
-    │   ├── {ProjectName}_BulletHandoff_v1_SpecToExecutor.md
-    │   └── {ProjectName}_BulletHandoff_v1_Agent1toAgent2.md
+    │   ├── {ProjectName}_HandoffPackage_v1.json     — structured executor handoff
+    │   └── {ProjectName}_goal_v1.md                 — /goal text for executor harness
     ├── worksheets/
     │   └── {ProjectName}_SetupWorksheet_v1.md
-    ├── handoff_package_v1.json
+    ├── forge/                                        — executor context files
+    │   ├── {ProjectName}_LockedSpec_v1.md
+    │   ├── {ProjectName}_DecisionContext_v1.md
+    │   └── {ProjectName}_OpenFlags_v1.md
+    ├── ingested/
+    │   ├── reference_context.md                     — LLM-extracted reference doc facts
+    │   └── {ProjectName}_V2Seeds.md                 — features deferred from V1
     └── audit/
-        └── {ProjectName}_AuditLog.md
+        ├── {ProjectName}_AuditLog.md                — append-only
+        └── {ProjectName}_InterviewState.json        — persisted after every LLM response
 ```
 
 ### File Invariants
@@ -232,7 +239,7 @@ class SpecVariant {
 
 #### SwarmSpaceProvider
 
-- **API:** SwarmSpace routing (`https://swarmspace.app/api/`) — confirm current endpoint in SwarmSpace repo
+- **API:** SwarmSpace MCP endpoint (`https://swarmspace-mcp-server.orbitalai.workers.dev/mcp`) — live Cloudflare Workers, no additional infrastructure
 - **Auth:** SwarmSpace API token (macOS Keychain)
 - **Billing:** Credits deducted per call via SwarmSpace billing system
 - **Advantage:** SwarmSpace handles model selection and routing — user doesn't need individual API keys
