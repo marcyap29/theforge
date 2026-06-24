@@ -1,10 +1,29 @@
+// Extracts only the spec sections relevant to service setup.
+// Completion Criteria (§5), Static Content (§6), Open Flags (§9), and
+// v2 Architecture Notes (§10) contain no service or credential information
+// and are excluded to reduce prompt size by ~40-60%.
+String _worksheetContext(String specContent) {
+  const relevant = ['## 1.', '## 2.', '## 3.', '## 4.', '## 7.', '## 8.'];
+  final buffer = StringBuffer();
+  for (final header in relevant) {
+    final start = specContent.indexOf(header);
+    if (start < 0) continue;
+    final nextHeader = specContent.indexOf('\n## ', start + 1);
+    final end = nextHeader < 0 ? specContent.length : nextHeader;
+    buffer.writeln(specContent.substring(start, end).trim());
+    buffer.writeln();
+  }
+  return buffer.isEmpty ? specContent : buffer.toString().trim();
+}
+
 String buildWorksheetPrompt(String projectName, String specContent) {
+  final context = _worksheetContext(specContent);
   return '''You are The Forge setup worksheet writer.
 
 PROJECT: $projectName
 
 LOCKED SPEC:
-$specContent
+$context
 
 Generate a Setup Worksheet for every external service mentioned in this spec.
 If the spec has no external services, output: "# $projectName — Setup Worksheet\n\nNo external services required. Proceed directly to executor."
