@@ -26,9 +26,9 @@ LOCKED SPEC:
 $context
 
 Generate a Setup Worksheet for every external service mentioned in this spec.
-If the spec has no external services, output: "# $projectName — Setup Worksheet\n\nNo external services required. Proceed directly to executor."
+If the spec has no external services, skip the per-service sections but still output the full structure below (Before You Start, Local Project Configuration, Environment Variables Table, Verification Checklist, What Happens Next, Free Tier Reference). Never output a one-liner — always produce the complete worksheet.
 
-Otherwise follow this exact structure:
+Follow this exact structure:
 
 # $projectName — Setup Worksheet
 
