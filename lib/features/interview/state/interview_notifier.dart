@@ -150,6 +150,18 @@ ForgeStateParse parseForgeState(String llmRaw) {
   }
 }
 
+// Omits null values and empty lists before encoding the extracted map.
+// Sending null fields on every turn wastes ~80-120 tokens with no signal value.
+String _compactExtractedJson(Map<String, dynamic> extracted) {
+  final compact = Map.fromEntries(
+    extracted.entries.where((e) {
+      final v = e.value;
+      return v != null && !(v is List && v.isEmpty);
+    }),
+  );
+  return const JsonEncoder.withIndent('  ').convert(compact);
+}
+
 String _v2SeedsMarkdown(List<String> seeds) {
   if (seeds.isEmpty) return '# V2 Seeds\n\n_(none captured)_\n';
   return '# V2 Seeds\n\n${seeds.map((s) => '- $s').join('\n')}\n';
@@ -227,8 +239,7 @@ String _buildInterviewSystemPrompt(InterviewState state,
           '$ingestedContext\n'
       : '';
 
-  final extractedJson =
-      const JsonEncoder.withIndent('  ').convert(state.extracted);
+  final extractedJson = _compactExtractedJson(state.extracted);
 
   return '''You are The Forge interviewer — a sharp, direct product architect
 running a Build Interview for a project called "${state.projectName}". Your
@@ -382,8 +393,7 @@ String _featureInterviewSystemPrompt(InterviewState state,
       ? components.join(', ')
       : '(see spec above)';
 
-  final extractedJson =
-      const JsonEncoder.withIndent('  ').convert(state.extracted);
+  final extractedJson = _compactExtractedJson(state.extracted);
 
   return '''You are The Forge interviewer — a sharp, direct product architect
 running a Feature Interview for a project called "${state.projectName}".
@@ -822,15 +832,18 @@ class InterviewNotifier
     final ingestedContext =
         await repo.readIngestedSummary(withUser.projectPath);
 
-    // Build contextual user prompt including prior conversation so the LLM
-    // doesn't re-ask questions it already has answers to. withUser.turns
-    // already contains the current user turn at index [length-1]; exclude it
-    // so the current message appears only once, as the final prompt line.
+    // Build contextual user prompt. The system prompt already carries the
+    // cumulative `extractedJson`, so the full history is redundant once data
+    // is extracted. Keep only the last 6 turns (3 exchanges) for immediate
+    // conversational context; older turns are already captured in the state.
     final priorTurns =
         withUser.turns.sublist(0, withUser.turns.length - 1);
-    final historyBlock = priorTurns.isEmpty
+    final windowTurns = priorTurns.length > 6
+        ? priorTurns.sublist(priorTurns.length - 6)
+        : priorTurns;
+    final historyBlock = windowTurns.isEmpty
         ? ''
-        : priorTurns
+        : windowTurns
                 .map((t) =>
                     '${t.isUser ? "User" : "Interviewer"}: ${t.content}')
                 .join('\n\n') +
@@ -878,16 +891,22 @@ class InterviewNotifier
     var parse = parseForgeState(llmRaw);
 
     if (!parse.parseOk) {
+      // Retry with a minimal prompt — no need to re-send full history.
+      // The LLM only needs its previous response + the format requirement.
       String retryRaw;
       try {
         retryRaw = await llmService.complete(
-          systemPrompt: _interviewSystemPrompt(withUser,
-              ingestedContext: ingestedContext,
-              priorSpecVersion: arg.priorSpecVersion),
-          userPrompt:
-              '$contextualPrompt\n\nYour previous response did not include a ```forge-state block. '
-              'Re-emit the SAME answer with the mandatory ```forge-state JSON block appended. '
-              'The block is required on every turn.',
+          systemPrompt: 'Append a forge-state block to the message below. '
+              'Do not change the message text. Output the original message '
+              'followed immediately by the block.\n\n'
+              'Required format:\n'
+              '```forge-state\n'
+              '{"layer":"${withUser.currentLayer}","layerComplete":false,'
+              '"extracted":{...full map...},"conflicts":[]}\n'
+              '```\n\n'
+              'Current extracted state:\n'
+              '${_compactExtractedJson(withUser.extracted)}',
+          userPrompt: llmRaw,
           temperature: 0.1,
           role: LlmRole.executor,
         );

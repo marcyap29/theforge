@@ -35,6 +35,20 @@ class IngestionState {
   }
 }
 
+// Stable cross-process fingerprint: content length + sampled char codes.
+// Avoids re-running the LLM extraction when a document hasn't changed.
+// String.hashCode is isolate-local; this uses arithmetic on codeUnits instead.
+String _contentFingerprint(String content) {
+  if (content.isEmpty) return '0:0';
+  const samples = 16;
+  var sum = content.length;
+  for (var i = 0; i < samples; i++) {
+    final idx = (content.length * i) ~/ samples;
+    sum = sum * 31 + content.codeUnitAt(idx);
+  }
+  return '${content.length}:${sum.toUnsigned(32).toRadixString(16)}';
+}
+
 class IngestionNotifier extends Notifier<IngestionState> {
   @override
   IngestionState build() {
@@ -74,18 +88,27 @@ class IngestionNotifier extends Notifier<IngestionState> {
       final rawText = await dest.readAsString();
       final wordCount = rawText.split(RegExp(r'\s+')).length;
 
-      final prompt = buildIngestionPrompt(docTitle, rawText);
-      final llmResult = await llmService.complete(
-        systemPrompt: prompt,
-        userPrompt: 'Extract structured reference context from the document above.',
-        temperature: 0.2,
-        role: LlmRole.architect,
-        maxTokens: 2048,
-      );
+      final fingerprint = _contentFingerprint(rawText);
+      final fingerprintFile = File('${dest.path}.fp');
+      final factsFile = File('${dest.path}.facts.md');
 
-      final facts = parseIngestedFacts(llmResult);
-      final factsPath = '${dest.path}.facts.md';
-      await File(factsPath).writeAsString(facts.toMarkdown(docTitle));
+      final unchanged = fingerprintFile.existsSync() &&
+          factsFile.existsSync() &&
+          await fingerprintFile.readAsString() == fingerprint;
+
+      if (!unchanged) {
+        final prompt = buildIngestionPrompt(docTitle, rawText);
+        final llmResult = await llmService.complete(
+          systemPrompt: prompt,
+          userPrompt: 'Extract structured reference context from the document above.',
+          temperature: 0.2,
+          role: LlmRole.architect,
+          maxTokens: 2048,
+        );
+        final facts = parseIngestedFacts(llmResult);
+        await factsFile.writeAsString(facts.toMarkdown(docTitle));
+        await fingerprintFile.writeAsString(fingerprint);
+      }
 
       await _rebuildContext(repo, projectPath);
 
