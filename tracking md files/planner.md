@@ -472,6 +472,57 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 
 ---
 
+## §VF1 — Versioned Folder Structure — COMPLETE ✅
+
+**Completed:** 2026-06-27
+
+- [x] `lib/data/filesystem/project_file_repository.dart` — versioned subfolder writes (`specs/v1/`, `handoffs/v1/`, `forge/v1/`, `worksheets/v1/`); backward-compatible reads (versioned path first, flat fallback); `_extractVersion()` regex helper; `hasFlatVersionedFiles()` + `migrateToVersionFolders()` migration helpers; `getSavedRootPath()` + `saveRootPath()` configurable root path via SharedPreferences
+- [x] `lib/features/projects/screens/project_detail_screen.dart` — `_FixStructureBanner` widget (detects flat files, runs migration on tap, auto-hides after); versioned artifact browser (`_scan()` returns `Map<folder, Map<version, List<filename>>>`); multi-version accordion panel (`_buildVersionPanel` / `_buildVersionEntry`; latest expanded, prior versions collapsed to pills); `_BacklogSection` (V2 seeds from ingested files); `_RepoPathRow` (repo path + Show in Finder); `_CopyWorksheetButton`
+- [x] `lib/features/projects/screens/new_project_screen.dart` — first-time root path picker via `FilePicker.platform.getDirectoryPath()`; saves path via `saveRootPath()`; falls back to default if dismissed
+- [x] `lib/features/spec_generation/executor_timeline_notifier.dart` — scans versioned handoffs subfolders for `*_BuildSequence_*` files (was flat-only)
+- [x] `dart analyze lib/` — zero issues
+
+### Notes
+- Backward compatibility is load-bearing: reads check versioned path first, fall back to flat. Existing projects open without migration. `_FixStructureBanner` offers one-click migration when flat files are detected.
+- Root path stored under SharedPreferences key `forge_root_path`; `_defaultRootDir()` reads it on every launch.
+- `writeHandoffPackage` now writes to `handoffs/v1/`. `writeLockedSpec` writes to `specs/v1/`. `writeForgeFiles` writes to `forge/v1/`. `writeWorksheet` writes to `worksheets/v1/`.
+
+---
+
+## §VC1 — Verification Checklist — COMPLETE ✅
+
+**Completed:** 2026-06-27
+
+- [x] `lib/features/spec_generation/spec_generator.dart` — `buildVerificationChecklistPrompt(specContent, projectName)` generates machine-readable checklist prompt; `parseVerificationChecklist(llmOutput)` parses JSON → `List<Map<String, dynamic>>`; `buildSpecPrompt()` gains `specVersion` param (spec title now includes version number); `externalServices` safe-null parse fix
+- [x] `lib/features/spec_generation/spec_notifier.dart` — `maxTokens` raised 4096 → 8192; truncation guard (throws if `## 9.` or `## 10.` absent — "try again" error instead of silently-truncated spec); post-lock checklist LLM call (non-fatal on failure; spec already immutably locked); checklist stored in handoff package under `verificationChecklist`
+- [x] `dart analyze lib/` — zero issues
+
+### Notes
+- Checklist generation is a second LLM call (architect role, t=0.1, maxTokens 1024) after `writeLockedSpec()`. Failure is explicitly non-fatal.
+- Truncation guard fires when the model hits its context ceiling; `maxTokens` raised to 8192 because the 10-section spec format was hitting 4096 regularly.
+- Each checklist item: `id`, `requirement`, `expectedFiles`, `expectedKeywords`, `autoVerifiable`, `verificationNote`.
+
+---
+
+## §CI1 — Spec Compliance Gate + Compliance-Informed Feature Interview — COMPLETE ✅
+
+**Completed:** 2026-06-27
+
+- [x] `lib/features/spec_generation/compliance/spec_compliance_models.dart` — NEW: `ComplianceStatus` enum (verified/uncertain/failed/skipToLlm); `ChecklistItem` model (id, requirement, expectedFiles, expectedKeywords, autoVerifiable, verificationNote); `SpecComplianceResult` model (priorSpecVersion, checkedAt, checkedCommit, ranGitCheck, grouped item lists)
+- [x] `lib/features/spec_generation/compliance/spec_compliance_notifier.dart` — NEW: `SpecComplianceNotifier` (`AutoDisposeFamilyAsyncNotifier` by `{projectPath, projectName, priorSpecVersion}`); `check()` reads `verificationChecklist` from handoff package, runs git-diff file-presence check per item, caches result to `forge/{version}/` keyed by commit hash, invalidates when HEAD changes; `skipToLlm` items skip git check (deployed services, external configs)
+- [x] `lib/features/spec_generation/compliance/spec_compliance_screen.dart` — NEW: full compliance check UI; idle/checking/done/error states; items grouped by status; feeds `SpecComplianceResult` as `complianceContext` to V2 interview
+- [x] `lib/features/interview/providers/interview_providers.dart` — `complianceContext: String?` added to `InterviewArgs`; `==` and `hashCode` updated
+- [x] `lib/features/interview/state/interview_notifier.dart` — `_featureInterviewSystemPrompt()` injects compliance block when `complianceContext` non-null; escape hatch fallback extended: fires at ANY layer after ≥10 user turns (was L3/L4 after ≥6)
+- [x] `dart analyze lib/` — zero issues
+
+### Notes
+- Full pipeline: §VC1 generates `verificationChecklist` JSON at spec-lock time → §CI1 `SpecComplianceNotifier.check()` evaluates each item against git state → `SpecComplianceScreen` shows results → user proceeds to V2 interview with compliance context injected.
+- Cache-by-commit: result is invalidated when the repo HEAD changes, so re-checking after new commits re-runs the evaluation. Cached to `forge/{version}/` to survive app restarts.
+- `autoVerifiable: false` items (deployed services, external configs, runtime behavior) are classified `skipToLlm` — the git check can't evaluate them, so they're surfaced in the compliance context for the LLM to ask about in the interview.
+- Escape hatch fallback (10 turns, any layer) catches the LLM concluding the interview at L1/L2 without emitting forge-state JSON blocks, which left the app stuck with no Generate Spec button.
+
+---
+
 ## Next Up — §W5: Watch Mode SwarmSpace Briefing + Decision Simulation
 
 **Status:** Not started — next on critical path (requires §W4 ✅)

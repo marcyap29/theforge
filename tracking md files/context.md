@@ -4,6 +4,74 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-06-27 — Claude Code [§VF1/§VC1/§CI1/§QOL — Versioned FS + Verification Checklist + QOL]
+
+**Branch:** main
+
+### Done
+
+**§VF1 — Versioned Folder Structure (committed — `723d733`):**
+- All artifact writes now go into version subfolders instead of flat directories:
+  - Before: `specs/ProjectName_LockedSpec_v1.md`
+  - After: `specs/v1/ProjectName_LockedSpec_v1.md`
+  - Same change applies to `handoffs/`, `forge/`, `worksheets/`
+- New methods added to `ProjectFileRepository`:
+  - `getSavedRootPath()` [STATIC] — reads root path from SharedPreferences
+  - `saveRootPath(String path)` [STATIC] — persists root path to SharedPreferences
+  - `_defaultRootDir()` — now checks saved root path first, falls back to `~/Documents/The Forge Projects/`
+  - `_extractVersion(String filename)` [STATIC] — regex extracts `v1`, `v2`, etc. from filename
+  - `hasFlatVersionedFiles(String projectPath)` — detects old flat-structure files needing migration
+  - `migrateToVersionFolders(String projectPath)` — moves flat versioned files into version subfolders; returns count of files moved
+- Backward compatibility: all reads check versioned path first, fall back to flat for existing projects. `writeHandoffPackage` now writes to `handoffs/v1/`.
+
+**§VC1 — Verification Checklist (committed — `723d733`):**
+- After spec generation, a second LLM call generates a machine-readable verification checklist and stores it in the handoff package JSON under `verificationChecklist`
+- New functions in `spec_generator.dart`:
+  - `buildVerificationChecklistPrompt(String specContent, String projectName)` — builds the LLM prompt
+  - `parseVerificationChecklist(String llmOutput)` — parses JSON output, returns `List<Map<String, dynamic>>`
+- Changes in `spec_notifier.dart`:
+  - `maxTokens` raised from 4096 → 8192
+  - Truncation guard added: if the spec doesn't contain `## 9.` and `## 10.`, throws an error ("Spec generation was truncated — sections 9/10 are missing")
+  - After `writeLockedSpec()`, calls checklist generation; failure is non-fatal (spec is already locked)
+  - `buildSpecPrompt()` now accepts `specVersion` param so the spec title includes the version number
+
+**§CI1 — Spec Compliance Gate + Compliance-Informed Feature Interview (committed — `1a8dcaf` + `723d733`):**
+- Full 3-file compliance gate in `lib/features/spec_generation/compliance/`:
+  - `spec_compliance_models.dart` — `ComplianceStatus` enum (verified/uncertain/failed/skipToLlm); `ChecklistItem`; `SpecComplianceResult` (cached by commit hash)
+  - `spec_compliance_notifier.dart` — `SpecComplianceNotifier` (`AutoDisposeFamilyAsyncNotifier`); reads `verificationChecklist` from handoff package; git-diff file-presence check per item; caches to `forge/{version}/`; invalidates when HEAD changes; `skipToLlm` path for non-verifiable items
+  - `spec_compliance_screen.dart` — full check UI; idle/checking/done/error; items grouped by status; feeds result as `complianceContext` to V2 interview
+- `InterviewArgs` gains `complianceContext: String?`; `_featureInterviewSystemPrompt()` injects compliance block when non-null
+
+**QOL fixes (committed — `723d733`):**
+- `lib/services/llm/llm_model_config.dart` — Gemini default reverted to `gemini-3.5-flash` (from `gemini-2.5-flash`; model ID had been upgraded prematurely, causing inconsistent outputs)
+- `lib/features/settings/settings_notifier.dart` — Ollama health check `maxTokens` bumped from 10 → 100 (10 tokens was too small to get a valid Ollama response, producing false "not connected" diagnostics)
+
+**Commits this session:**
+- `723d733` — feat(interview+spec): interview UX, persistence, feature mode, compliance gate, model catalog
+- `1a8dcaf` — feat(compliance): spec compliance gate — pre-V2 interview build verification check
+
+### Key Technical Findings
+- **Versioned folder migrations must decouple reads from writes** — if reads hard-require the new versioned path, existing projects break at launch before the user has a chance to migrate. The correct pattern: write to `specs/v1/`, read versioned first then fall back to flat. Migration is opt-in via `_FixStructureBanner`, not forced.
+- **Spec truncation is silent without a content guard** — `maxTokens: 4096` cut specs mid-section with no error; the write-once lock sealed a half-finished document. Checking for trailing sections (`## 9.`, `## 10.`) as a completeness proxy catches this before `writeLockedSpec()` fires.
+- **Post-lock supplementary LLM calls must be non-fatal** — the spec is write-once; re-throwing from a post-lock call misleads the user into thinking the spec wasn't saved when it was. Wrap in try/catch, swallow the error, log if needed.
+- **Escape hatch gate logic needs a length-only fallback** — layer-gated triggers (`L3/L4 + 6 turns`) break when the LLM exits the interview at L1/L2 without emitting forge-state JSON blocks, leaving the layer stuck and the button never showing. A raw turn-count fallback (≥10 turns, any layer) is the safety net.
+- **`FilePicker` dismissal must save a default** — if the user cancels the root path picker, `picked` is null. Not saving a default in that branch means the picker reappears on every future project create, making the app appear broken on first launch.
+
+### Next
+- §W5 — Watch Mode: SwarmSpace Briefing + Decision Simulation (next on critical path; requires §W4 ✅)
+
+### Modified (key files)
+- `lib/data/filesystem/project_file_repository.dart` — versioned folder writes + root path persistence + migration helpers
+- `lib/features/projects/screens/project_detail_screen.dart` — multi-version panel, _FixStructureBanner, _BacklogSection, _RepoPathRow, _CopyWorksheetButton
+- `lib/features/spec_generation/spec_generator.dart` — buildVerificationChecklistPrompt, parseVerificationChecklist, specVersion param
+- `lib/features/spec_generation/spec_notifier.dart` — maxTokens 8192, truncation guard, checklist generation
+- `lib/features/interview/providers/interview_providers.dart` — complianceContext on InterviewArgs
+- `lib/features/interview/state/interview_notifier.dart` — compliance block injection, escape hatch fallback
+- `lib/features/projects/screens/new_project_screen.dart` — first-time root path picker
+- `lib/services/llm/llm_model_config.dart` — Gemini default gemini-3.5-flash
+- `lib/features/settings/settings_notifier.dart` — Ollama maxTokens 10 → 100
+- `lib/features/spec_generation/executor_timeline_notifier.dart` — versioned handoffs scan
+
 ## Session: 2026-06-18/19 — Claude Code [Interview UX + Bug Fixes + Watch Mode §W4 Ship]
 
 **Branch:** main
