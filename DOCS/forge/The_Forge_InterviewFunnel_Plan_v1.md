@@ -1,6 +1,6 @@
 # The Forge — Interview Funnel Redesign Plan v1
 
-**Status:** Planning doc — for markup before any code lands
+**Status:** IMPLEMENTED ✅ — Executor prompt in `DOCS/forge/interview_funnel_executor_plan_v1.md`. Code shipped 2026-06-11/12. See `tracking md files/planner.md §IF1`.
 **Date:** 2026-06-11
 **Scope:** Build Interview only. Audit Interview unchanged.
 **Supersedes:** Nothing. The 8 confidence dimensions survive as spec invariants (see §4).

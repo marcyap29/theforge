@@ -361,7 +361,7 @@ List<String> _extractComponents(String? featureContext) {
 }
 
 String _featureInterviewSystemPrompt(InterviewState state,
-    {String? ingestedContext, required String priorSpecVersion}) {
+    {String? ingestedContext, required String priorSpecVersion, String? complianceContext}) {
   final nextVersion = nextSpecVersion(priorSpecVersion);
   final goalStatement = _extractGoalStatement(state.featureContext);
   final components = _extractComponents(state.featureContext);
@@ -395,10 +395,16 @@ String _featureInterviewSystemPrompt(InterviewState state,
 
   final extractedJson = _compactExtractedJson(state.extracted);
 
+  final complianceBlock = complianceContext != null
+      ? '\n\nV1 BUILD COMPLIANCE — USE THIS TO SCOPE THE V2 INTERVIEW:\n'
+          '$complianceContext\n'
+          'Items marked ❌ or ⚠️ from V1 may need to be addressed or explicitly deferred before scoping V2.'
+      : '';
+
   return '''You are The Forge interviewer — a sharp, direct product architect
 running a Feature Interview for a project called "${state.projectName}".
 You are scoping $nextVersion. $priorSpecVersion is already shipped and immutable.
-$refBlock$contextBlock$goalRef
+$refBlock$contextBlock$goalRef$complianceBlock
 THE FUNNEL — you are currently at ${state.currentLayer}. Do not advance until
 the exit condition is met. Never ask about a later layer early.
 
@@ -407,7 +413,7 @@ Do NOT open with a question. Start by presenting what $priorSpecVersion delivere
 "${state.projectName} $priorSpecVersion shipped [restate the outcome in one sentence from FEATURE CONTEXT].
 The components built were: $componentList.
 The features deferred were: [list the v2 seeds from FEATURE CONTEXT, or 'none captured' if empty].
-What is the ONE thing you'd add or improve for $nextVersion?"
+What is the ONE thing you\'d add or improve for $nextVersion?"
 After the user responds, confirm it in one sentence and exit L1.
 Exit: new outcome confirmed.
 
@@ -465,14 +471,14 @@ Set layerComplete: true only when the current layer exit condition is met.''';
 }
 
 String _interviewSystemPrompt(InterviewState state,
-    {String? ingestedContext, String? priorSpecVersion}) {
+    {String? ingestedContext, String? priorSpecVersion, String? complianceContext}) {
   final isBuild = state.dimensions == buildDimensions;
   if (!isBuild) {
     return _auditInterviewSystemPrompt(state, ingestedContext: ingestedContext);
   }
   if (priorSpecVersion != null) {
     return _featureInterviewSystemPrompt(state,
-        ingestedContext: ingestedContext, priorSpecVersion: priorSpecVersion);
+        ingestedContext: ingestedContext, priorSpecVersion: priorSpecVersion, complianceContext: complianceContext);
   }
   return _buildInterviewSystemPrompt(state, ingestedContext: ingestedContext);
 }
@@ -787,7 +793,9 @@ class InterviewNotifier
     try {
       llmText = await llmService.complete(
         systemPrompt: _interviewSystemPrompt(withUser,
-            ingestedContext: ingestedContext),
+            ingestedContext: ingestedContext,
+            priorSpecVersion: arg.priorSpecVersion,
+            complianceContext: arg.complianceContext),
         userPrompt: text.trim(),
         temperature: 0.1,
         role: LlmRole.executor,
@@ -856,7 +864,8 @@ class InterviewNotifier
       llmRaw = await llmService.complete(
         systemPrompt: _interviewSystemPrompt(withUser,
             ingestedContext: ingestedContext,
-            priorSpecVersion: arg.priorSpecVersion),
+            priorSpecVersion: arg.priorSpecVersion,
+            complianceContext: arg.complianceContext),
         userPrompt: contextualPrompt,
         temperature: 0.1,
         role: LlmRole.executor,

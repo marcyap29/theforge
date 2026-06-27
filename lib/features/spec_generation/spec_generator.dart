@@ -1,7 +1,9 @@
+import 'dart:convert';
+
 import '../interview/state/interview_dimension.dart';
 import '../interview/state/interview_state.dart';
 
-String buildSpecPrompt(InterviewState state, {String? ingestedContext}) {
+String buildSpecPrompt(InterviewState state, {String? ingestedContext, String specVersion = 'v1'}) {
   final isBuild = state.dimensions == buildDimensions;
   final modeLabel = isBuild ? 'Build' : 'Audit';
   final transcript = state.turns
@@ -27,8 +29,11 @@ String buildSpecPrompt(InterviewState state, {String? ingestedContext}) {
           '$ingestedContext\n'
       : '';
 
+  final specTitle = isBuild
+      ? '# ${state.projectName} — Locked Spec $specVersion'
+      : '# ${state.projectName} — Audit Spec $specVersion';
   final specStructure =
-      isBuild ? _buildSpecStructure : _auditSpecStructure;
+      '$specTitle\n\n${isBuild ? _buildSpecStructure : _auditSpecStructure}';
 
   final extracted = state.extracted;
   final hasFunnelData = isBuild &&
@@ -55,7 +60,7 @@ Architectural defaults (confirmed by the user — put these in Hard Constraints)
 - Output model: ${extracted['outputModel']}
 
 External services (only services with core=true belong in V1):
-${(extracted['externalServices'] as List).map((s) => '- ${s['name']} (core=${s['core']}, stripped=${s['stripped']})').join('\n')}
+${(extracted['externalServices'] as List? ?? []).map((s) => s is Map ? '- ${s['name']} (core=${s['core']}, stripped=${s['stripped']})' : '- $s').join('\n')}
 
 V2 seeds (put these in Explicit Out-of-Scope and v2 Architecture Notes — never V1):
 ${(extracted['v2Seeds'] as List).map((s) => '- $s').join('\n')}
@@ -416,4 +421,77 @@ int _countListItems(String content, String sectionHeader) {
       .where(
           (l) => l.trimLeft().startsWith('- ') || l.trimLeft().startsWith('* '))
       .length;
+}
+
+/// Builds the LLM prompt that generates a machine-readable verification checklist
+/// from a just-locked spec. Call after writeLockedSpec(), before or alongside
+/// buildHandoffPackage().
+String buildVerificationChecklistPrompt(String specContent, String projectName) {
+  return '''
+You are generating a machine-readable verification checklist for a software spec.
+
+PROJECT: $projectName
+
+LOCKED SPEC:
+$specContent
+
+---
+
+Output a JSON array called verificationChecklist. Each item represents one discrete
+deliverable from the spec — one screen, one service, one integration, one file.
+
+Rules:
+1. One item per deliverable. Never merge multiple files into one item.
+2. expectedFiles must be explicit repo-relative paths the executor would create
+   (e.g. "lib/features/auth/auth_screen.dart", "functions/src/index.ts").
+   Infer from the spec text and standard Flutter/Firebase project conventions.
+3. autoVerifiable: true only if confirmation = check that specific files exist
+   and were modified in git since spec lock. False for: deployed services,
+   external API credentials, runtime/behavioral requirements, third-party configs.
+4. expectedKeywords: optional array of words likely to appear in commit messages.
+   Use only when a reliable file path cannot be inferred.
+5. verificationNote: required when autoVerifiable is false. One sentence.
+6. requirement: one sentence, plain English, present tense.
+7. id format: "vc-01", "vc-02" incrementing.
+
+Output ONLY the raw JSON array. No prose, no markdown fences.
+
+Schema:
+[
+  {
+    "id": "vc-01",
+    "requirement": "SetupScreen accepts ZIP input and geolocation",
+    "expectedFiles": ["lib/features/setup/setup_screen.dart"],
+    "expectedKeywords": ["setup", "zip", "geolocation"],
+    "autoVerifiable": true,
+    "verificationNote": ""
+  },
+  {
+    "id": "vc-02",
+    "requirement": "Backend proxy deployed to Firebase Cloud Functions",
+    "expectedFiles": ["functions/src/index.ts"],
+    "expectedKeywords": ["functions", "deploy", "proxy"],
+    "autoVerifiable": false,
+    "verificationNote": "Deployment state cannot be read from source files."
+  }
+]
+''';
+}
+
+/// Parses the LLM output for verification checklist
+List<Map<String, dynamic>> parseVerificationChecklist(String llmOutput) {
+  try {
+    // Strip markdown fences if present
+    final cleanOutput = llmOutput
+        .replaceAll(RegExp(r'^```json\s*'), '')
+        .replaceAll(RegExp(r'^```'), '')
+        .replaceAll(RegExp(r'```\s*$'), '')
+        .trim();
+    
+    final decoded = jsonDecode(cleanOutput) as List<dynamic>;
+    return decoded.cast<Map<String, dynamic>>();
+  } catch (e) {
+    // Return empty list on any parse error - checklist is supplementary
+    return [];
+  }
 }

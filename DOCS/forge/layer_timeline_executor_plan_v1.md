@@ -1,3 +1,5 @@
+> **STATUS: COMPLETE ✅** — Implemented 2026-06-12. DeepSeek + Claude Code. Branch merged to main. See `tracking md files/planner.md §UI1` for full implementation notes.
+
 # §UI1 — Layer Sub-Timeline
 
 ## Scoped Executor Prompt for DeepSeek V4 Pro

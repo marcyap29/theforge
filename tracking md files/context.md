@@ -4,6 +4,79 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-06-18/19 — Claude Code [Interview UX + Bug Fixes + Watch Mode §W4 Ship]
+
+**Branch:** main
+
+### Done
+
+**Interview UX improvements (all committed):**
+- **Shift+Enter newline / Enter sends** — `FocusNode.onKeyEvent` intercepts Enter; Shift+Enter falls through to multiline default
+- **Auto-scroll on AI response** — `ref.listen` on turn count; scrolls on user AND AI messages
+- **Auto-focus text field** — `requestFocus()` on mount + after send + after AI response via `addPostFrameCallback`
+- **Conversation turn rewind** — "edit" link on every user bubble; tapping populates composer + calls `rewindTo(i)` which truncates turns and refocuses
+- **"Continue with V1/V2 Interview →" CTA** — first user message writes `v1_interview_active` phase to DB; detail screen shows "Continue" vs "Start" correctly
+- **Auto-opener (zero tokens)** — 4 variations per mode (Build / Feature V2+ / Audit) injected as AI turn in `build()`; reset also reinjects opener
+- **Layer rewind** — completed L1/L2/L3 dots are tappable; `rewindToLayer(layer)` truncates turns to layer boundary, clears extracted data for that layer+later, re-derives confidence map, persists to disk
+- **Layer boundaries** — `InterviewState.layerBoundaries: Map<String,int>` tracks when each layer was entered; persisted and restored across app restarts
+- **Escape hatch button** — amber `OutlinedButton` at L3/L4 after ≥6 user turns when `specGenEnabled` is still false; "Generate Spec with current data →"
+
+**Interview persistence (all committed):**
+- **Full state restore on relaunch** — `writeInterviewProgress` now saves turns + confidenceMap + extracted + specGenEnabled + layerBoundaries on every LLM response (Build + Audit)
+- `build()` reads `InterviewState.json` on launch; restores full turn history so mid-interview app close = seamless resume
+- `reset()` clears the state file; spec generation clears it after locking
+- `_restoreState` re-evaluates `specGenEnabled` from extracted data (fixes old sessions saved with buggy code)
+
+**Interview gate bugs fixed:**
+- **`externalServices` TypeError** — `(as List<dynamic>?)` hard cast threw when LLM output `"None"` (string); normalized to `is List` check; non-list → `[]`
+- **Same fix for `capabilities`, `demoScript`, `v2Seeds`** — all 4 list fields now use safe `is List` parse; prevents full parse degradation on any field
+- **`specGenEnabled` gate relaxed** — now fires when `allResolved || l4GateMet`; L4 funnel completion (platform+identity+input+output non-null) is sufficient, individual dimension tracking no longer the sole gate
+- **`_confidenceFromExtracted` externalServices** — now resolves when other L4 fields are present (not just `is List` which was always true from initial empty state)
+
+**Handoff/output bug fixes:**
+- **`v2SeedItems` populated** in `HandoffPackage.json` from `state.extracted['v2Seeds']`
+- **`setupWorksheetComplete: true`** written to HandoffPackage after worksheet generation via `updateHandoffPackageField()`
+- **Component names strip `**`** — `parseComponentNames` now strips markdown bold formatting
+- **README "What's Next"** updated to "Ready for executor — review build sequence" after worksheet completes
+
+**Model catalog + settings fixes:**
+- **Model ID validation on load** — `settings_notifier.build()` validates stored model IDs; retired IDs (`gemini-3.5-flash`, `gpt-4-turbo`) silently fall back to first valid model
+- **Model catalog updated** — OpenAI: `gpt-4-turbo` → `gpt-4.1`; Gemini: `gemini-1.5-flash` → `gemini-2.0-flash`; `gemini-2.5-flash` + `gemini-2.5-pro` retained
+
+**Commits this session:**
+- `f4c106c` — interview resume, auto-opener, chat UX + handoff fixes
+- `7390568` — externalServices parse TypeError + escape hatch
+- `716e475` — layer rewind (tappable L1/L2/L3 dots)
+- `0c2f4b1` — all list field parse fixes + gate relaxation + widened escape hatch
+- `3721a29` — specGen restore + model ID validation + retire outdated models
+- `a8062bc` — escape hatch button amber outlined
+
+### Key Technical Findings
+- **`as List<dynamic>?` hard cast pattern is dangerous** — any non-list LLM output (string, null) throws TypeError; the outer try/catch degrades the ENTIRE parse, discarding all extracted data for that turn. Always use `is List<dynamic>` check first.
+- **specGenEnabled should track funnel completion, not dimension resolution** — dimension resolution is a derivative signal that can silently fail; funnel gate (L4 fields all present) is the ground truth
+- **`_restoreState` must re-evaluate gates** — never trust saved booleans for computed state; re-derive from the data on restore
+- **Model IDs in SharedPreferences outlive code changes** — need validation on load to handle catalog updates across app versions
+- **`layerBoundaries[newLayer] = withUser.turns.length + 1`** — the boundary is stored AFTER the transition AI response is added, so rewinding to that layer keeps the transition message visible (user sees "great, now L2: list your capabilities")
+
+### Next
+- §W5 — Watch Mode: SwarmSpace Briefing + Decision Simulation (next on critical path)
+- AR Mechanic project still shows "Continue with V1 Interview →" — interview complete inside app but DB phase not yet `v1_spec_locked`; user needs to generate spec from within interview screen
+
+### Modified (key files)
+- `lib/features/interview/state/interview_state.dart` — `layerBoundaries` field
+- `lib/features/interview/state/interview_notifier.dart` — openers, boundaries, rewindToLayer, persist, gate fixes, parse fixes, model restore fix
+- `lib/features/interview/ui/interview_screen.dart` — FocusNode, auto-scroll, escape hatch, layer dot taps
+- `lib/features/projects/screens/project_detail_screen.dart` — "Continue" CTA, `_previousVersion` helper
+- `lib/features/spec_generation/spec_generator.dart` — v2SeedItems, component name strip
+- `lib/features/spec_generation/worksheet_notifier.dart` — setupWorksheetComplete, README update
+- `lib/features/settings/settings_notifier.dart` — model ID validation
+- `lib/services/llm/llm_model_config.dart` — model catalog update
+- `lib/data/filesystem/project_file_repository.dart` — clearInterviewProgress, updateHandoffPackageField
+
+---
+
+
+
 ## Session: 2026-06-17 — Claude Code [§W4 Watch Mode: Dashboard UI Shell]
 
 **Branch:** main

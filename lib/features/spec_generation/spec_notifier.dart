@@ -42,13 +42,23 @@ class SpecNotifier extends AutoDisposeNotifier<SpecGenState> {
       final repo = ref.read(projectFileRepositoryProvider);
       final ingestedContext = await repo.readIngestedSummary(projectPath);
       final rawSpec = await llmService.complete(
-        systemPrompt: buildSpecPrompt(interviewState, ingestedContext: ingestedContext),
+        systemPrompt: buildSpecPrompt(interviewState, ingestedContext: ingestedContext, specVersion: specVersion),
         userPrompt: 'Generate the complete locked spec now.',
         temperature: 0.6,
         role: LlmRole.architect,
-        maxTokens: 4096,
+        maxTokens: 8192,
       );
       final specContent = SpecParser.clean(rawSpec);
+
+      // Guard against silently saving a truncated spec. A complete build spec
+      // always ends with sections 9 and 10; if either is absent the model hit
+      // its token ceiling mid-generation.
+      if (!specContent.contains('## 9.') || !specContent.contains('## 10.')) {
+        throw Exception(
+          'Spec generation was truncated — sections 9/10 are missing. '
+          'Try generating again.',
+        );
+      }
 
       await repo.writeLockedSpec(
           projectPath, projectName, specVersion, specContent);
@@ -80,6 +90,28 @@ class SpecNotifier extends AutoDisposeNotifier<SpecGenState> {
       final handoffPackage =
           buildHandoffPackage(interviewState, specVersion, specContent);
       await repo.writeHandoffPackage(projectPath, projectName, specVersion, handoffPackage);
+
+      // Generate and store verification checklist
+      final checklistPrompt = buildVerificationChecklistPrompt(specContent, projectName);
+      try {
+        final llmService = ref.read(llmServiceProvider);
+        final checklistRaw = await llmService.complete(
+          systemPrompt: 'You output only raw JSON arrays. No prose.',
+          userPrompt: checklistPrompt,
+          role: LlmRole.architect,
+          temperature: 0.1,
+          maxTokens: 1024,
+        );
+        final checklist = parseVerificationChecklist(checklistRaw);
+        if (checklist.isNotEmpty) {
+          await repo.updateHandoffPackageField(
+            projectPath, projectName, specVersion,
+            {'verificationChecklist': checklist},
+          );
+        }
+      } catch (_) {
+        // Checklist generation failure is non-fatal. Spec is already locked.
+      }
 
       final settings = ref.read(llmSettingsProvider);
       final providerName = settings

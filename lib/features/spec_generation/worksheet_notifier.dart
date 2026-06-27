@@ -43,7 +43,7 @@ class WorksheetNotifier extends AutoDisposeNotifier<WorksheetGenState> {
         userPrompt: 'Generate the setup worksheet now.',
         temperature: 0.3,
         role: LlmRole.architect,
-        maxTokens: 4096,
+        maxTokens: 8192,
       );
 
       await repo.writeWorksheet(projectPath, worksheetFilename, rawWorksheet.trim());

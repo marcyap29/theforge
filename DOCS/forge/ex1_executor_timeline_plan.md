@@ -1,3 +1,5 @@
+> **STATUS: COMPLETE ✅** — Implemented 2026-06-11. Gemma4 + Claude Code review. Branch merged to main. See `tracking md files/planner.md §EX1` for full implementation notes.
+
 # §EX1 — Executor Timeline
 ## Scoped Executor Prompt for Gemma
 

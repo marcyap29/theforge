@@ -201,13 +201,16 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen>
                 isLoading: _isLoading,
                 onSend: _send,
               ),
-              // Escape hatch: if parsing issues or dimension tracking failures
-              // prevent the gate from firing, surface a manual override after
-              // enough turns at L3 or L4 (6 user turns total is a full funnel).
+              // Escape hatch: surface a manual override when the gate hasn't
+              // fired. Primary trigger: L3/L4 after 6 user turns (normal path).
+              // Fallback: any layer after 10 user turns — catches cases where
+              // the LLM concludes the interview at L1/L2 without emitting
+              // forge-state blocks, leaving the app stuck with no button.
               if (!state.specGenEnabled &&
-                  (state.currentLayer == 'L3' ||
-                      state.currentLayer == 'L4') &&
-                  state.turns.where((t) => t.isUser).length >= 6)
+                  (((state.currentLayer == 'L3' ||
+                          state.currentLayer == 'L4') &&
+                      state.turns.where((t) => t.isUser).length >= 6) ||
+                      state.turns.where((t) => t.isUser).length >= 10))
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
                   child: SizedBox(

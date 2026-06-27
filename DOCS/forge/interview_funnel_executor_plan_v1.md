@@ -1,3 +1,5 @@
+> **STATUS: COMPLETE ✅** — Implemented 2026-06-11/12. DeepSeek + Claude Code review. Branch `wt/interview-funnel` merged to main. See `tracking md files/planner.md §IF1` for full implementation notes. Design source: `DOCS/forge/The_Forge_InterviewFunnel_Plan_v1.md`.
+
 # §IF1 — Interview Funnel Redesign
 
 ## Scoped Executor Prompt for DeepSeek V4 Pro

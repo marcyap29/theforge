@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 enum ProjectMode { build, audit }
 
@@ -28,7 +29,22 @@ class ProjectFileRepository {
   ProjectFileRepository({Future<Directory> Function()? rootDirProvider})
       : _rootDirProvider = rootDirProvider ?? _defaultRootDir;
 
+  static const _prefsKeyRootPath = 'forge_root_path';
+
+  static Future<String?> getSavedRootPath() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_prefsKeyRootPath);
+  }
+
+  static Future<void> saveRootPath(String path) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefsKeyRootPath, path);
+  }
+
   static Future<Directory> _defaultRootDir() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(_prefsKeyRootPath);
+    if (saved != null) return Directory(saved);
     final docs = await getApplicationDocumentsDirectory();
     return Directory(p.join(docs.path, 'The Forge Projects'));
   }
@@ -105,18 +121,16 @@ class ProjectFileRepository {
       String projectName,
       String specVersion,
       String content) async {
-    final specsDir = Directory(p.join(projectPath, 'specs'));
-    final specPath =
-        p.join(specsDir.path, '${projectName}_LockedSpec_$specVersion.md');
+    final versionDir = Directory(p.join(projectPath, 'specs', specVersion));
+    await versionDir.create(recursive: true);
+    final specPath = p.join(versionDir.path, '${projectName}_LockedSpec_$specVersion.md');
 
     if (File(specPath).existsSync()) {
       throw SpecAlreadyExistsException(specPath);
     }
 
     final tmpPath = '$specPath.tmp';
-    final tmpFile = File(tmpPath);
-    await tmpFile.writeAsString(content);
-
+    await File(tmpPath).writeAsString(content);
     File(tmpPath).renameSync(specPath);
   }
 
@@ -136,9 +150,12 @@ class ProjectFileRepository {
 
   Future<void> writeHandoff(
       String projectPath, String filename, String content) async {
-    final handoffsDir = Directory(p.join(projectPath, 'handoffs'));
-    final handoffFile = File(p.join(handoffsDir.path, filename));
-    await handoffFile.writeAsString(content);
+    final version = _extractVersion(filename);
+    final dir = version != null
+        ? Directory(p.join(projectPath, 'handoffs', version))
+        : Directory(p.join(projectPath, 'handoffs'));
+    await dir.create(recursive: true);
+    await File(p.join(dir.path, filename)).writeAsString(content);
   }
 
   Future<void> writeForgeFiles(
@@ -149,35 +166,97 @@ class ProjectFileRepository {
     required String decisionContextContent,
     required String openFlagsContent,
   }) async {
-    final forgeDir = Directory(p.join(projectPath, 'forge'));
-    await File(p.join(forgeDir.path, '${projectName}_LockedSpec_$specVersion.md'))
+    final versionDir = Directory(p.join(projectPath, 'forge', specVersion));
+    await versionDir.create(recursive: true);
+    await File(p.join(versionDir.path, '${projectName}_LockedSpec_$specVersion.md'))
         .writeAsString(lockedSpecContent);
-    await File(p.join(forgeDir.path, '${projectName}_DecisionContext_$specVersion.md'))
+    await File(p.join(versionDir.path, '${projectName}_DecisionContext_$specVersion.md'))
         .writeAsString(decisionContextContent);
-    await File(p.join(forgeDir.path, '${projectName}_OpenFlags_$specVersion.md'))
+    await File(p.join(versionDir.path, '${projectName}_OpenFlags_$specVersion.md'))
         .writeAsString(openFlagsContent);
   }
 
   Future<void> writeWorksheet(
       String projectPath, String filename, String content) async {
-    final worksheetsDir = Directory(p.join(projectPath, 'worksheets'));
-    final worksheetFile = File(p.join(worksheetsDir.path, filename));
-    await worksheetFile.writeAsString(content);
+    final version = _extractVersion(filename);
+    final dir = version != null
+        ? Directory(p.join(projectPath, 'worksheets', version))
+        : Directory(p.join(projectPath, 'worksheets'));
+    await dir.create(recursive: true);
+    await File(p.join(dir.path, filename)).writeAsString(content);
   }
 
   Future<void> writeHandoffPackage(
       String projectPath, String projectName, String version, Map<String, dynamic> data) async {
-    final handoffsDir = Directory(p.join(projectPath, 'handoffs'));
-    final packageFile =
-        File(p.join(handoffsDir.path, '${projectName}_HandoffPackage_$version.json'));
+    final versionDir = Directory(p.join(projectPath, 'handoffs', version));
+    await versionDir.create(recursive: true);
+    final packageFile = File(p.join(versionDir.path, '${projectName}_HandoffPackage_$version.json'));
     await packageFile.writeAsString(const JsonEncoder.withIndent('  ').convert(data));
   }
 
   Future<String> readLockedSpec(
       String projectPath, String projectName, String specVersion) async {
-    final specPath = p.join(
+    // Check versioned subfolder first, fall back to flat for existing projects.
+    final versionedPath = p.join(
+        projectPath, 'specs', specVersion, '${projectName}_LockedSpec_$specVersion.md');
+    if (File(versionedPath).existsSync()) return File(versionedPath).readAsString();
+    final flatPath = p.join(
         projectPath, 'specs', '${projectName}_LockedSpec_$specVersion.md');
-    return File(specPath).readAsString();
+    return File(flatPath).readAsString();
+  }
+
+  static String? _extractVersion(String filename) {
+    final match = RegExp(r'_(v\d+)[._]').firstMatch(filename);
+    return match?.group(1);
+  }
+
+  static const _versionedFolders = ['specs', 'forge', 'handoffs', 'worksheets'];
+
+  /// Returns true if the project has any flat versioned files that should be
+  /// inside a version subfolder.
+  Future<bool> hasFlatVersionedFiles(String projectPath) async {
+    for (final folder in _versionedFolders) {
+      final dir = Directory(p.join(projectPath, folder));
+      if (!dir.existsSync()) continue;
+      for (final entry in dir.listSync()) {
+        if (entry is File && _extractVersion(p.basename(entry.path)) != null) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// Migrates flat versioned files into version subfolders.
+  /// - Files not yet in a version subfolder are moved there.
+  /// - Flat files that are exact duplicates of the versioned copy are deleted.
+  /// Returns the number of files moved/cleaned.
+  Future<int> migrateToVersionFolders(String projectPath) async {
+    int count = 0;
+    for (final folder in _versionedFolders) {
+      final dir = Directory(p.join(projectPath, folder));
+      if (!dir.existsSync()) continue;
+      for (final entry in dir.listSync()) {
+        if (entry is! File) continue;
+        final filename = p.basename(entry.path);
+        final version = _extractVersion(filename);
+        if (version == null) continue;
+
+        final destDir = Directory(p.join(projectPath, folder, version));
+        final destFile = File(p.join(destDir.path, filename));
+
+        if (destFile.existsSync()) {
+          // Versioned copy already exists — delete the flat duplicate.
+          await entry.delete();
+        } else {
+          // No versioned copy yet — move the flat file there.
+          await destDir.create(recursive: true);
+          await entry.rename(destFile.path);
+        }
+        count++;
+      }
+    }
+    return count;
   }
 
   Future<List<String>> scanProjectPaths() async {
@@ -224,6 +303,159 @@ class ProjectFileRepository {
     final newPath = p.join(oldDir.parent.path, newName);
     await oldDir.rename(newPath);
     return newPath;
+  }
+
+  /// Reads project configuration from {projectPath}/forge/project_config.json
+  /// Returns empty map if file doesn't exist
+  static Future<Map<String, dynamic>> readProjectConfig(String projectPath) async {
+    final configPath = p.join(projectPath, 'forge', 'project_config.json');
+    final config = File(configPath);
+    if (!config.existsSync()) {
+      return {};
+    }
+    try {
+      return jsonDecode(await config.readAsString()) as Map<String, dynamic>;
+    } catch (e) {
+      return {};
+    }
+  }
+
+  /// Writes project configuration to {projectPath}/forge/project_config.json
+  /// Merges with existing config if present
+  static Future<void> writeProjectConfig(String projectPath, Map<String, dynamic> data) async {
+    final configPath = p.join(projectPath, 'forge', 'project_config.json');
+    final config = File(configPath);
+    Map<String, dynamic> existing = {};
+    if (config.existsSync()) {
+      try {
+        existing = jsonDecode(await config.readAsString()) as Map<String, dynamic>;
+      } catch (e) {
+        // Ignore errors and use empty map
+      }
+    }
+    final merged = {...existing, ...data};
+    await config.writeAsString(jsonEncode(merged));
+  }
+
+  /// Reads handoff package from versioned subfolder first, falls back to flat
+  static Future<Map<String, dynamic>?> readHandoffPackage(
+      String projectPath, String projectName, String version) async {
+    // Check versioned subfolder first
+    final versionedPath = p.join(
+        projectPath, 'handoffs', version, '${projectName}_HandoffPackage_$version.json');
+    if (File(versionedPath).existsSync()) {
+      try {
+        return jsonDecode(await File(versionedPath).readAsString()) as Map<String, dynamic>;
+      } catch (e) {
+        return null;
+      }
+    }
+    // Fall back to flat
+    final flatPath = p.join(
+        projectPath, 'handoffs', '${projectName}_HandoffPackage_$version.json');
+    if (File(flatPath).existsSync()) {
+      try {
+        return jsonDecode(await File(flatPath).readAsString()) as Map<String, dynamic>;
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  /// Gets list of changed files from git history in a repository
+  /// Returns empty list on any error (not throwing)
+  static Future<Set<String>> getGitChangedFiles(String repoPath, {required String since}) async {
+    try {
+      final process = await Process.run(
+        'git',
+        ['log', '--name-only', '--pretty=format:', '--since=$since'],
+        workingDirectory: repoPath,
+      );
+      
+      if (process.exitCode != 0) {
+        return {};
+      }
+      
+      final lines = process.stdout
+          .toString()
+          .split('\n')
+          .where((line) => line.trim().isNotEmpty)
+          .toList();
+      
+      return lines.toSet(); // Remove duplicates
+    } catch (e) {
+      return {};
+    }
+  }
+
+  /// Gets list of commit messages from git history in a repository
+  /// Returns empty list on any error (not throwing)
+  static Future<List<String>> getGitCommitMessages(String repoPath, {required String since}) async {
+    try {
+      final process = await Process.run(
+        'git',
+        ['log', '--oneline', '--since=$since'],
+        workingDirectory: repoPath,
+      );
+      
+      if (process.exitCode != 0) {
+        return [];
+      }
+      
+      final lines = process.stdout
+          .toString()
+          .split('\n')
+          .where((line) => line.trim().isNotEmpty)
+          .toList();
+      
+      return lines;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Gets current git HEAD commit hash
+  /// Returns null on any error (not throwing)
+  static Future<String?> getGitHead(String repoPath) async {
+    try {
+      final process = await Process.run(
+        'git',
+        ['rev-parse', 'HEAD'],
+        workingDirectory: repoPath,
+      );
+      
+      if (process.exitCode != 0) {
+        return null;
+      }
+      
+      return process.stdout.toString().trim();
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Writes verification result cache to forge/{version}/Name_Verification_{version}.json
+  static Future<void> writeVerificationResult(
+      String projectPath, String projectName, String specVersion,
+      Map<String, dynamic> data) async {
+    final versionDir = Directory(p.join(projectPath, 'forge', specVersion));
+    await versionDir.create(recursive: true);
+    final cacheFile = File(p.join(versionDir.path, '${projectName}_Verification_$specVersion.json'));
+    await cacheFile.writeAsString(jsonEncode(data));
+  }
+
+  /// Reads verification result cache from forge/{version}/Name_Verification_{version}.json
+  static Future<Map<String, dynamic>?> readVerificationResult(
+      String projectPath, String projectName, String specVersion) async {
+    final cacheFile = File(p.join(
+        projectPath, 'forge', specVersion, '${projectName}_Verification_$specVersion.json'));
+    if (!cacheFile.existsSync()) return null;
+    try {
+      return jsonDecode(await cacheFile.readAsString()) as Map<String, dynamic>;
+    } catch (e) {
+      return null;
+    }
   }
 
   Future<List<File>> listReferenceDocs(String projectPath) async {

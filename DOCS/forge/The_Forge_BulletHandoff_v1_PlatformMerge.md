@@ -1,3 +1,5 @@
+> **STATUS: COMPLETE ✅** — §6 Spec Generation + §7 Artifact Viewers implemented 2026-06-04. See `tracking md files/planner.md §6` and `§7` for implementation notes. This document is an archived executor handoff retained for format reference.
+
 # The Forge — Bullet Handoff v1 · Platform Merge + §6 Spec Generation
 **Prepared for:** External agent (DeepSeek Flash / any capable coding model)
 **Date:** 2026-06-03

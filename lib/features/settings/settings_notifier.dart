@@ -103,13 +103,13 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
       // with a model that the API will reject.
       final validIds = modelsFor(providerType).map((m) => m.id).toSet();
       final fallbackId =
-          modelsFor(providerType).firstOrNull?.id ?? 'gemini-2.5-flash';
+          modelsFor(providerType).firstOrNull?.id ?? 'gemini-3.5-flash';
       final modelId = (savedModelId != null &&
               savedModelId.isNotEmpty &&
               (providerType == LlmProviderType.ollama ||
                   validIds.contains(savedModelId)))
           ? savedModelId
-          : (isFirstRun ? 'gemini-2.5-flash' : fallbackId);
+          : (isFirstRun ? 'gemini-3.5-flash' : fallbackId);
       assignments[role] = ModelAssignment(
         providerType: providerType,
         modelId: modelId,
@@ -270,7 +270,7 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
       case LlmProviderType.gemini:
         if (key == null || key.isEmpty) return 'No API key configured.';
         provider = GeminiProvider(apiKey: key);
-        modelId = 'gemini-2.5-flash';
+        modelId = 'gemini-3.5-flash';
       case LlmProviderType.claude:
         if (key == null || key.isEmpty) return 'No API key configured.';
         provider = ClaudeProvider(apiKey: key);
@@ -290,7 +290,7 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
         userPrompt: 'Reply with exactly one word: OK',
         temperature: 0.0,
         modelId: modelId,
-        maxTokens: 10,
+        maxTokens: 100,
       );
       return null;
     } catch (e) {

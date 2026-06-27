@@ -1,3 +1,5 @@
+> **STATUS: COMPLETE ✅** — Implemented 2026-06-17. Branch `wt/feature-mode` merged to main. See `tracking md files/planner.md §FM1` for full implementation notes.
+
 # §FM1 — Feature Interview Mode (V2, V3, …)
 
 ## Scoped Executor Prompt for DeepSeek V4 Pro

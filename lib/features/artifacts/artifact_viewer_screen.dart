@@ -11,12 +11,14 @@ class ArtifactViewArgs {
   final String projectName;
   final String filename;
   final ArtifactViewMode mode;
+  final String? specVersion;
 
   const ArtifactViewArgs({
     required this.projectPath,
     required this.projectName,
     required this.filename,
     required this.mode,
+    this.specVersion,
   });
 }
 
@@ -47,7 +49,9 @@ class ArtifactViewerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final file = File(p.join(args.projectPath, _folder, args.filename));
+    final file = args.specVersion != null
+        ? File(p.join(args.projectPath, _folder, args.specVersion!, args.filename))
+        : File(p.join(args.projectPath, _folder, args.filename));
 
     return Scaffold(
       appBar: AppBar(

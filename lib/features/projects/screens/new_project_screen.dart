@@ -1,5 +1,8 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import '../../../data/filesystem/project_file_repository.dart';
 import '../../../data/local_db/forge_database.dart';
@@ -42,6 +45,22 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
     setState(() => _creating = true);
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
+
+    // First-time setup: pick a root folder if none is saved yet.
+    final savedRoot = await ProjectFileRepository.getSavedRootPath();
+    if (savedRoot == null) {
+      final picked = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: 'Choose where to store Forge Projects',
+      );
+      if (picked != null) {
+        await ProjectFileRepository.saveRootPath(picked);
+      } else {
+        // User dismissed — fall back to default and save it so we don't ask again.
+        final docs = await getApplicationDocumentsDirectory();
+        await ProjectFileRepository.saveRootPath(
+            p.join(docs.path, 'The Forge Projects'));
+      }
+    }
 
     final repo = ref.read(projectFileRepositoryProvider);
     final db = ref.read(forgeDatabaseProvider);

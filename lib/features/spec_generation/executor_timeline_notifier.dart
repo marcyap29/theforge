@@ -26,7 +26,15 @@ class ExecutorTimelineNotifier extends AutoDisposeFamilyAsyncNotifier<ExecutorTi
         return const ExecutorTimelineState(status: ExecutorTimelineStatus.notGenerated);
       }
 
-      final files = handoffsDir.listSync().whereType<File>().toList();
+      // Collect files from version subfolders and flat root.
+      final files = <File>[];
+      for (final entry in handoffsDir.listSync()) {
+        if (entry is Directory) {
+          files.addAll(entry.listSync().whereType<File>());
+        } else if (entry is File) {
+          files.add(entry);
+        }
+      }
       final sequenceFile = files.firstWhereOrNull(
         (f) => p.basename(f.path).contains('_BuildSequence_'),
       );

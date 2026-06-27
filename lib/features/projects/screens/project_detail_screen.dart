@@ -1,6 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
@@ -10,6 +14,7 @@ import '../../../data/local_db/forge_database.dart';
 import '../../artifacts/artifact_viewer_screen.dart';
 import '../../interview/providers/interview_providers.dart';
 import '../../interview/ui/interview_screen.dart';
+import '../../spec_generation/compliance/spec_compliance_screen.dart';
 import '../../spec_generation/executor_timeline_notifier.dart';
 import '../../spec_generation/worksheet_generation_screen.dart';
 import '../ingestion/ingestion_notifier.dart';
@@ -67,6 +72,7 @@ class ProjectDetailScreen extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
               children: [
+                _FixStructureBanner(projectPath: live.path),
                 _PhaseTimeline(project: live),
                 const SizedBox(height: 24),
                 const _SectionHeader('Project State'),
@@ -80,8 +86,21 @@ class ProjectDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 24),
                 const _SectionHeader('Reference Documents'),
                 _ReferenceDocsRow(projectPath: project.path),
-                if (_stageOf(live.phase) == 'worksheet_complete')
+                const SizedBox(height: 24),
+                _RepoPathRow(projectPath: project.path, projectName: project.name),
+                if (_stageOf(live.phase) == 'worksheet_complete') ...[
                   _BuildSequenceSection(project: live),
+                  const SizedBox(height: 8),
+                  _CopyWorksheetButton(
+                    projectPath: live.path,
+                    projectName: live.name,
+                    specVersion: sv,
+                  ),
+                ],
+                _BacklogSection(
+                  projectPath: live.path,
+                  projectName: live.name,
+                ),
                 const SizedBox(height: 24),
                 // Phase-aware CTA
                 _SectionHeader(_ctaSectionLabel(live.phase)),
@@ -164,18 +183,15 @@ class ProjectDetailScreen extends ConsumerWidget {
                 width: double.infinity,
                 height: 44,
                 child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => InterviewScreen(
-                        args: InterviewArgs(
-                          path: live.path,
-                          name: live.name,
-                          mode: ProjectMode.build,
-                          priorSpecVersion: version,
-                        ),
-                      ),
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => SpecComplianceScreen(
+                      projectPath: live.path,
+                      projectName: live.name,
+                      priorSpecVersion: version,  // e.g. "v1"
+                      nextVersion: _nextVersion(version),  // e.g. "v2"
+                      mode: mode,
                     ),
-                  ),
+                  )),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Color(0xFFE8A04C)),
                     foregroundColor: const Color(0xFFE8A04C),
@@ -275,10 +291,13 @@ class _AppBarTitleState extends State<_AppBarTitle> {
   Future<void> _load() async {
     final sv = widget.specVersion ?? 'v1';
     try {
-      final file = File(p.join(
-        widget.projectPath, 'specs',
-        '${widget.projectName}_LockedSpec_$sv.md',
-      ));
+      // Check versioned subfolder first, fall back to flat for older projects.
+      File file = File(p.join(widget.projectPath, 'specs', sv,
+          '${widget.projectName}_LockedSpec_$sv.md'));
+      if (!file.existsSync()) {
+        file = File(p.join(
+            widget.projectPath, 'specs', '${widget.projectName}_LockedSpec_$sv.md'));
+      }
       if (!file.existsSync()) return;
       final content = await file.readAsString();
       final goal = _parseGoal(content);
@@ -377,10 +396,13 @@ class _VersionHistoryLaneState extends State<_VersionHistoryLane> {
 
   Future<_SpecSummary> _loadSpec(String version) async {
     try {
-      final file = File(p.join(
-        widget.projectPath, 'specs',
-        '${widget.projectName}_LockedSpec_$version.md',
-      ));
+      File file = File(p.join(
+          widget.projectPath, 'specs', version,
+          '${widget.projectName}_LockedSpec_$version.md'));
+      if (!file.existsSync()) {
+        file = File(p.join(widget.projectPath, 'specs',
+            '${widget.projectName}_LockedSpec_$version.md'));
+      }
       if (!file.existsSync()) return (goal: null, components: <String>[]);
       final content = await file.readAsString();
       return (goal: _parseGoal(content), components: _parseComponents(content));
@@ -576,8 +598,10 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
   late AnimationController _pulseCtrl;
   late Animation<double> _pulseOpacity;
   Map<String, dynamic>? _progress;
-  // version → component names; loaded for all completed versions
   final Map<String, List<String>> _allComponents = {};
+  final Map<String, String?> _versionGoals = {};
+  // true = expanded; shipped versions default false, active version defaults true
+  final Map<String, bool> _expanded = {};
 
   @override
   void initState() {
@@ -598,20 +622,52 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
     final stage = _stageOf(pj.phase);
     final currentVersion = _versionOf(pj.phase);
     final n = int.tryParse(currentVersion.substring(1)) ?? 1;
-    final completedCount = stage == 'worksheet_complete' ? n : n - 1;
-    for (int i = 1; i <= completedCount; i++) {
+    // Load all versions that have a locked spec (prior completed + current if spec exists).
+    for (int i = 1; i <= n; i++) {
       await _loadVersionComponents(pj, 'v$i');
+    }
+    // Default expansion: active version expanded, shipped ones collapsed.
+    if (mounted) {
+      setState(() {
+        for (int i = 1; i <= n; i++) {
+          final v = 'v$i';
+          if (!_expanded.containsKey(v)) {
+            _expanded[v] = (v == currentVersion) && (stage != 'worksheet_complete' || n == 1);
+          }
+        }
+      });
     }
   }
 
   Future<void> _loadVersionComponents(Project pj, String version) async {
     try {
-      final file = File(p.join(
-          pj.path, 'specs', '${pj.name}_LockedSpec_$version.md'));
+      File file = File(p.join(pj.path, 'specs', version, '${pj.name}_LockedSpec_$version.md'));
+      if (!file.existsSync()) {
+        file = File(p.join(pj.path, 'specs', '${pj.name}_LockedSpec_$version.md'));
+      }
       if (!file.existsSync()) return;
       final content = await file.readAsString();
       final result = <String>[];
       final lines = content.split('\n');
+
+      // Extract goal
+      bool inGoal = false;
+      String? goal;
+      for (final line in lines) {
+        if (RegExp(r'##\s+\d*\.?\s*(Immutable )?Goal Statement', caseSensitive: false).hasMatch(line)) {
+          inGoal = true;
+          continue;
+        }
+        if (inGoal) {
+          final t = line.trim();
+          if (t.isEmpty) continue;
+          if (t.startsWith('#')) break;
+          goal = t.replaceAll(RegExp(r'^\*+|\*+$'), '').trim();
+          break;
+        }
+      }
+
+      // Extract components
       bool inSection = false;
       bool pastHeader = false;
       for (final line in lines) {
@@ -640,7 +696,10 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
           }
         }
       }
-      if (mounted) setState(() => _allComponents[version] = result);
+      if (mounted) setState(() {
+        _allComponents[version] = result;
+        _versionGoals[version] = goal;
+      });
     } catch (_) {}
   }
 
@@ -673,10 +732,16 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
   }
 
   void _openArtifact(
-      BuildContext context, String folder, String filename, ArtifactViewMode mode) {
-    final file =
-        File(p.join(widget.project.path, folder, filename));
-    if (!file.existsSync()) return;
+      BuildContext context, String folder, String filename, ArtifactViewMode mode,
+      {String? specVersion}) {
+    final file = specVersion != null
+        ? File(p.join(widget.project.path, folder, specVersion, filename))
+        : File(p.join(widget.project.path, folder, filename));
+    // Fall back to flat path for existing projects.
+    final resolvedFile = file.existsSync()
+        ? file
+        : File(p.join(widget.project.path, folder, filename));
+    if (!resolvedFile.existsSync()) return;
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => ArtifactViewerScreen(
         args: ArtifactViewArgs(
@@ -684,9 +749,243 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
           projectName: widget.project.name,
           filename: filename,
           mode: mode,
+          specVersion: specVersion,
         ),
       ),
     ));
+  }
+
+  Widget _buildChips(List<String> chips) {
+    return Wrap(
+      spacing: 4,
+      runSpacing: 3,
+      children: [
+        for (final c in chips)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F2318),
+              borderRadius: BorderRadius.circular(3),
+              border: Border.all(color: const Color(0xFF1A3324)),
+            ),
+            child: Text(c,
+                style: const TextStyle(
+                    fontSize: 9, fontFamily: 'Menlo', color: Color(0xFF4ADE80))),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildTimelineRow(BuildContext context, Project pj, String sv,
+      ProjectMode mode, String stage) {
+    final interviewDone = stage != 'interview';
+    final worksheetDone = stage == 'worksheet_complete';
+    final worksheetCurrent = stage == 'spec_locked';
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _TimelineStep(
+              label: 'Interview',
+              isDone: interviewDone,
+              isCurrent: !interviewDone,
+              pulseOpacity: _pulseOpacity,
+              onTap: interviewDone
+                  ? () => _openArtifact(context, 'specs',
+                      '${pj.name}_LockedSpec_$sv.md', ArtifactViewMode.spec,
+                      specVersion: sv)
+                  : () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => InterviewScreen(
+                          args: InterviewArgs(
+                              path: pj.path, name: pj.name, mode: mode),
+                        ),
+                      )),
+            ),
+            if (mode == ProjectMode.build)
+              _LayerSubRow(
+                progress: _progress,
+                interviewDone: interviewDone,
+                pulseOpacity: _pulseOpacity,
+              ),
+          ],
+        ),
+        Expanded(child: _TimelineConnector(done: interviewDone)),
+        _TimelineStep(
+          label: 'Worksheet',
+          isDone: worksheetDone,
+          isCurrent: worksheetCurrent,
+          pulseOpacity: _pulseOpacity,
+          onTap: worksheetDone
+              ? () => _openArtifact(context, 'worksheets',
+                  '${pj.name}_SetupWorksheet_$sv.md', ArtifactViewMode.worksheet,
+                  specVersion: sv)
+              : worksheetCurrent
+                  ? () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => WorksheetGenerationScreen(
+                          projectPath: pj.path,
+                          projectName: pj.name,
+                          specVersion: sv,
+                        ),
+                      ))
+                  : null,
+        ),
+        Expanded(child: _TimelineConnector(done: worksheetDone)),
+        _TimelineStep(
+          label: 'Ready',
+          isDone: worksheetDone,
+          isCurrent: false,
+          pulseOpacity: _pulseOpacity,
+          onTap: worksheetDone
+              ? () => _openArtifact(context, 'handoffs',
+                  '${pj.name}_BulletHandoff_${sv}_Interview.md',
+                  ArtifactViewMode.handoff,
+                  specVersion: sv)
+              : null,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildVersionPanel(
+    BuildContext context, {
+    required String version,
+    required bool isShipped,
+    required Widget expandedContent,
+    Widget? collapsedTrailing,
+  }) {
+    final isExpanded = _expanded[version] ?? !isShipped;
+    final color =
+        isShipped ? const Color(0xFF22C55E) : const Color(0xFFE8A04C);
+    final label = isShipped
+        ? '${version.toUpperCase()} SHIPPED'
+        : '${version.toUpperCase()} IN PROGRESS';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // ── Chevron header ──────────────────────────────────
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () => setState(() => _expanded[version] = !isExpanded),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isExpanded ? Icons.expand_more : Icons.chevron_right,
+                    size: 14,
+                    color: color,
+                  ),
+                  const SizedBox(width: 4),
+                  if (isShipped) ...[
+                    const Icon(Icons.check_circle,
+                        size: 11, color: Color(0xFF22C55E)),
+                    const SizedBox(width: 4),
+                  ],
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontFamily: 'Menlo',
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.4,
+                      color: color,
+                    ),
+                  ),
+                  // In-progress: show mini L-dots inline when collapsed
+                  if (!isShipped && !isExpanded && collapsedTrailing != null) ...[
+                    const SizedBox(width: 10),
+                    collapsedTrailing,
+                  ],
+                ],
+              ),
+            ),
+          ),
+          // ── Expanded body ───────────────────────────────────
+          if (isExpanded)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, left: 18),
+              child: expandedContent,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVersionEntry(
+    BuildContext context,
+    String v, {
+    required String sv,
+    required ProjectMode mode,
+    required String stage,
+    required bool worksheetDone,
+    required String latestVersion,
+    required Project pj,
+  }) {
+    final vIsShipped = (v != latestVersion) || worksheetDone;
+    final chips = _allComponents[v] ?? [];
+    final goal = _versionGoals[v];
+
+    return _buildVersionPanel(
+      context,
+      version: v,
+      isShipped: vIsShipped,
+      collapsedTrailing: !vIsShipped && mode == ProjectMode.build
+          ? _LayerSubRow(
+              progress: _progress,
+              interviewDone: false,
+              pulseOpacity: _pulseOpacity,
+            )
+          : null,
+      expandedContent: vIsShipped
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (goal != null) ...[
+                  Text(
+                    goal,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontFamily: 'Menlo',
+                      color: Color(0xFF6B7280),
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                if (chips.isNotEmpty) _buildChips(chips),
+                if (chips.isNotEmpty && mode == ProjectMode.build) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Interview',
+                          style: TextStyle(
+                              fontSize: 9,
+                              fontFamily: 'Menlo',
+                              color: Color(0xFF4B5563))),
+                      const SizedBox(width: 8),
+                      _LayerSubRow(
+                        progress: v == latestVersion ? _progress : null,
+                        interviewDone: true,
+                        pulseOpacity: _pulseOpacity,
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            )
+          : _buildTimelineRow(context, pj, sv, mode, stage),
+    );
   }
 
   @override
@@ -697,228 +996,29 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
       (m) => m.name == pj.mode,
       orElse: () => ProjectMode.build,
     );
-
     final stage = _stageOf(pj.phase);
-    final interviewDone = stage != 'interview';
     final worksheetDone = stage == 'worksheet_complete';
-    final worksheetCurrent = stage == 'spec_locked';
-
     final latestVersion = _versionOf(pj.phase);
     final latestN = int.tryParse(latestVersion.substring(1)) ?? 1;
-    final priorVersions = worksheetDone
-        ? List.generate(latestN - 1, (i) => 'v${i + 1}')
-        : <String>[];
-    final latestChips = _allComponents[latestVersion] ?? [];
+    final allVersions = List.generate(latestN, (i) => 'v${i + 1}');
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // ── Main timeline row: compact dots + connectors ──────────────────
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Interview dot — compact, never widens the row
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (worksheetDone)
-                    MouseRegion(
-                      cursor: SystemMouseCursors.click,
-                      child: GestureDetector(
-                        onTap: () => _openArtifact(
-                            context, 'specs',
-                            '${pj.name}_LockedSpec_$sv.md',
-                            ArtifactViewMode.spec),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.check_circle,
-                                color: Color(0xFF22C55E), size: 20),
-                            const SizedBox(height: 5),
-                            Text(
-                              '${latestVersion.toUpperCase()} SHIPPED',
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontFamily: 'Menlo',
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.4,
-                                color: Color(0xFF22C55E),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  else ...[
-                    _TimelineStep(
-                      label: 'Interview',
-                      isDone: interviewDone,
-                      isCurrent: !interviewDone,
-                      pulseOpacity: _pulseOpacity,
-                      onTap: interviewDone
-                          ? () => _openArtifact(
-                              context, 'specs',
-                              '${pj.name}_LockedSpec_$sv.md',
-                              ArtifactViewMode.spec)
-                          : () => Navigator.of(context).push(MaterialPageRoute(
-                                builder: (_) => InterviewScreen(
-                                  args: InterviewArgs(
-                                    path: pj.path,
-                                    name: pj.name,
-                                    mode: mode,
-                                  ),
-                                ),
-                              )),
-                    ),
-                    if (mode == ProjectMode.build &&
-                        (!interviewDone || _progress != null))
-                      _LayerSubRow(
-                        progress: _progress,
-                        interviewDone: interviewDone,
-                        pulseOpacity: _pulseOpacity,
-                      ),
-                  ],
-                ],
-              ),
-              Expanded(child: _TimelineConnector(done: interviewDone)),
-          // Step 2: Worksheet → opens worksheet when done, generates when current
-          _TimelineStep(
-            label: 'Worksheet',
-            isDone: worksheetDone,
-            isCurrent: worksheetCurrent,
-            pulseOpacity: _pulseOpacity,
-            onTap: worksheetDone
-                ? () => _openArtifact(
-                    context,
-                    'worksheets',
-                    '${pj.name}_SetupWorksheet_$sv.md',
-                    ArtifactViewMode.worksheet)
-                : worksheetCurrent
-                    ? () => Navigator.of(context).push(MaterialPageRoute(
-                          builder: (_) => WorksheetGenerationScreen(
-                            projectPath: pj.path,
-                            projectName: pj.name,
-                            specVersion: sv,
-                          ),
-                        ))
-                    : null,
-          ),
-          Expanded(child: _TimelineConnector(done: worksheetDone)),
-          // Step 3: Ready → opens bullet handoff when done
-          _TimelineStep(
-            label: 'Ready',
-            isDone: worksheetDone,
-            isCurrent: false,
-            pulseOpacity: _pulseOpacity,
-            onTap: worksheetDone
-                ? () => _openArtifact(
-                    context,
-                    'handoffs',
-                    '${pj.name}_BulletHandoff_${sv}_Interview.md',
-                    ArtifactViewMode.handoff)
-                : null,
-          ),
+          for (final v in allVersions)
+            _buildVersionEntry(context, v,
+                sv: sv,
+                mode: mode,
+                stage: stage,
+                worksheetDone: worksheetDone,
+                latestVersion: latestVersion,
+                pj: pj),
         ],
       ),
-      // ── Below timeline: version detail (worksheetDone, Build mode only) ──
-      if (worksheetDone && mode == ProjectMode.build) ...[
-        // Latest version component chips
-        if (latestChips.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Wrap(
-              spacing: 4,
-              runSpacing: 3,
-              children: [
-                for (final c in latestChips)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0F2318),
-                      borderRadius: BorderRadius.circular(3),
-                      border: Border.all(color: const Color(0xFF1A3324)),
-                    ),
-                    child: Text(c,
-                        style: const TextStyle(
-                          fontSize: 9,
-                          fontFamily: 'Menlo',
-                          color: Color(0xFF4ADE80),
-                        )),
-                  ),
-              ],
-            ),
-          ),
-        // Prior versions: collapsed pills (only shown when v2+)
-        if (priorVersions.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (final v in priorVersions) ...[
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0A1A0E),
-                      borderRadius: BorderRadius.circular(3),
-                      border: Border.all(color: const Color(0xFF1A3324)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.check_circle,
-                            color: Color(0xFF22C55E), size: 9),
-                        const SizedBox(width: 3),
-                        Text(v.toUpperCase(),
-                            style: const TextStyle(
-                              fontSize: 9,
-                              fontFamily: 'Menlo',
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF22C55E),
-                            )),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                ],
-              ],
-            ),
-          ),
-        // "Interview" label + L1–L4 on the same row
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Text(
-                'Interview',
-                style: TextStyle(
-                  fontSize: 9,
-                  fontFamily: 'Menlo',
-                  letterSpacing: 0.3,
-                  color: Color(0xFF4B5563),
-                ),
-              ),
-              const SizedBox(width: 8),
-              _LayerSubRow(
-                progress: _progress,
-                interviewDone: true,
-                pulseOpacity: _pulseOpacity,
-              ),
-            ],
-          ),
-        ),
-      ],
-    ],
-  ),
-);
+    );
   }
 }
 
@@ -1161,7 +1261,10 @@ class _FilesSidebar extends StatefulWidget {
 
 class _FilesSidebarState extends State<_FilesSidebar> with RouteAware {
   String? _selected;
-  Future<Map<String, List<String>>>? _scanFuture;
+  // folder → version ('' for flat files) → filenames
+  Future<Map<String, Map<String, List<String>>>>? _scanFuture;
+  // null key → defaults to expanded (true)
+  final Map<String, bool> _folderExpanded = {};
 
   @override
   void initState() {
@@ -1186,22 +1289,19 @@ class _FilesSidebarState extends State<_FilesSidebar> with RouteAware {
 
   @override
   void didPopNext() {
-    final next = _scan();
-    setState(() {
-      _scanFuture = next;
-    });
+    setState(() { _scanFuture = _scan(); });
   }
 
-  void _open(BuildContext context, String folder, String filename) {
-    setState(() => _selected = '$folder/$filename');
-    final projectName = p.basename(widget.projectPath);
+  void _open(BuildContext context, String folder, String version, String filename) {
+    setState(() => _selected = '$folder/$version/$filename');
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ArtifactViewerScreen(
           args: ArtifactViewArgs(
             projectPath: widget.projectPath,
-            projectName: projectName,
+            projectName: p.basename(widget.projectPath),
             filename: filename,
+            specVersion: version.isEmpty ? null : version,
             mode: _modeForFolder(folder),
           ),
         ),
@@ -1209,18 +1309,30 @@ class _FilesSidebarState extends State<_FilesSidebar> with RouteAware {
     );
   }
 
-  Future<Map<String, List<String>>> _scan() async {
-    final result = <String, List<String>>{};
+  /// Scans each folder. Version subfolders (v1, v2, …) are grouped by name;
+  /// flat files (audit, ingested, legacy) land under the '' key.
+  Future<Map<String, Map<String, List<String>>>> _scan() async {
+    final result = <String, Map<String, List<String>>>{};
     for (final f in _folders) {
       final dir = Directory(p.join(widget.projectPath, f.id));
       if (!dir.existsSync()) continue;
-      final files = dir
-          .listSync()
-          .whereType<File>()
-          .map((e) => p.basename(e.path))
-          .toList()
-        ..sort();
-      if (files.isNotEmpty) result[f.id] = files;
+      final versions = <String, List<String>>{};
+      for (final entry in dir.listSync()) {
+        if (entry is Directory) {
+          final vName = p.basename(entry.path);
+          if (RegExp(r'^v\d+$').hasMatch(vName)) {
+            final vFiles = entry.listSync()
+                .whereType<File>()
+                .map((e) => p.basename(e.path))
+                .toList()..sort();
+            if (vFiles.isNotEmpty) versions[vName] = vFiles;
+          }
+        } else if (entry is File) {
+          (versions[''] ??= []).add(p.basename(entry.path));
+        }
+      }
+      versions['']?.sort();
+      if (versions.isNotEmpty) result[f.id] = versions;
     }
     return result;
   }
@@ -1231,11 +1343,12 @@ class _FilesSidebarState extends State<_FilesSidebar> with RouteAware {
       width: 220,
       child: Container(
         color: const Color(0xFF141414),
-        child: FutureBuilder<Map<String, List<String>>>(
+        child: FutureBuilder<Map<String, Map<String, List<String>>>>(
           future: _scanFuture,
           builder: (context, snapshot) {
             final files = snapshot.data ?? {};
-            final hasAny = files.values.any((l) => l.isNotEmpty);
+            final hasAny = files.values
+                .any((vMap) => vMap.values.any((l) => l.isNotEmpty));
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1272,36 +1385,85 @@ class _FilesSidebarState extends State<_FilesSidebar> with RouteAware {
                           children: [
                             for (final folder in _folders) ...[
                               if (files[folder.id]?.isNotEmpty == true) ...[
-                                Padding(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(12, 12, 12, 4),
-                                  child: Row(
-                                    children: [
-                                      Icon(folder.icon,
-                                          size: 11,
-                                          color: const Color(0xFF6B7280)),
-                                      const SizedBox(width: 5),
-                                      Text(
-                                        folder.label,
-                                        style: const TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w600,
-                                          letterSpacing: 0.6,
-                                          fontFamily: 'Menlo',
-                                          color: Color(0xFF6B7280),
-                                        ),
+                                // ── Collapsible folder header ──────────────
+                                MouseRegion(
+                                  cursor: SystemMouseCursors.click,
+                                  child: GestureDetector(
+                                    onTap: () => setState(() {
+                                      _folderExpanded[folder.id] =
+                                          !(_folderExpanded[folder.id] ?? true);
+                                    }),
+                                    child: Padding(
+                                      padding: const EdgeInsets.fromLTRB(8, 12, 12, 4),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            (_folderExpanded[folder.id] ?? true)
+                                                ? Icons.expand_more
+                                                : Icons.chevron_right,
+                                            size: 13,
+                                            color: const Color(0xFF6B7280),
+                                          ),
+                                          const SizedBox(width: 3),
+                                          Icon(folder.icon,
+                                              size: 11,
+                                              color: const Color(0xFF6B7280)),
+                                          const SizedBox(width: 5),
+                                          Text(
+                                            folder.label,
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w600,
+                                              letterSpacing: 0.6,
+                                              fontFamily: 'Menlo',
+                                              color: Color(0xFF6B7280),
+                                            ),
+                                          ),
+                                          if (!(_folderExpanded[folder.id] ?? true)) ...[
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              '${files[folder.id]!.values.fold(0, (s, l) => s + l.length)}',
+                                              style: const TextStyle(
+                                                fontSize: 9,
+                                                fontFamily: 'Menlo',
+                                                color: Color(0xFF4B5563),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
                                       ),
-                                    ],
+                                    ),
                                   ),
                                 ),
-                                for (final filename in files[folder.id]!)
-                                  _FileRow(
-                                    filename: filename,
-                                    selected: _selected ==
-                                        '${folder.id}/$filename',
-                                    onTap: () =>
-                                        _open(context, folder.id, filename),
-                                  ),
+                                // ── Files (only when expanded) ─────────────
+                                if (_folderExpanded[folder.id] ?? true)
+                                  // Sort versions: flat ('') first, then v1, v2...
+                                  for (final version in (files[folder.id]!.keys.toList()
+                                        ..sort((a, b) => a.isEmpty ? -1 : b.isEmpty ? 1 : a.compareTo(b)))) ...[
+                                    if (version.isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.fromLTRB(24, 8, 12, 2),
+                                        child: Text(
+                                          version.toUpperCase(),
+                                          style: const TextStyle(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 0.6,
+                                            fontFamily: 'Menlo',
+                                            color: Color(0xFF4B5563),
+                                          ),
+                                        ),
+                                      ),
+                                    for (final filename in files[folder.id]![version]!)
+                                      _FileRow(
+                                        filename: filename,
+                                        selected: _selected == '${folder.id}/$version/$filename',
+                                        onTap: () => _open(context, folder.id, version, filename),
+                                        filePath: version.isEmpty
+                                            ? p.join(widget.projectPath, folder.id, filename)
+                                            : p.join(widget.projectPath, folder.id, version, filename),
+                                      ),
+                                  ],
                               ],
                             ],
                           ],
@@ -1321,19 +1483,51 @@ class _FileRow extends StatelessWidget {
     required this.filename,
     required this.selected,
     required this.onTap,
+    required this.filePath,
   });
 
   final String filename;
   final bool selected;
   final VoidCallback onTap;
+  final String filePath;
+
+  void _showInFinder() {
+    Process.run('open', ['-R', filePath]);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
+    return GestureDetector(
+      onSecondaryTapUp: (details) async {
+        final overlay =
+            Overlay.of(context).context.findRenderObject() as RenderBox;
+        await showMenu(
+          context: context,
+          position: RelativeRect.fromRect(
+            details.globalPosition & Size.zero,
+            Offset.zero & overlay.size,
+          ),
+          color: const Color(0xFF1C1C1E),
+          items: [
+            PopupMenuItem(
+              onTap: _showInFinder,
+              child: const Text(
+                'Show in Finder',
+                style: TextStyle(
+                  fontFamily: 'Menlo',
+                  fontSize: 12,
+                  color: Color(0xFFD1D5DB),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
           padding: const EdgeInsets.fromLTRB(24, 5, 12, 5),
           decoration: BoxDecoration(
             color: selected ? const Color(0x1AE8A04C) : Colors.transparent,
@@ -1356,7 +1550,8 @@ class _FileRow extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 }
 
@@ -1377,6 +1572,83 @@ class _SectionHeader extends StatelessWidget {
           fontWeight: FontWeight.w600,
           letterSpacing: 0.8,
           color: Color(0xFF9CA3AF),
+        ),
+      ),
+    );
+  }
+}
+
+class _RepoPathRow extends StatefulWidget {
+  const _RepoPathRow({required this.projectPath, required this.projectName});
+  final String projectPath;
+  final String projectName;
+
+  @override
+  State<_RepoPathRow> createState() => _RepoPathRowState();
+}
+
+class _RepoPathRowState extends State<_RepoPathRow> {
+  String? _repoPath;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final config = await ProjectFileRepository.readProjectConfig(widget.projectPath);
+    if (mounted) setState(() => _repoPath = config['repoPath'] as String?);
+  }
+
+  Future<void> _pick() async {
+    final picked = await FilePicker.platform.getDirectoryPath(
+      dialogTitle: 'Select implementation repo for ${widget.projectName}',
+    );
+    if (picked == null) return;
+    await ProjectFileRepository.writeProjectConfig(widget.projectPath, {'repoPath': picked});
+    if (mounted) setState(() => _repoPath = picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final label = _repoPath == null ? 'No repo linked' : _repoPath!.split('/').last;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: _pick,
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F0F10),
+            border: Border.all(color: const Color(0xFF2C2C2E)),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              const Icon(Icons.code_outlined, size: 14, color: Color(0xFF6B7280)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontFamily: 'Menlo',
+                    fontSize: 12,
+                    color: Color(0xFFE5E5E7),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Text(
+                _repoPath == null ? 'Link Repo →' : 'Change →',
+                style: const TextStyle(
+                  fontFamily: 'Menlo',
+                  fontSize: 10,
+                  color: Color(0xFFE8A04C),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1606,6 +1878,299 @@ class _BuildSequenceSection extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _CopyWorksheetButton extends StatelessWidget {
+  const _CopyWorksheetButton({
+    required this.projectPath,
+    required this.projectName,
+    required this.specVersion,
+  });
+
+  final String projectPath;
+  final String projectName;
+  final String specVersion;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () async {
+          // Check versioned subfolder first, fall back to flat.
+          File _resolve(String folder, String filename) {
+            final v = File(p.join(projectPath, folder, specVersion, filename));
+            return v.existsSync() ? v : File(p.join(projectPath, folder, filename));
+          }
+          final goalFile = _resolve('handoffs', '${projectName}_goal_$specVersion.md');
+          final worksheetFile = _resolve('worksheets', '${projectName}_SetupWorksheet_$specVersion.md');
+
+          final goalExists = await goalFile.exists();
+          final worksheetExists = await worksheetFile.exists();
+
+          if (!goalExists && !worksheetExists) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('No files found to copy')),
+              );
+            }
+            return;
+          }
+
+          final parts = <String>[];
+          if (goalExists) parts.add(await goalFile.readAsString());
+          if (worksheetExists) parts.add(await worksheetFile.readAsString());
+
+          await Clipboard.setData(ClipboardData(text: parts.join('\n\n---\n\n')));
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Handoff copied to clipboard'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        },
+        icon: const Icon(Icons.copy_outlined, size: 14),
+        label: const Text(
+          'Copy Handoff to Clipboard',
+          style: TextStyle(fontFamily: 'Menlo', fontWeight: FontWeight.w500),
+        ),
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size.fromHeight(40),
+          foregroundColor: const Color(0xFFE8A04C),
+          side: const BorderSide(color: Color(0xFFE8A04C)),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Fix File Structure Banner ─────────────────────────────────────────────────
+
+class _FixStructureBanner extends StatefulWidget {
+  const _FixStructureBanner({required this.projectPath});
+  final String projectPath;
+
+  @override
+  State<_FixStructureBanner> createState() => _FixStructureBannerState();
+}
+
+class _FixStructureBannerState extends State<_FixStructureBanner> {
+  bool _hasFlatFiles = false;
+  bool _running = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _check();
+  }
+
+  Future<void> _check() async {
+    final has = await ProjectFileRepository().hasFlatVersionedFiles(widget.projectPath);
+    if (mounted) setState(() => _hasFlatFiles = has);
+  }
+
+  Future<void> _fix(BuildContext context) async {
+    setState(() => _running = true);
+    try {
+      final count = await ProjectFileRepository().migrateToVersionFolders(widget.projectPath);
+      if (mounted) {
+        setState(() { _hasFlatFiles = false; _running = false; });
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Reorganized $count file${count == 1 ? '' : 's'} into version folders.'),
+          duration: const Duration(seconds: 3),
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _running = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: const Color(0xFFEF4444),
+        ));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_hasFlatFiles) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1C1200),
+          border: Border.all(color: const Color(0xFFE8A04C)),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.folder_open_outlined,
+                size: 14, color: Color(0xFFE8A04C)),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Files from before version folders were added are still in the flat layout. Fix to keep versions clean.',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontFamily: 'Menlo',
+                  color: Color(0xFFE8A04C),
+                  height: 1.4,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            _running
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Color(0xFFE8A04C)),
+                  )
+                : TextButton(
+                    onPressed: () => _fix(context),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text(
+                      'Fix Structure →',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontFamily: 'Menlo',
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFE8A04C),
+                      ),
+                    ),
+                  ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Backlog (deferred features) ───────────────────────────────────────────────
+
+class _BacklogSection extends StatefulWidget {
+  const _BacklogSection({required this.projectPath, required this.projectName});
+  final String projectPath;
+  final String projectName;
+
+  @override
+  State<_BacklogSection> createState() => _BacklogSectionState();
+}
+
+class _BacklogSectionState extends State<_BacklogSection> {
+  // version string → list of deferred items
+  final Map<String, List<String>> _seedsByVersion = {};
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final handoffsDir = Directory(p.join(widget.projectPath, 'handoffs'));
+    if (!handoffsDir.existsSync()) {
+      if (mounted) setState(() => _loaded = true);
+      return;
+    }
+    final result = <String, List<String>>{};
+    for (final entry in handoffsDir.listSync()) {
+      if (entry is! Directory) continue;
+      final vName = p.basename(entry.path);
+      if (!RegExp(r'^v\d+$').hasMatch(vName)) continue;
+      for (final file in entry.listSync().whereType<File>()) {
+        if (!p.basename(file.path).contains('_HandoffPackage_')) continue;
+        try {
+          final data = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+          final seeds = (data['v2SeedItems'] as List<dynamic>?)?.cast<String>() ?? [];
+          if (seeds.isNotEmpty) result[vName] = seeds;
+        } catch (_) {}
+      }
+    }
+    if (mounted) setState(() { _seedsByVersion.addAll(result); _loaded = true; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_loaded || _seedsByVersion.isEmpty) return const SizedBox.shrink();
+
+    // Deduplicate across versions; latest version's label wins.
+    final sortedVersions = _seedsByVersion.keys.toList()..sort();
+    final seen = <String>{};
+    // item text → version it was last deferred from
+    final items = <String, String>{};
+    for (final v in sortedVersions) {
+      for (final item in _seedsByVersion[v]!) {
+        if (seen.add(item)) items[item] = v;
+      }
+    }
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 24),
+        const _SectionHeader('Deferred Features'),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F0F10),
+            border: Border.all(color: const Color(0xFF2C2C2E)),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final entry in items.entries)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 5),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(top: 1),
+                        child: Icon(Icons.schedule_outlined,
+                            size: 12, color: Color(0xFF4B5563)),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          entry.key,
+                          style: const TextStyle(
+                            fontFamily: 'Menlo',
+                            fontSize: 12,
+                            height: 1.4,
+                            color: Color(0xFF9CA3AF),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'deferred from ${entry.value}',
+                        style: const TextStyle(
+                          fontFamily: 'Menlo',
+                          fontSize: 10,
+                          color: Color(0xFF4B5563),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
