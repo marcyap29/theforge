@@ -61,11 +61,13 @@ class LlmSettings {
   final Map<LlmRole, ModelAssignment> roleAssignments;
   final Map<LlmProviderType, String?> apiKeys;
   final String ollamaBaseUrl;
+  final String? swarmspaceApiKey;
 
   const LlmSettings({
     required this.roleAssignments,
     required this.apiKeys,
     required this.ollamaBaseUrl,
+    this.swarmspaceApiKey,
   });
 
   static const LlmSettings defaults = LlmSettings(
@@ -92,11 +94,13 @@ class LlmSettings {
     Map<LlmRole, ModelAssignment>? roleAssignments,
     Map<LlmProviderType, String?>? apiKeys,
     String? ollamaBaseUrl,
+    String? swarmspaceApiKey,
   }) {
     return LlmSettings(
       roleAssignments: roleAssignments ?? this.roleAssignments,
       apiKeys: apiKeys ?? this.apiKeys,
       ollamaBaseUrl: ollamaBaseUrl ?? this.ollamaBaseUrl,
+      swarmspaceApiKey: swarmspaceApiKey ?? this.swarmspaceApiKey,
     );
   }
 }

@@ -46,6 +46,7 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
   static const _prefsKeyRoleProvider = 'forge_role_provider_';
   static const _prefsKeyRoleModel = 'forge_role_model_';
   static const _keychainKeyPrefix = 'forge_api_key_';
+  static const _keychainKeyPrefixSwarmspace = 'forge_api_key_swarmspace';
   static const _configFileName = 'forge_config.json';
 
   // ── Config file helpers ───────────────────────────────────────────────────
@@ -147,11 +148,15 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
       await _writeConfigFile(updatedConfig);
     }
 
+    final swarmspaceApiKey =
+        config['swarmspace_api_key'] as String?;
+
     return LlmSettingsState(
       settings: LlmSettings(
         roleAssignments: assignments,
         apiKeys: apiKeys,
         ollamaBaseUrl: baseUrl,
+        swarmspaceApiKey: swarmspaceApiKey,
       ),
     );
   }
@@ -251,6 +256,43 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
     state = AsyncData(
       current.copyWith(
         settings: current.settings.copyWith(apiKeys: newKeys),
+      ),
+    );
+  }
+
+  Future<void> setSwarmspaceApiKey(String key) async {
+    final trimmed = key.trim();
+    if (trimmed.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keychainKeyPrefixSwarmspace, trimmed);
+
+    final config = await _readConfigFile();
+    await _writeConfigFile({...config, 'swarmspace_api_key': trimmed});
+
+    final current = state.valueOrNull;
+    if (current == null) return;
+    state = AsyncData(
+      current.copyWith(
+        settings: current.settings.copyWith(swarmspaceApiKey: trimmed),
+      ),
+    );
+  }
+
+  Future<void> clearSwarmspaceApiKey() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keychainKeyPrefixSwarmspace);
+
+    final config = await _readConfigFile();
+    final updatedConfig = Map<String, dynamic>.from(config);
+    updatedConfig.remove('swarmspace_api_key');
+    await _writeConfigFile(updatedConfig);
+
+    final current = state.valueOrNull;
+    if (current == null) return;
+    state = AsyncData(
+      current.copyWith(
+        settings: current.settings.copyWith(swarmspaceApiKey: null),
       ),
     );
   }

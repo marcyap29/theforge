@@ -948,7 +948,9 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
+                _buildTimelineRow(context, pj, v, mode, 'worksheet_complete'),
                 if (goal != null) ...[
+                  const SizedBox(height: 8),
                   Text(
                     goal,
                     maxLines: 2,
@@ -960,27 +962,10 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
                       height: 1.4,
                     ),
                   ),
-                  const SizedBox(height: 8),
                 ],
-                if (chips.isNotEmpty) _buildChips(chips),
-                if (chips.isNotEmpty && mode == ProjectMode.build) ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('Interview',
-                          style: TextStyle(
-                              fontSize: 9,
-                              fontFamily: 'Menlo',
-                              color: Color(0xFF4B5563))),
-                      const SizedBox(width: 8),
-                      _LayerSubRow(
-                        progress: v == latestVersion ? _progress : null,
-                        interviewDone: true,
-                        pulseOpacity: _pulseOpacity,
-                      ),
-                    ],
-                  ),
+                if (chips.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  _buildChips(chips),
                 ],
               ],
             )

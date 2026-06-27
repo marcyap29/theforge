@@ -35,7 +35,7 @@ class SpecComplianceNotifier extends AutoDisposeFamilyAsyncNotifier<SpecComplian
     final handoff = await ProjectFileRepository.readHandoffPackage(projectPath, projectName, priorSpecVersion);
     
     if (handoff == null) {
-      return SpecComplianceResult(
+      final result = SpecComplianceResult(
         priorSpecVersion: priorSpecVersion,
         checkedAt: DateTime.now().toIso8601String(),
         checkedCommit: null,
@@ -45,11 +45,13 @@ class SpecComplianceNotifier extends AutoDisposeFamilyAsyncNotifier<SpecComplian
         failed: const [],
         skipToLlm: const [],
       );
+      state = AsyncData(result);
+      return result;
     }
     
     final checklistRaw = handoff['verificationChecklist'] as List<dynamic>? ?? [];
     if (checklistRaw.isEmpty) {
-      return SpecComplianceResult(
+      final result = SpecComplianceResult(
         priorSpecVersion: priorSpecVersion,
         checkedAt: DateTime.now().toIso8601String(),
         checkedCommit: null,
@@ -59,6 +61,8 @@ class SpecComplianceNotifier extends AutoDisposeFamilyAsyncNotifier<SpecComplian
         failed: const [],
         skipToLlm: const [],
       );
+      state = AsyncData(result);
+      return result;
     }
     
     // Parse checklist items
@@ -70,7 +74,7 @@ class SpecComplianceNotifier extends AutoDisposeFamilyAsyncNotifier<SpecComplian
     final lockedAt = handoff['lockedAt'] as String?;
     
     if (lockedAt == null) {
-      return SpecComplianceResult(
+      final result = SpecComplianceResult(
         priorSpecVersion: priorSpecVersion,
         checkedAt: DateTime.now().toIso8601String(),
         checkedCommit: null,
@@ -80,6 +84,8 @@ class SpecComplianceNotifier extends AutoDisposeFamilyAsyncNotifier<SpecComplian
         failed: const [],
         skipToLlm: const [],
       );
+      state = AsyncData(result);
+      return result;
     }
     
     // Get project configuration
