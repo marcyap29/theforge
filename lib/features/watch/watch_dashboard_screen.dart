@@ -124,6 +124,12 @@ class WatchDashboardScreen extends ConsumerWidget {
           ),
           child: const Text('VIEW WORKSPACE HEALTH →'),
         ),
+        const SizedBox(height: 8),
+        OutlinedButton(
+          onPressed: () =>
+              Navigator.of(context).pushNamed('/watch/briefing'),
+          child: const Text('WEEKLY BRIEFING →'),
+        ),
       ],
     );
   }
