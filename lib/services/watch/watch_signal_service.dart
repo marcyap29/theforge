@@ -7,6 +7,7 @@ import 'ci_outcome_provider.dart';
 import 'failure_signal_engine.dart';
 import 'git_activity_provider.dart';
 import 'project_status_aggregator.dart';
+import 'spec_drift_engine.dart';
 import 'usage_provider.dart';
 
 @immutable
@@ -32,6 +33,7 @@ class WatchSignalService {
     required List<GitCommit> commits,
     required List<CIRun> ciRuns,
     required List<AlertEntry> existingLog,
+    List<SpecDriftResult> specDrift = const [],
   }) {
     final signals = const FailureSignalEngine().evaluate(
       correlations: correlations,
@@ -39,6 +41,7 @@ class WatchSignalService {
       roster: roster,
       commits: commits,
       ciRuns: ciRuns,
+      specDrift: specDrift,
     );
     final newAlerts = const AlertEngine().evaluate(
       signals: signals,

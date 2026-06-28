@@ -4,6 +4,7 @@ import '../../features/settings/engineer_roster_notifier.dart';
 import 'ci_correlator.dart';
 import 'ci_outcome_provider.dart';
 import 'git_activity_provider.dart';
+import 'spec_drift_engine.dart';
 import 'usage_provider.dart';
 
 enum SignalType {
@@ -13,6 +14,7 @@ enum SignalType {
   spendThreshold,
   runawayDay,
   stalledWorkspace,
+  specDriftExceeded,
 }
 
 enum SignalSeverity { info, warning, critical }
@@ -45,6 +47,7 @@ class FailureSignalEngine {
     required List<EngineerRosterEntry> roster,
     required List<GitCommit> commits,
     required List<CIRun> ciRuns,
+    List<SpecDriftResult> specDrift = const [],
   }) {
     final now = DateTime.now();
     final out = <FailureSignal>[];
@@ -54,6 +57,7 @@ class FailureSignalEngine {
     out.addAll(_spendThreshold(tokenUsage, roster, now));
     out.addAll(_runawayDay(correlations, now));
     out.addAll(_stalledWorkspace(commits, tokenUsage, now));
+    out.addAll(_specDrift(specDrift, now));
     return out;
   }
 
@@ -251,5 +255,34 @@ class FailureSignalEngine {
         metadata: {'stalledDays': stalledDays, 'workspaceSpend30d': workspaceSpend},
       ),
     ];
+  }
+
+  List<FailureSignal> _specDrift(
+    List<SpecDriftResult> driftResults,
+    DateTime now,
+  ) {
+    final out = <FailureSignal>[];
+    for (final r in driftResults) {
+      if (r.driftScore < 30) continue;
+      final severity =
+          r.driftScore >= 70 ? SignalSeverity.critical : SignalSeverity.warning;
+      out.add(FailureSignal(
+        engineerHandle: 'workspace',
+        type: SignalType.specDriftExceeded,
+        severity: severity,
+        detail:
+            '${r.projectName} spec drift: ${r.driftScore}/100 '
+            '(${r.failedCount} missing, ${r.uncertainCount} partial — ${r.specVersion})',
+        detectedAt: now,
+        metadata: {
+          'projectPath': r.projectPath,
+          'specVersion': r.specVersion,
+          'driftScore': r.driftScore,
+          'failedCount': r.failedCount,
+          'uncertainCount': r.uncertainCount,
+        },
+      ));
+    }
+    return out;
   }
 }

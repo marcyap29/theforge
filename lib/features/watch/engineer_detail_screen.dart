@@ -439,5 +439,7 @@ String _labelFor(SignalType type) {
       return 'Runaway day';
     case SignalType.stalledWorkspace:
       return 'Stalled workspace';
+    case SignalType.specDriftExceeded:
+      return 'Spec drift';
   }
 }
