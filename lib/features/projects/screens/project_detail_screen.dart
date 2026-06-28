@@ -593,18 +593,38 @@ String _nextVersion(String current) {
   return 'v2';
 }
 
+/// Scans specs/ for any *_LockedSpec_{version}.md file — works even when the
+/// project display name differs from the original folder/file prefix (rename case).
+File? _findSpecFile(String projectPath, String version) {
+  final suffix = '_LockedSpec_$version.md';
+  final nestedDir = Directory(p.join(projectPath, 'specs', version));
+  if (nestedDir.existsSync()) {
+    final hit = nestedDir
+        .listSync()
+        .whereType<File>()
+        .where((f) => p.basename(f.path).endsWith(suffix))
+        .firstOrNull;
+    if (hit != null) return hit;
+  }
+  final flatDir = Directory(p.join(projectPath, 'specs'));
+  if (flatDir.existsSync()) {
+    return flatDir
+        .listSync()
+        .whereType<File>()
+        .where((f) => p.basename(f.path).endsWith(suffix))
+        .firstOrNull;
+  }
+  return null;
+}
+
+bool _specFileExistsOnDisk(String projectPath, String version) =>
+    _findSpecFile(projectPath, version) != null;
+
 /// Returns true if the next version's locked spec exists on disk.
-/// Used to hide "Start V{n+1} Interview" when V{n+1} is already underway.
+/// Uses suffix scan so renamed projects are handled correctly.
 Future<bool> _nextVersionStarted(
     String projectPath, String projectName, String currentVersion) async {
-  final nextV = _nextVersion(currentVersion);
-  // Check versioned path first, then legacy flat path.
-  if (await File(p.join(projectPath, 'specs', nextV,
-          '${projectName}_LockedSpec_$nextV.md'))
-      .exists()) return true;
-  return File(p.join(
-          projectPath, 'specs', '${projectName}_LockedSpec_$nextV.md'))
-      .exists();
+  return _specFileExistsOnDisk(projectPath, _nextVersion(currentVersion));
 }
 
 String _previousVersion(String current) {
@@ -661,13 +681,10 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
       await _loadVersionComponents(pj, 'v$i');
     }
     // Scan beyond DB-declared n: if a spec exists for v{n+1}, the DB phase drifted.
-    // Use direct file existence (not _allComponents) — component parsing may return
-    // empty for valid specs, which would break the map-key detection.
+    // Scan by suffix (*_LockedSpec_vN.md) — exact name fails when project was renamed.
     while (true) {
       final vNext = 'v${n + 1}';
-      final nested = File(p.join(pj.path, 'specs', vNext, '${pj.name}_LockedSpec_$vNext.md'));
-      final flat = File(p.join(pj.path, 'specs', '${pj.name}_LockedSpec_$vNext.md'));
-      if (!nested.existsSync() && !flat.existsSync()) break;
+      if (!_specFileExistsOnDisk(pj.path, vNext)) break;
       await _loadVersionComponents(pj, vNext);
       n++;
     }
@@ -687,11 +704,9 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
 
   Future<void> _loadVersionComponents(Project pj, String version) async {
     try {
-      File file = File(p.join(pj.path, 'specs', version, '${pj.name}_LockedSpec_$version.md'));
-      if (!file.existsSync()) {
-        file = File(p.join(pj.path, 'specs', '${pj.name}_LockedSpec_$version.md'));
-      }
-      if (!file.existsSync()) return;
+      // Find spec by suffix in case the project was renamed after creation.
+      final File? file = _findSpecFile(pj.path, version);
+      if (file == null) return;
       final content = await file.readAsString();
       final result = <String>[];
       final lines = content.split('\n');
