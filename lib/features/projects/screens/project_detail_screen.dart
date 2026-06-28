@@ -187,10 +187,45 @@ class ProjectDetailScreen extends ConsumerWidget {
             ),
             if (mode == ProjectMode.build) ...[
               const SizedBox(height: 10),
-              FutureBuilder<bool>(
-                future: _nextVersionStarted(live.path, live.name, version),
+              FutureBuilder<_DiskNextState>(
+                future: _diskNextVersionState(live.path, version),
                 builder: (context, snap) {
-                  if (snap.data != false) return const SizedBox.shrink();
+                  if (snap.connectionState == ConnectionState.waiting) {
+                    return const SizedBox.shrink();
+                  }
+                  final diskState = snap.data ?? _DiskNextState.none;
+                  if (diskState == _DiskNextState.worksheetDone) {
+                    return const SizedBox.shrink();
+                  }
+                  if (diskState == _DiskNextState.specLocked) {
+                    final nextV = _nextVersion(version);
+                    return SizedBox(
+                      width: double.infinity,
+                      height: 44,
+                      child: FilledButton(
+                        onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => WorksheetGenerationScreen(
+                            projectPath: live.path,
+                            projectName: live.name,
+                            specVersion: nextV,
+                          ),
+                        )),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(44),
+                          backgroundColor: const Color(0xFFE8A04C),
+                          foregroundColor: const Color(0xFF0F0F10),
+                        ),
+                        child: Text(
+                          'Generate ${nextV.toUpperCase()} Setup Worksheet →',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Menlo',
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                  // _DiskNextState.none — next version hasn't started yet
                   return SizedBox(
                     width: double.infinity,
                     height: 44,
@@ -620,11 +655,41 @@ File? _findSpecFile(String projectPath, String version) {
 bool _specFileExistsOnDisk(String projectPath, String version) =>
     _findSpecFile(projectPath, version) != null;
 
-/// Returns true if the next version's locked spec exists on disk.
-/// Uses suffix scan so renamed projects are handled correctly.
-Future<bool> _nextVersionStarted(
-    String projectPath, String projectName, String currentVersion) async {
-  return _specFileExistsOnDisk(projectPath, _nextVersion(currentVersion));
+/// Like _findSpecFile but for setup worksheets (*_SetupWorksheet_{version}.md).
+File? _findWorksheetFile(String projectPath, String version) {
+  final suffix = '_SetupWorksheet_$version.md';
+  final nestedDir = Directory(p.join(projectPath, 'worksheets', version));
+  if (nestedDir.existsSync()) {
+    final hit = nestedDir
+        .listSync()
+        .whereType<File>()
+        .where((f) => p.basename(f.path).endsWith(suffix))
+        .firstOrNull;
+    if (hit != null) return hit;
+  }
+  final flatDir = Directory(p.join(projectPath, 'worksheets'));
+  if (flatDir.existsSync()) {
+    return flatDir
+        .listSync()
+        .whereType<File>()
+        .where((f) => p.basename(f.path).endsWith(suffix))
+        .firstOrNull;
+  }
+  return null;
+}
+
+bool _worksheetFileExistsOnDisk(String projectPath, String version) =>
+    _findWorksheetFile(projectPath, version) != null;
+
+enum _DiskNextState { none, specLocked, worksheetDone }
+
+/// Returns the disk state of the next version: none / specLocked / worksheetDone.
+Future<_DiskNextState> _diskNextVersionState(
+    String projectPath, String currentVersion) async {
+  final nextV = _nextVersion(currentVersion);
+  if (!_specFileExistsOnDisk(projectPath, nextV)) return _DiskNextState.none;
+  if (_worksheetFileExistsOnDisk(projectPath, nextV)) return _DiskNextState.worksheetDone;
+  return _DiskNextState.specLocked;
 }
 
 String _previousVersion(String current) {
@@ -656,6 +721,8 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
   final Map<String, bool> _expanded = {};
   // disk-discovered max version (may exceed DB-declared phase when DB drifts)
   int _diskLatestN = 1;
+  // stage ('spec_locked' | 'worksheet_complete') for disk-extra versions
+  final Map<String, String> _diskExtraStages = {};
 
   @override
   void initState() {
@@ -681,17 +748,22 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
       await _loadVersionComponents(pj, 'v$i');
     }
     // Scan beyond DB-declared n: if a spec exists for v{n+1}, the DB phase drifted.
-    // Scan by suffix (*_LockedSpec_vN.md) — exact name fails when project was renamed.
+    // Track each extra version's actual disk stage (spec_locked vs worksheet_complete).
+    final extraStages = <String, String>{};
     while (true) {
       final vNext = 'v${n + 1}';
       if (!_specFileExistsOnDisk(pj.path, vNext)) break;
       await _loadVersionComponents(pj, vNext);
+      extraStages[vNext] = _worksheetFileExistsOnDisk(pj.path, vNext)
+          ? 'worksheet_complete'
+          : 'spec_locked';
       n++;
     }
     // Default expansion: active version expanded, shipped ones collapsed.
     if (mounted) {
       setState(() {
         _diskLatestN = n;
+        _diskExtraStages.addAll(extraStages);
         for (int i = 1; i <= n; i++) {
           final v = 'v$i';
           if (!_expanded.containsKey(v)) {
@@ -989,9 +1061,19 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
     required String latestVersion,
     required Project pj,
   }) {
-    final vIsShipped = (v != latestVersion) || worksheetDone;
+    // Disk-extra versions carry their own stage determined from the filesystem.
+    final diskStage = _diskExtraStages[v];
+    final effectiveStage = diskStage ?? stage;
+    final vIsShipped = diskStage != null
+        ? diskStage == 'worksheet_complete'
+        : (v != latestVersion) || worksheetDone;
+
     final chips = _allComponents[v] ?? [];
     final goal = _versionGoals[v];
+
+    // For a disk-extra version that isn't shipped yet, use `v` as the spec version
+    // so artifact links and worksheet navigation point to the correct version.
+    final effectiveSv = (diskStage != null && !vIsShipped) ? v : sv;
 
     return _buildVersionPanel(
       context,
@@ -1000,7 +1082,7 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
       collapsedTrailing: !vIsShipped && mode == ProjectMode.build
           ? _LayerSubRow(
               progress: _progress,
-              interviewDone: false,
+              interviewDone: diskStage != null,
               pulseOpacity: _pulseOpacity,
             )
           : null,
@@ -1030,7 +1112,7 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
                 ],
               ],
             )
-          : _buildTimelineRow(context, pj, sv, mode, stage),
+          : _buildTimelineRow(context, pj, effectiveSv, mode, effectiveStage),
     );
   }
 
