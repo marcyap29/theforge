@@ -130,6 +130,12 @@ class WatchDashboardScreen extends ConsumerWidget {
               Navigator.of(context).pushNamed('/watch/briefing'),
           child: const Text('WEEKLY BRIEFING →'),
         ),
+        const SizedBox(height: 8),
+        OutlinedButton(
+          onPressed: () =>
+              Navigator.of(context).pushNamed('/watch/decision'),
+          child: const Text('RUN DECISION SIM →'),
+        ),
       ],
     );
   }

@@ -5,6 +5,7 @@ import '../features/interview/ui/interview_screen.dart';
 import '../features/projects/screens/projects_list_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/watch/briefing_screen.dart';
+import '../features/watch/decision_screen.dart';
 import '../features/watch/watch_dashboard_screen.dart';
 import 'theme/app_theme.dart';
 
@@ -35,6 +36,7 @@ class TheForgeApp extends StatelessWidget {
         '/settings': (context) => const SettingsScreen(),
         '/watch': (context) => const WatchDashboardScreen(),
         '/watch/briefing': (context) => const BriefingScreen(),
+        '/watch/decision': (context) => const DecisionScreen(),
       },
     );
   }
