@@ -102,8 +102,18 @@ const auditDimensions = <DimensionDef>[
   ),
 ];
 
-List<DimensionDef> dimensionsFor(ProjectMode mode) =>
-    mode == ProjectMode.build ? buildDimensions : auditDimensions;
+List<DimensionDef> dimensionsFor(ProjectMode mode) {
+  switch (mode) {
+    case ProjectMode.build:
+      return buildDimensions;
+    case ProjectMode.audit:
+      return auditDimensions;
+    case ProjectMode.reverse:
+      // Reverse Mode doesn't use the Build/Audit interview flow
+      // This is a fallback - Reverse Mode projects should use codebase ingestion first
+      return auditDimensions;
+  }
+}
 
 @immutable
 class LayerDef {

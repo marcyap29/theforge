@@ -523,7 +523,43 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 
 ---
 
-## Next Up — §W5: Watch Mode SwarmSpace Briefing + Decision Simulation
+## §W5 — SwarmSpace Briefing + Decision Simulation — COMPLETE ✅
 
-**Status:** Not started — next on critical path (requires §W4 ✅)
-- See `backlog.md` §W5 for scope
+**Completed:** 2026-06-27
+
+- [x] `lib/services/swarmspace/swarmspace_service.dart` — `SwarmSpaceService` HTTP client; JSON-RPC 2.0 to `swarmspace-mcp-server.orbitalai.workers.dev/mcp`; `deepResearch(String query) → Future<String>`
+- [x] `lib/services/swarmspace/swarmspace_service_provider.dart` — `Provider<SwarmSpaceService?>` watching `settingsProvider.swarmspaceApiKey`
+- [x] `lib/features/settings/settings_notifier.dart` — `setSwarmspaceApiKey` / `clearSwarmspaceApiKey` persisted to `forge_config.json`
+- [x] `lib/services/llm/llm_model_config.dart` — `swarmspaceApiKey: String?` added to `LlmSettings`
+- [x] `lib/features/watch/briefing_notifier.dart` — `BriefingNotifier` (`AsyncNotifier<BriefingState>`); `runBriefing()` assembles git signals → SwarmSpace query → returns markdown
+- [x] `lib/features/watch/briefing_screen.dart` — idle/loading/done/error states; markdown rendered in `SelectableText`
+- [x] `lib/features/watch/decision_models.dart` — `DecisionInput` + `DecisionResult`
+- [x] `lib/features/watch/decision_notifier.dart` — `DecisionNotifier` (`AsyncNotifier<DecisionResult?>`); `runSimulation(DecisionInput)` → 50-iteration Monte Carlo prompt → SwarmSpace → markdown; `reset()` back to form
+- [x] `lib/features/watch/decision_screen.dart` — form (question + context + 3 options) → loading → result markdown; `ConsumerStatefulWidget`
+- [x] `lib/features/watch/watch_dashboard_screen.dart` — WEEKLY BRIEFING + RUN DECISION SIM buttons
+- [x] `lib/core/app.dart` — `/watch/briefing` + `/watch/decision` routes
+- [x] `dart analyze lib/` — zero issues
+
+---
+
+## §W6 — Spec Compliance Monitor + Drift Detector — COMPLETE ✅
+
+**Completed:** 2026-06-27
+
+- [x] `lib/services/watch/spec_drift_engine.dart` — `SpecDriftResult` model + `SpecDriftEngine` static `evaluateProject()`: version discovery loop (v3→v1), git diff since `lockedAt`, item scoring (failed×10 + uncertain×3, cap 100)
+- [x] `lib/services/watch/spec_drift_service.dart` — `SpecDriftService` const class; `evaluate(List<Project>)` with per-project try/catch isolation
+- [x] `lib/services/watch/spec_drift_service_provider.dart` — `Provider<SpecDriftService>` non-nullable
+- [x] `lib/services/watch/failure_signal_engine.dart` — `specDriftExceeded` enum value; `_specDrift()` method; warning ≥30, critical ≥70; `specDrift` optional param on `evaluate()`
+- [x] `lib/services/watch/watch_signal_service.dart` — `specDrift` param threaded through
+- [x] `lib/features/watch/watch_data_notifier.dart` — `specDrift: List<SpecDriftResult>` on `WatchData`; `await projectListProvider.future` + `specDriftService.evaluate()` in `_fetch()`
+- [x] `lib/features/watch/spec_drift_screen.dart` — drift card list with color-coded score badge (0–29 green / 30–69 amber / 70+ red), project name, specVersion, missing/partial counts; empty state
+- [x] `lib/features/watch/watch_dashboard_screen.dart` — SPEC DRIFT → button (conditional on `data.specDrift.isNotEmpty`)
+- [x] `lib/core/app.dart` — `/watch/spec-drift` route
+- [x] `dart analyze lib/` — zero issues
+
+---
+
+## Next Up — §R1: Reverse Mode Codebase Ingestion Engine
+
+**Status:** Not started — next on critical path (requires §W6 ✅)
+- See `backlog.md` §R1 for scope

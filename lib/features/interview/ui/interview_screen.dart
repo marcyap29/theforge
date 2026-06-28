@@ -91,7 +91,11 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen>
     final stateAsync = ref.watch(interviewProvider(args));
     _isLoading = stateAsync.valueOrNull?.isLoading ?? false;
     final notifier = ref.read(interviewProvider(args).notifier);
-    final modeLabel = args.mode == ProjectMode.build ? 'Build' : 'Audit';
+    final modeLabel = args.mode == ProjectMode.build
+        ? 'Build'
+        : args.mode == ProjectMode.audit
+            ? 'Audit'
+            : 'Reverse';
 
     ref.listen(interviewProvider(args), (prev, next) {
       final prevLen = prev?.valueOrNull?.turns.length ?? 0;

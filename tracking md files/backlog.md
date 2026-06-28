@@ -30,8 +30,8 @@ Long-term feature pool. Active sprint work lives in `planner.md`.
    → §W2 Watch Mode: Git Activity Engine + CI Outcome Correlator ✅
    → §W3 Watch Mode: Failure Signal Engine + Alert Engine ✅
    → §W4 Watch Mode: Dashboard UI Shell ✅
-   → §W5 Watch Mode: SwarmSpace Briefing + Decision Simulation
-  → §W6 Watch Mode: Spec Compliance Monitor + Drift Detector (requires spec)
+   → §W5 Watch Mode: SwarmSpace Briefing + Decision Simulation ✅
+  → §W6 Watch Mode: Spec Compliance Monitor + Drift Detector ✅
        ↓
   → §R1 Reverse Mode: Codebase Ingestion Engine
   → §R2 Reverse Mode: Reverse Interview Engine + As-Built Spec Generator
@@ -672,36 +672,12 @@ EngineerUsage {
 ---
 
 ### §W5 — SwarmSpace Briefing + Decision Simulation
-
-**What it is:** Weekly intelligence synthesis via SwarmSpace MCP, and a 50-iteration Monte Carlo decision simulation for management decisions. Both call SwarmSpace's Cloudflare Workers endpoint via direct HTTP.
-
-**Briefing owns:** Assembles Watch Mode data package (token trends, git signals, CI outcomes, alert summary), calls SwarmSpace `deep_research`, renders plain-language weekly narrative.
-
-**Decision Simulation owns:** Decision framing interface (what is the decision? what's the context?), attaches engineering telemetry from Watch Mode, calls SwarmSpace `deep_research` with 50-iteration simulation prompt, renders recommended path + confidence score + regret risk + time-horizon projections.
-
-**SwarmSpace endpoint:** `https://swarmspace-mcp-server.orbitalai.workers.dev/mcp` (live, no additional infrastructure)
-
-**Note on naming:** The Plan Mode variant generator (t=0.2/0.6/1.0) is also called "Monte Carlo" by method. Backlog Appendation item 002 addresses this naming conflict — resolve when both are live in the same surface.
-
-**Dependencies:** §W4 (dashboard data layer), SwarmSpace MCP endpoint (already live)
-
-**Status:** Not started
+✅ Complete 2026-06-27 — `SwarmSpaceService` HTTP client (JSON-RPC 2.0 to MCP endpoint); `swarmspaceServiceProvider`; `swarmspaceApiKey` on `LlmSettings`; `BriefingNotifier` + `BriefingScreen` (idle/loading/done/error, markdown render); `DecisionInput`/`DecisionResult` models; `DecisionNotifier` (50-iter Monte Carlo prompt, `runSimulation`/`reset`); `DecisionScreen` (form → loading → result); WEEKLY BRIEFING + RUN DECISION SIM buttons in dashboard; `/watch/briefing` + `/watch/decision` routes; `dart analyze lib/` zero issues
 
 ---
 
 ### §W6 — Spec Compliance Monitor + Drift Detector
-
-**What it is:** Evaluates incoming commits against the locked spec component map. Requires a locked spec (from Plan Mode or Reverse Mode) to activate. Surfaces out-of-scope file changes, component boundary violations, and cumulative drift score per repository.
-
-**Spec Compliance Monitor owns:** Commit-to-component-map evaluation, out-of-scope file detection, boundary violation detection, drift score (0–100, cumulative per repo).
-
-**Drift Detector owns:** Trend analysis on drift score over time, threshold-based alerting (wired into Alert Engine), visual drift timeline in dashboard.
-
-**Interface contract:** See SuperSpec v1 `DOCS/forge/The_Forge_SuperSpec_v1.md` — Spec Compliance Monitor section.
-
-**Dependencies:** §W3 (alert routing), §W4 (display), a locked spec (from §6 Plan Mode or §R2 Reverse Mode)
-
-**Status:** Not started — this is Configuration C's unlock (Qualcomm pilot use case)
+✅ Complete 2026-06-27 — `SpecDriftResult` model + `SpecDriftEngine` (static `evaluateProject`: version discovery → git diff since `lockedAt` → item scoring failed×10 + uncertain×3 capped 100); `SpecDriftService` const class with per-project error isolation; `specDriftServiceProvider`; `specDriftExceeded` signal type in `FailureSignalEngine` (warning ≥30, critical ≥70); `WatchSignalService` accepts `specDrift` param; `WatchData.specDrift` field; `_fetch()` awaits `projectListProvider.future` → evaluates all projects; `SpecDriftScreen` (drift cards with color-coded score badge + missing/partial counts, empty state); SPEC DRIFT → button in dashboard (conditional); `/watch/spec-drift` route; `dart analyze lib/` zero issues
 
 ---
 
