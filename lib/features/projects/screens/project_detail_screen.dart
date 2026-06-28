@@ -190,7 +190,7 @@ class ProjectDetailScreen extends ConsumerWidget {
               FutureBuilder<bool>(
                 future: _nextVersionStarted(live.path, live.name, version),
                 builder: (context, snap) {
-                  if (snap.data == true) return const SizedBox.shrink();
+                  if (snap.data != false) return const SizedBox.shrink();
                   return SizedBox(
                     width: double.infinity,
                     height: 44,
@@ -660,16 +660,16 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
     for (int i = 1; i <= n; i++) {
       await _loadVersionComponents(pj, 'v$i');
     }
-    // Scan beyond DB-declared n: if a spec exists for v{n+1}, the DB phase drifted
-    // (e.g. phase update failed after worksheet generation). Include those versions.
+    // Scan beyond DB-declared n: if a spec exists for v{n+1}, the DB phase drifted.
+    // Use direct file existence (not _allComponents) — component parsing may return
+    // empty for valid specs, which would break the map-key detection.
     while (true) {
-      final extra = 'v${n + 1}';
-      await _loadVersionComponents(pj, extra);
-      if (_allComponents.containsKey(extra)) {
-        n++;
-      } else {
-        break;
-      }
+      final vNext = 'v${n + 1}';
+      final nested = File(p.join(pj.path, 'specs', vNext, '${pj.name}_LockedSpec_$vNext.md'));
+      final flat = File(p.join(pj.path, 'specs', '${pj.name}_LockedSpec_$vNext.md'));
+      if (!nested.existsSync() && !flat.existsSync()) break;
+      await _loadVersionComponents(pj, vNext);
+      n++;
     }
     // Default expansion: active version expanded, shipped ones collapsed.
     if (mounted) {
