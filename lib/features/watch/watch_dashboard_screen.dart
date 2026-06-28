@@ -136,6 +136,14 @@ class WatchDashboardScreen extends ConsumerWidget {
               Navigator.of(context).pushNamed('/watch/decision'),
           child: const Text('RUN DECISION SIM →'),
         ),
+        if (data.specDrift.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          OutlinedButton(
+            onPressed: () =>
+                Navigator.of(context).pushNamed('/watch/spec-drift'),
+            child: const Text('SPEC DRIFT →'),
+          ),
+        ],
       ],
     );
   }

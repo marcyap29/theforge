@@ -6,10 +6,13 @@ import '../../services/watch/ci_correlator.dart';
 import '../../services/watch/failure_signal_engine.dart';
 import '../../services/watch/git_activity_provider.dart';
 import '../../services/watch/git_activity_service_provider.dart';
+import '../../services/watch/spec_drift_engine.dart';
+import '../../services/watch/spec_drift_service_provider.dart';
 import '../../services/watch/usage_provider.dart';
 import '../../services/watch/usage_service_provider.dart';
 import '../../services/watch/watch_signal_service.dart';
 import '../../services/watch/watch_signal_service_provider.dart';
+import '../projects/providers/providers.dart';
 import '../settings/engineer_roster_notifier.dart';
 
 @immutable
@@ -18,12 +21,14 @@ class WatchData {
   final List<EngineerCorrelation> correlations;
   final WatchSignalResult signalResult;
   final bool hasGitHubConfig;
+  final List<SpecDriftResult> specDrift;
 
   const WatchData({
     required this.usage,
     required this.correlations,
     required this.signalResult,
     required this.hasGitHubConfig,
+    required this.specDrift,
   });
 
   List<GitCommit> get allCommits =>
@@ -50,6 +55,7 @@ class WatchDataNotifier extends AsyncNotifier<WatchData> {
     final gitService = ref.read(gitActivityServiceProvider);
     final roster = await ref.read(engineerRosterProvider.future);
     final alertLog = await ref.read(alertLogProvider.future);
+    final specDriftService = ref.read(specDriftServiceProvider);
 
     final usage = usageService != null
         ? await usageService.fetchAllUsage()
@@ -60,6 +66,9 @@ class WatchDataNotifier extends AsyncNotifier<WatchData> {
         : const <EngineerCorrelation>[];
 
     final commits = correlations.expand((c) => c.gitActivity.commits).toList();
+
+    final projects = await ref.read(projectListProvider.future);
+    final specDrift = await specDriftService.evaluate(projects);
 
     // v1: ciRuns not available post-correlation; WorkspaceStatus.ciPassRate30d
     // will be 0. Velocity trend and stall detection (commit-based) still work.
@@ -72,6 +81,7 @@ class WatchDataNotifier extends AsyncNotifier<WatchData> {
       commits: commits,
       ciRuns: const [],
       existingLog: alertLog,
+      specDrift: specDrift,
     );
 
     if (signalResult.newAlerts.isNotEmpty) {
@@ -83,6 +93,7 @@ class WatchDataNotifier extends AsyncNotifier<WatchData> {
       correlations: correlations,
       signalResult: signalResult,
       hasGitHubConfig: gitService != null,
+      specDrift: specDrift,
     );
   }
 }
