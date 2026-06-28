@@ -155,107 +155,111 @@ class ProjectDetailScreen extends ConsumerWidget {
                 fontWeight: FontWeight.w600, fontFamily: 'Menlo'),
           ),
         ),
-      'worksheet_complete' => Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFF0F0F10),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF22C55E)),
-              ),
-              child: Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.check_circle,
-                        color: Color(0xFF22C55E), size: 14),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${version.toUpperCase()} ready for executor',
+      'worksheet_complete' => FutureBuilder<_DiskNextInfo>(
+          future: _diskNextVersionState(live.path, version),
+          builder: (context, snap) {
+            // info.nextVersion is the first unstarted/in-progress version,
+            // so the latest completed is one step before it.
+            final info = snap.data;
+            final latestCompletedV = info != null
+                ? _previousVersion(info.nextVersion)
+                : version;
+            Widget? actionButton;
+            if (mode == ProjectMode.build &&
+                snap.connectionState != ConnectionState.waiting &&
+                info != null) {
+              if (info.state == _DiskNextState.specLocked) {
+                actionButton = SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: FilledButton(
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => WorksheetGenerationScreen(
+                        projectPath: live.path,
+                        projectName: live.name,
+                        specVersion: info.nextVersion,
+                      ),
+                    )),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(44),
+                      backgroundColor: const Color(0xFFE8A04C),
+                      foregroundColor: const Color(0xFF0F0F10),
+                    ),
+                    child: Text(
+                      'Generate ${info.nextVersion.toUpperCase()} Setup Worksheet →',
                       style: const TextStyle(
-                        fontSize: 13,
+                          fontWeight: FontWeight.w600, fontFamily: 'Menlo'),
+                    ),
+                  ),
+                );
+              } else {
+                final priorV = _previousVersion(info.nextVersion);
+                actionButton = SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => SpecComplianceScreen(
+                        projectPath: live.path,
+                        projectName: live.name,
+                        priorSpecVersion: priorV,
+                        nextVersion: info.nextVersion,
+                        mode: mode,
+                      ),
+                    )),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFE8A04C)),
+                      foregroundColor: const Color(0xFFE8A04C),
+                    ),
+                    child: Text(
+                      'Start ${info.nextVersion.toUpperCase()} Interview →',
+                      style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         fontFamily: 'Menlo',
-                        color: Color(0xFF22C55E),
+                        fontSize: 13,
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ),
-            if (mode == ProjectMode.build) ...[
-              const SizedBox(height: 10),
-              FutureBuilder<_DiskNextInfo>(
-                future: _diskNextVersionState(live.path, version),
-                builder: (context, snap) {
-                  if (snap.connectionState == ConnectionState.waiting) {
-                    return const SizedBox.shrink();
-                  }
-                  final info = snap.data;
-                  if (info == null) return const SizedBox.shrink();
-
-                  if (info.state == _DiskNextState.specLocked) {
-                    return SizedBox(
-                      width: double.infinity,
-                      height: 44,
-                      child: FilledButton(
-                        onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                          builder: (_) => WorksheetGenerationScreen(
-                            projectPath: live.path,
-                            projectName: live.name,
-                            specVersion: info.nextVersion,
-                          ),
-                        )),
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(44),
-                          backgroundColor: const Color(0xFFE8A04C),
-                          foregroundColor: const Color(0xFF0F0F10),
-                        ),
-                        child: Text(
-                          'Generate ${info.nextVersion.toUpperCase()} Setup Worksheet →',
+                  ),
+                );
+              }
+            }
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F0F10),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF22C55E)),
+                  ),
+                  child: Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.check_circle,
+                            color: Color(0xFF22C55E), size: 14),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${latestCompletedV.toUpperCase()} ready for executor',
                           style: const TextStyle(
+                            fontSize: 13,
                             fontWeight: FontWeight.w600,
                             fontFamily: 'Menlo',
+                            color: Color(0xFF22C55E),
                           ),
                         ),
-                      ),
-                    );
-                  }
-                  // state == none: next version has no spec yet — show interview button
-                  final priorV = _previousVersion(info.nextVersion);
-                  return SizedBox(
-                    width: double.infinity,
-                    height: 44,
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                        builder: (_) => SpecComplianceScreen(
-                          projectPath: live.path,
-                          projectName: live.name,
-                          priorSpecVersion: priorV,
-                          nextVersion: info.nextVersion,
-                          mode: mode,
-                        ),
-                      )),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Color(0xFFE8A04C)),
-                        foregroundColor: const Color(0xFFE8A04C),
-                      ),
-                      child: Text(
-                        'Start ${info.nextVersion.toUpperCase()} Interview →',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'Menlo',
-                          fontSize: 13,
-                        ),
-                      ),
+                      ],
                     ),
-                  );
-                },
-              ),
-            ],
-          ],
+                  ),
+                ),
+                if (actionButton != null) ...[
+                  const SizedBox(height: 10),
+                  actionButton,
+                ],
+              ],
+            );
+          },
         ),
        'interview_active' => mode == ProjectMode.reverse
            ? const _ReverseModeWarningButton()
