@@ -4,8 +4,9 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../features/projects/models/reverse_ingestion_summary.dart';
 
-enum ProjectMode { build, audit }
+enum ProjectMode { build, audit, reverse }
 
 class ProjectAlreadyExistsException implements Exception {
   final String path;
@@ -551,5 +552,84 @@ class ProjectFileRepository {
       parts.add('V2 SEEDS (features deferred from $priorSpecVersion):\n$seedsContent');
     }
     return parts.join('\n\n---\n\n');
+  }
+
+  Future<List<Map<String, dynamic>>> scanProjectCodebase(
+      String projectPath, List<String> extensions) async {
+    final rootDir = Directory(projectPath);
+    final results = <Map<String, dynamic>>[];
+
+    final queue = [rootDir];
+    while (queue.isNotEmpty) {
+      final dir = queue.removeAt(0);
+      if (!dir.existsSync()) continue;
+
+      for (final entity in dir.listSync()) {
+        if (entity is Directory) {
+          final baseName = p.basename(entity.path);
+          if (baseName != '.git' && baseName != '.build') {
+            queue.add(entity);
+          }
+        } else if (entity is File) {
+          final ext = p.extension(entity.path);
+          if (extensions.contains(ext)) {
+            try {
+              final content = await entity.readAsString();
+              results.add({
+                'filePath': entity.path,
+                'extension': ext,
+                'content': content,
+                'filename': p.basename(entity.path),
+              });
+            } catch (e) {
+              continue;
+            }
+          }
+        }
+      }
+    }
+
+    return results;
+  }
+
+  Future<void> writeIngestionSummary(
+      String projectPath, String projectName, IngestionSummary summary) async {
+    final ingestedDir = Directory(p.join(projectPath, 'ingested'));
+    await ingestedDir.create(recursive: true);
+
+    final jsonPath = p.join(ingestedDir.path,
+        '${projectName}_IngestionSummary_${summary.scannedAt.millisecondsSinceEpoch}.json');
+    final jsonFile = File(jsonPath);
+    await jsonFile.writeAsString(jsonEncode(summary.toJson()));
+
+    final mdContent = summary.toMarkdown();
+    final mdPath = p.join(ingestedDir.path,
+        '${projectName}_IngestionSummary.md');
+    final mdFile = File(mdPath);
+    await mdFile.writeAsString(mdContent);
+  }
+
+  Future<IngestionSummary?> readIngestionSummary(
+      String projectPath, String projectName) async {
+    final ingestedDir = Directory(p.join(projectPath, 'ingested'));
+    if (!ingestedDir.existsSync()) return null;
+
+    final jsonFiles = ingestedDir
+        .listSync()
+        .where((e) => e is File && p.basename(e.path).endsWith('_IngestionSummary.json'))
+        .cast<File>()
+        .toList();
+
+    if (jsonFiles.isEmpty) return null;
+
+    jsonFiles.sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+    final latestFile = jsonFiles.first;
+
+    try {
+      final data = jsonDecode(await latestFile.readAsString()) as Map<String, dynamic>;
+      return IngestionSummary.fromJson(data);
+    } on FormatException {
+      return null;
+    }
   }
 }

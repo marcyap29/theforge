@@ -19,7 +19,11 @@ import '../../spec_generation/executor_timeline_notifier.dart';
 import '../../spec_generation/worksheet_generation_screen.dart';
 import '../ingestion/ingestion_notifier.dart';
 import '../ingestion/reference_docs_screen.dart';
+import '../ingestion/reverse_ingestion_notifier.dart';
+import '../models/reverse_ingestion_summary.dart' as rev_ingest;
 import '../providers/providers.dart';
+import 'reverse_ingestion_progress_screen.dart';
+import 'reverse_ingestion_summary_screen.dart';
 
 class ProjectDetailScreen extends ConsumerWidget {
   const ProjectDetailScreen({super.key, required this.project});
@@ -87,6 +91,10 @@ class ProjectDetailScreen extends ConsumerWidget {
                 const _SectionHeader('Reference Documents'),
                 _ReferenceDocsRow(projectPath: project.path),
                 const SizedBox(height: 24),
+                if (mode == ProjectMode.reverse) ...[
+                  _RepoIngestRow(projectPath: project.path, projectName: project.name),
+                  const SizedBox(height: 24),
+                ],
                 _RepoPathRow(projectPath: project.path, projectName: project.name),
                 if (_stageOf(live.phase) == 'worksheet_complete') ...[
                   _BuildSequenceSection(project: live),
@@ -209,56 +217,60 @@ class ProjectDetailScreen extends ConsumerWidget {
             ],
           ],
         ),
-      'interview_active' => FilledButton(
-          onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => InterviewScreen(
-                args: InterviewArgs(
-                  path: live.path,
-                  name: live.name,
-                  mode: mode,
-                  priorSpecVersion:
-                      version != 'v1' ? _previousVersion(version) : null,
-                ),
-              ),
-            ),
-          ),
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(44),
-            backgroundColor: const Color(0xFFE8A04C),
-            foregroundColor: const Color(0xFF0F0F10),
-          ),
-          child: Text(
-            'Continue with ${version.toUpperCase()} Interview →',
-            style: const TextStyle(
-                fontWeight: FontWeight.w600, fontFamily: 'Menlo'),
-          ),
-        ),
-      _ => FilledButton(
-          onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => InterviewScreen(
-                args: InterviewArgs(
-                  path: live.path,
-                  name: live.name,
-                  mode: mode,
-                ),
-              ),
-            ),
-          ),
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(44),
-            backgroundColor: const Color(0xFFE8A04C),
-            foregroundColor: const Color(0xFF0F0F10),
-          ),
-          child: Text(
-            mode == ProjectMode.build
-                ? 'Start Build Interview'
-                : 'Start Audit Interview',
-            style: const TextStyle(
-                fontWeight: FontWeight.w600, fontFamily: 'Menlo'),
-          ),
-        ),
+       'interview_active' => mode == ProjectMode.reverse
+           ? const _ReverseModeWarningButton()
+           : FilledButton(
+               onPressed: () => Navigator.of(context).push(
+                 MaterialPageRoute(
+                   builder: (_) => InterviewScreen(
+                     args: InterviewArgs(
+                       path: live.path,
+                       name: live.name,
+                       mode: mode,
+                       priorSpecVersion:
+                           version != 'v1' ? _previousVersion(version) : null,
+                     ),
+                   ),
+                 ),
+               ),
+               style: FilledButton.styleFrom(
+                 minimumSize: const Size.fromHeight(44),
+                 backgroundColor: const Color(0xFFE8A04C),
+                 foregroundColor: const Color(0xFF0F0F10),
+               ),
+               child: Text(
+                 'Continue with ${version.toUpperCase()} Interview →',
+                 style: const TextStyle(
+                     fontWeight: FontWeight.w600, fontFamily: 'Menlo'),
+               ),
+             ),
+       _ => mode == ProjectMode.reverse
+           ? const _ReverseModeWarningButton()
+           : FilledButton(
+               onPressed: () => Navigator.of(context).push(
+                 MaterialPageRoute(
+                   builder: (_) => InterviewScreen(
+                     args: InterviewArgs(
+                       path: live.path,
+                       name: live.name,
+                       mode: mode,
+                     ),
+                   ),
+                 ),
+               ),
+               style: FilledButton.styleFrom(
+                 minimumSize: const Size.fromHeight(44),
+                 backgroundColor: const Color(0xFFE8A04C),
+                 foregroundColor: const Color(0xFF0F0F10),
+               ),
+               child: Text(
+                 mode == ProjectMode.build
+                     ? 'Start Build Interview'
+                     : 'Start Audit Interview',
+                 style: const TextStyle(
+                     fontWeight: FontWeight.w600, fontFamily: 'Menlo'),
+               ),
+             ),
     };
   }
 }
@@ -1713,6 +1725,89 @@ class _ReferenceDocsRowState extends ConsumerState<_ReferenceDocsRow> {
   }
 }
 
+class _RepoIngestRow extends ConsumerStatefulWidget {
+  final String projectPath;
+  final String projectName;
+
+  const _RepoIngestRow({
+    required this.projectPath,
+    required this.projectName,
+  });
+
+  @override
+  ConsumerState<_RepoIngestRow> createState() => _RepoIngestRowState();
+}
+
+class _RepoIngestRowState extends ConsumerState<_RepoIngestRow> {
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () async {
+          await ref
+              .read(reverseIngestionNotifierProvider.notifier)
+              .startIngestion(widget.projectPath);
+
+          final ingestionState = ref.read(reverseIngestionNotifierProvider);
+          if (ingestionState.state == rev_ingest.IngestionState.done) {
+            final name = widget.projectName;
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ReverseIngestionSummaryScreen(
+                  projectPath: widget.projectPath,
+                  projectName: name,
+                ),
+              ),
+            );
+          } else {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ReverseIngestionProgressScreen(
+                  projectPath: widget.projectPath,
+                ),
+              ),
+            );
+          }
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F0F10),
+            border: Border.all(color: const Color(0xFF2C2C2E)),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: const Row(
+            children: [
+              Icon(Icons.code_outlined,
+                  size: 14, color: Color(0xFF6B7280)),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Ready to ingest repository codebase',
+                  style: TextStyle(
+                    fontFamily: 'Menlo',
+                    fontSize: 12,
+                    color: Color(0xFFE5E5E7),
+                  ),
+                ),
+              ),
+              Text(
+                'Ingest Repo →',
+                style: TextStyle(
+                  fontFamily: 'Menlo',
+                  fontSize: 10,
+                  color: Color(0xFFE8A04C),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _BuildSequenceSection extends ConsumerWidget {
   final Project project;
 
@@ -2266,5 +2361,33 @@ class _ReadmeContent extends StatelessWidget {
     final nextHeaderIdx = content.indexOf('\n## ', afterHeader);
     final endIdx = nextHeaderIdx < 0 ? content.length : nextHeaderIdx;
     return content.substring(afterHeader, endIdx).trim();
+  }
+}
+
+class _ReverseModeWarningButton extends StatelessWidget {
+  const _ReverseModeWarningButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton(
+      onPressed: null,
+      style: FilledButton.styleFrom(
+        minimumSize: const Size.fromHeight(44),
+        backgroundColor: const Color(0xFF2C2C2E),
+        foregroundColor: const Color(0xFF6B7280),
+      ),
+      child: const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.info_outline, size: 16, color: Color(0xFF6B7280)),
+          SizedBox(width: 8),
+          Text(
+            'Reverse Mode — Ingest Repo First',
+            style: TextStyle(
+                fontWeight: FontWeight.w600, fontFamily: 'Menlo'),
+          ),
+        ],
+      ),
+    );
   }
 }

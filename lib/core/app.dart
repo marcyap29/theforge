@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../features/interview/providers/interview_providers.dart';
 import '../features/interview/ui/interview_screen.dart';
 import '../features/projects/screens/projects_list_screen.dart';
+import '../features/projects/screens/reverse_ingestion_progress_screen.dart';
+import '../features/projects/screens/reverse_ingestion_summary_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/watch/briefing_screen.dart';
 import '../features/watch/decision_screen.dart';
@@ -39,6 +41,27 @@ class TheForgeApp extends StatelessWidget {
         '/watch/briefing': (context) => const BriefingScreen(),
         '/watch/decision': (context) => const DecisionScreen(),
         '/watch/spec-drift': (context) => const SpecDriftScreen(),
+        '/reverse-ingestion/progress': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          if (args is String) {
+            return ReverseIngestionProgressScreen(projectPath: args);
+          }
+          return const Scaffold(
+            body: Center(child: Text('Invalid project path')),
+          );
+        },
+        '/reverse-ingestion/summary': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          if (args is Map<String, String>) {
+            return ReverseIngestionSummaryScreen(
+              projectPath: args['projectPath']!,
+              projectName: args['projectName']!,
+            );
+          }
+          return const Scaffold(
+            body: Center(child: Text('Invalid arguments')),
+          );
+        },
       },
     );
   }
