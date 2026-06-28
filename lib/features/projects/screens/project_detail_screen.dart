@@ -187,18 +187,16 @@ class ProjectDetailScreen extends ConsumerWidget {
             ),
             if (mode == ProjectMode.build) ...[
               const SizedBox(height: 10),
-              FutureBuilder<_DiskNextState>(
+              FutureBuilder<_DiskNextInfo>(
                 future: _diskNextVersionState(live.path, version),
                 builder: (context, snap) {
                   if (snap.connectionState == ConnectionState.waiting) {
                     return const SizedBox.shrink();
                   }
-                  final diskState = snap.data ?? _DiskNextState.none;
-                  if (diskState == _DiskNextState.worksheetDone) {
-                    return const SizedBox.shrink();
-                  }
-                  if (diskState == _DiskNextState.specLocked) {
-                    final nextV = _nextVersion(version);
+                  final info = snap.data;
+                  if (info == null) return const SizedBox.shrink();
+
+                  if (info.state == _DiskNextState.specLocked) {
                     return SizedBox(
                       width: double.infinity,
                       height: 44,
@@ -207,7 +205,7 @@ class ProjectDetailScreen extends ConsumerWidget {
                           builder: (_) => WorksheetGenerationScreen(
                             projectPath: live.path,
                             projectName: live.name,
-                            specVersion: nextV,
+                            specVersion: info.nextVersion,
                           ),
                         )),
                         style: FilledButton.styleFrom(
@@ -216,7 +214,7 @@ class ProjectDetailScreen extends ConsumerWidget {
                           foregroundColor: const Color(0xFF0F0F10),
                         ),
                         child: Text(
-                          'Generate ${nextV.toUpperCase()} Setup Worksheet →',
+                          'Generate ${info.nextVersion.toUpperCase()} Setup Worksheet →',
                           style: const TextStyle(
                             fontWeight: FontWeight.w600,
                             fontFamily: 'Menlo',
@@ -225,7 +223,8 @@ class ProjectDetailScreen extends ConsumerWidget {
                       ),
                     );
                   }
-                  // _DiskNextState.none — next version hasn't started yet
+                  // state == none: next version has no spec yet — show interview button
+                  final priorV = _previousVersion(info.nextVersion);
                   return SizedBox(
                     width: double.infinity,
                     height: 44,
@@ -234,8 +233,8 @@ class ProjectDetailScreen extends ConsumerWidget {
                         builder: (_) => SpecComplianceScreen(
                           projectPath: live.path,
                           projectName: live.name,
-                          priorSpecVersion: version,
-                          nextVersion: _nextVersion(version),
+                          priorSpecVersion: priorV,
+                          nextVersion: info.nextVersion,
                           mode: mode,
                         ),
                       )),
@@ -244,7 +243,7 @@ class ProjectDetailScreen extends ConsumerWidget {
                         foregroundColor: const Color(0xFFE8A04C),
                       ),
                       child: Text(
-                        'Start ${_nextVersion(version).toUpperCase()} Interview →',
+                        'Start ${info.nextVersion.toUpperCase()} Interview →',
                         style: const TextStyle(
                           fontWeight: FontWeight.w600,
                           fontFamily: 'Menlo',
@@ -681,15 +680,29 @@ File? _findWorksheetFile(String projectPath, String version) {
 bool _worksheetFileExistsOnDisk(String projectPath, String version) =>
     _findWorksheetFile(projectPath, version) != null;
 
-enum _DiskNextState { none, specLocked, worksheetDone }
+enum _DiskNextState { none, specLocked }
 
-/// Returns the disk state of the next version: none / specLocked / worksheetDone.
-Future<_DiskNextState> _diskNextVersionState(
+/// Record returned by _diskNextVersionState: the state and the version it applies to.
+typedef _DiskNextInfo = ({_DiskNextState state, String nextVersion});
+
+/// Scans forward from [currentVersion], skipping versions that are fully done
+/// (spec + worksheet on disk), until it finds the first gap. Returns:
+///   state=none      → nextVersion has no spec yet  (show "Start V{n} Interview")
+///   state=specLocked → nextVersion has spec but no worksheet (show "Generate Worksheet")
+Future<_DiskNextInfo> _diskNextVersionState(
     String projectPath, String currentVersion) async {
-  final nextV = _nextVersion(currentVersion);
-  if (!_specFileExistsOnDisk(projectPath, nextV)) return _DiskNextState.none;
-  if (_worksheetFileExistsOnDisk(projectPath, nextV)) return _DiskNextState.worksheetDone;
-  return _DiskNextState.specLocked;
+  String v = currentVersion;
+  while (true) {
+    final nextV = _nextVersion(v);
+    if (!_specFileExistsOnDisk(projectPath, nextV)) {
+      return (state: _DiskNextState.none, nextVersion: nextV);
+    }
+    if (!_worksheetFileExistsOnDisk(projectPath, nextV)) {
+      return (state: _DiskNextState.specLocked, nextVersion: nextV);
+    }
+    // nextV is fully shipped — advance one more
+    v = nextV;
+  }
 }
 
 String _previousVersion(String current) {
