@@ -187,32 +187,38 @@ class ProjectDetailScreen extends ConsumerWidget {
             ),
             if (mode == ProjectMode.build) ...[
               const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                height: 44,
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => SpecComplianceScreen(
-                      projectPath: live.path,
-                      projectName: live.name,
-                      priorSpecVersion: version,  // e.g. "v1"
-                      nextVersion: _nextVersion(version),  // e.g. "v2"
-                      mode: mode,
+              FutureBuilder<bool>(
+                future: _nextVersionStarted(live.path, live.name, version),
+                builder: (context, snap) {
+                  if (snap.data == true) return const SizedBox.shrink();
+                  return SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => SpecComplianceScreen(
+                          projectPath: live.path,
+                          projectName: live.name,
+                          priorSpecVersion: version,
+                          nextVersion: _nextVersion(version),
+                          mode: mode,
+                        ),
+                      )),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFE8A04C)),
+                        foregroundColor: const Color(0xFFE8A04C),
+                      ),
+                      child: Text(
+                        'Start ${_nextVersion(version).toUpperCase()} Interview →',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Menlo',
+                          fontSize: 13,
+                        ),
+                      ),
                     ),
-                  )),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFFE8A04C)),
-                    foregroundColor: const Color(0xFFE8A04C),
-                  ),
-                  child: Text(
-                    'Start ${_nextVersion(version).toUpperCase()} Interview →',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'Menlo',
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
+                  );
+                },
               ),
             ],
           ],
@@ -587,6 +593,20 @@ String _nextVersion(String current) {
   return 'v2';
 }
 
+/// Returns true if the next version's locked spec exists on disk.
+/// Used to hide "Start V{n+1} Interview" when V{n+1} is already underway.
+Future<bool> _nextVersionStarted(
+    String projectPath, String projectName, String currentVersion) async {
+  final nextV = _nextVersion(currentVersion);
+  // Check versioned path first, then legacy flat path.
+  if (await File(p.join(projectPath, 'specs', nextV,
+          '${projectName}_LockedSpec_$nextV.md'))
+      .exists()) return true;
+  return File(p.join(
+          projectPath, 'specs', '${projectName}_LockedSpec_$nextV.md'))
+      .exists();
+}
+
 String _previousVersion(String current) {
   if (current.startsWith('v')) {
     final n = int.tryParse(current.substring(1));
@@ -614,6 +634,8 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
   final Map<String, String?> _versionGoals = {};
   // true = expanded; shipped versions default false, active version defaults true
   final Map<String, bool> _expanded = {};
+  // disk-discovered max version (may exceed DB-declared phase when DB drifts)
+  int _diskLatestN = 1;
 
   @override
   void initState() {
@@ -633,14 +655,26 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
     final pj = widget.project;
     final stage = _stageOf(pj.phase);
     final currentVersion = _versionOf(pj.phase);
-    final n = int.tryParse(currentVersion.substring(1)) ?? 1;
+    int n = int.tryParse(currentVersion.substring(1)) ?? 1;
     // Load all versions that have a locked spec (prior completed + current if spec exists).
     for (int i = 1; i <= n; i++) {
       await _loadVersionComponents(pj, 'v$i');
     }
+    // Scan beyond DB-declared n: if a spec exists for v{n+1}, the DB phase drifted
+    // (e.g. phase update failed after worksheet generation). Include those versions.
+    while (true) {
+      final extra = 'v${n + 1}';
+      await _loadVersionComponents(pj, extra);
+      if (_allComponents.containsKey(extra)) {
+        n++;
+      } else {
+        break;
+      }
+    }
     // Default expansion: active version expanded, shipped ones collapsed.
     if (mounted) {
       setState(() {
+        _diskLatestN = n;
         for (int i = 1; i <= n; i++) {
           final v = 'v$i';
           if (!_expanded.containsKey(v)) {
@@ -996,8 +1030,8 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
     final stage = _stageOf(pj.phase);
     final worksheetDone = stage == 'worksheet_complete';
     final latestVersion = _versionOf(pj.phase);
-    final latestN = int.tryParse(latestVersion.substring(1)) ?? 1;
-    final allVersions = List.generate(latestN, (i) => 'v${i + 1}');
+    // Use _diskLatestN so versions found on disk (but not yet in DB) appear in timeline.
+    final allVersions = List.generate(_diskLatestN, (i) => 'v${i + 1}');
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
