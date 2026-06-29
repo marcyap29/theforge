@@ -4,6 +4,32 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-06-28 — Claude Code [§R1 Completion: Reverse Mode Wiring]
+
+**Branch:** main
+
+### Done
+
+**§R1 — Reverse Mode Wiring (uncommitted, Marc reviews):**
+- R1-1: `project_file_repository.dart` — `modeDisplay` ternary → switch expression handling all 3 modes; "What's Next" section conditional on mode
+- R1-2: `new_project_screen.dart` — added Project Onboarding card (REVERSE MODE → PROJECT ONBOARDING) with purple accent; `_ModeCard` icon/accent now uses switch instead of boolean
+- R1-3: `project_detail_screen.dart` — `_RepoIngestRow` loads `repoPath` from `project_config.json` on init; shows SnackBar if no repo linked; uses `_repoPath` for ingestion instead of `widget.projectPath`; dynamic label shows linked repo name
+
+### Key Technical Findings
+- `_ModeCard` was using an `isBuild` boolean to derive icon and accent color. Replacing with a switch on `ProjectMode` is more extensible for future modes.
+- `_RepoIngestRow` must watch `project_config.json` asynchronously on mount — same pattern as `_RepoPathRow`. The repo path is the source of truth for what to ingest.
+
+### Next
+- Marc reviews changes, then commits
+- §R2 — Reverse Interview (separate plan, not started)
+
+### Modified
+- `lib/data/filesystem/project_file_repository.dart` — modeDisplay switch, What's Next conditional
+- `lib/features/projects/screens/new_project_screen.dart` — Project Onboarding card, switch for icon/accent
+- `lib/features/projects/screens/project_detail_screen.dart` — _RepoIngestRow loads repoPath, dynamic label
+
+---
+
 ## Session: 2026-06-27 — Claude Code [§VF1/§VC1/§CI1/§QOL — Versioned FS + Verification Checklist + QOL]
 
 **Branch:** main

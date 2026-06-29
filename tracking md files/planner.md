@@ -559,7 +559,23 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 
 ---
 
-## Next Up — §R1: Reverse Mode Codebase Ingestion Engine
+## §R1 — Reverse Mode Wiring — COMPLETE ✅
 
-**Status:** Not started — next on critical path (requires §W6 ✅)
-- See `backlog.md` §R1 for scope
+**Completed:** 2026-06-28 (uncommitted, Marc reviews)
+
+- [x] R1-1: `project_file_repository.dart` — `modeDisplay` ternary → switch for all 3 modes; "What's Next" conditional
+- [x] R1-2: `new_project_screen.dart` — Project Onboarding card; `_ModeCard` icon/accent use switch
+- [x] R1-3: `project_detail_screen.dart` — `_RepoIngestRow` loads `repoPath` from config; SnackBar guard; dynamic label
+- [x] `dart analyze lib/` — zero issues
+
+### Notes
+- Card title: "PROJECT ONBOARDING" (not "REVERSE MODE")
+- Accent color: purple (`0xFFA78BFA`) for onboarding, amber for build, slate for audit
+- `_RepoIngestRow` mirrors `_RepoPathRow` pattern for loading `repoPath` from `project_config.json`
+
+---
+
+## Next Up — §R2: Reverse Interview
+
+**Status:** Not started — requires §R1 ✅
+- See `backlog.md` §R2 for scope

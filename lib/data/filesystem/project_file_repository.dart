@@ -76,7 +76,11 @@ class ProjectFileRepository {
     final now = DateTime.now();
     final dateStr =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-    final modeDisplay = mode == ProjectMode.build ? 'Build' : 'Audit';
+    final modeDisplay = switch (mode) {
+      ProjectMode.build => 'Build',
+      ProjectMode.audit => 'Audit',
+      ProjectMode.reverse => 'Reverse',
+    };
 
     final readmeContent = '# $projectName — Project State\n'
         '**Interview mode:** $modeDisplay\n'
@@ -88,7 +92,7 @@ class ProjectFileRepository {
         '## What\'s Done\n'
         '- Project folder created\n'
         '## What\'s Next\n'
-        '- Begin $modeDisplay Interview\n'
+        '${mode == ProjectMode.reverse ? '- Ingest target codebase (link repo via Repo Path row)\n' : '- Begin $modeDisplay Interview\n'}'
         '## Open Flags\n'
         '- (none)\n';
 

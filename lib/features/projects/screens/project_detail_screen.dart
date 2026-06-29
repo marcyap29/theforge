@@ -1887,24 +1887,46 @@ class _RepoIngestRow extends ConsumerStatefulWidget {
 }
 
 class _RepoIngestRowState extends ConsumerState<_RepoIngestRow> {
+  String? _repoPath;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRepoPath();
+  }
+
+  Future<void> _loadRepoPath() async {
+    final config = await ProjectFileRepository.readProjectConfig(widget.projectPath);
+    if (mounted) setState(() => _repoPath = config['repoPath'] as String?);
+  }
+
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: () async {
+          if (_repoPath == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Link a repo first using the Repo Path row below.'),
+              ),
+            );
+            return;
+          }
+
           await ref
               .read(reverseIngestionNotifierProvider.notifier)
-              .startIngestion(widget.projectPath);
+              .startIngestion(_repoPath!);
 
+          if (!mounted) return;
           final ingestionState = ref.read(reverseIngestionNotifierProvider);
           if (ingestionState.state == rev_ingest.IngestionState.done) {
-            final name = widget.projectName;
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => ReverseIngestionSummaryScreen(
                   projectPath: widget.projectPath,
-                  projectName: name,
+                  projectName: widget.projectName,
                 ),
               ),
             );
@@ -1925,22 +1947,24 @@ class _RepoIngestRowState extends ConsumerState<_RepoIngestRow> {
             borderRadius: BorderRadius.circular(6),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: const Row(
+          child: Row(
             children: [
-              Icon(Icons.code_outlined,
+              const Icon(Icons.code_outlined,
                   size: 14, color: Color(0xFF6B7280)),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Ready to ingest repository codebase',
-                  style: TextStyle(
+                  _repoPath == null
+                      ? 'No repo linked — use Repo Path row below'
+                      : 'Ready to ingest: ${_repoPath!.split('/').last}',
+                  style: const TextStyle(
                     fontFamily: 'Menlo',
                     fontSize: 12,
                     color: Color(0xFFE5E5E7),
                   ),
                 ),
               ),
-              Text(
+              const Text(
                 'Ingest Repo →',
                 style: TextStyle(
                   fontFamily: 'Menlo',

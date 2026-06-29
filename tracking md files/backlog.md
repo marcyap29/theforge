@@ -684,16 +684,7 @@ EngineerUsage {
 ## Reverse Mode — gated on Watch Mode §W1-§W4
 
 ### §R1 — Codebase Ingestion Engine
-
-**What it is:** Reads a repository and extracts component structure, interface contracts as implemented, infrastructure choices, and dependency patterns. Identifies gaps — what cannot be determined from code alone — for the Reverse Interview to fill.
-
-**Owns:** Repository read (local filesystem), component structure extraction, interface contract inference from implementation, infrastructure pattern detection, dependency mapping, gap identification.
-
-**Output:** Structured ingestion summary → input to §R2 Reverse Interview Engine.
-
-**Dependencies:** §12 Document Ingestion (Audit Mode doc ingestion shares the same extraction pattern — R1 extends it for whole-repo analysis)
-
-**Status:** Not started
+✅ Complete 2026-06-28 — Engine + models + notifier + progress/summary screens existed from prior session; 3 wiring pieces completed: `project_file_repository.dart` modeDisplay switch for Reverse mode + "What's Next" conditional; `new_project_screen.dart` "PROJECT ONBOARDING" card with purple accent + `_ModeCard` icon/accent switch; `project_detail_screen.dart` `_RepoIngestRow` loads `repoPath` from `project_config.json` on mount (was scanning Forge project folder instead of linked repo); `dart analyze lib/` zero issues
 
 ---
 

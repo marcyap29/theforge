@@ -243,6 +243,24 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
                   ? null
                   : () => setState(() => _mode = ProjectMode.audit),
             ),
+            _ModeCard(
+              mode: ProjectMode.reverse,
+              title: 'PROJECT ONBOARDING',
+              tagline: 'Map an existing codebase.',
+              description:
+                  'Ingest a repo, fill knowledge gaps via interview, '
+                  'produce as-built spec.',
+              dimensions: const [
+                'Architecture',
+                'Data flow',
+                'API surface',
+                'Dependencies',
+              ],
+              selected: _mode == ProjectMode.reverse,
+              onTap: _creating
+                  ? null
+                  : () => setState(() => _mode = ProjectMode.reverse),
+            ),
             const SizedBox(height: 32),
             SizedBox(
               width: double.infinity,
@@ -327,8 +345,16 @@ class _ModeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final borderColor = selected ? _amberBorder : _slateBorder;
     final backgroundColor = selected ? _amberBackground : _cardBackground;
-    final isBuild = mode == ProjectMode.build;
-    final accentColor = isBuild ? _amberBorder : const Color(0xFF94A3B8);
+    final icon = switch (mode) {
+      ProjectMode.build => Icons.build_outlined,
+      ProjectMode.audit => Icons.fact_check_outlined,
+      ProjectMode.reverse => Icons.search_outlined,
+    };
+    final accentColor = switch (mode) {
+      ProjectMode.build => _amberBorder,
+      ProjectMode.audit => const Color(0xFF94A3B8),
+      ProjectMode.reverse => const Color(0xFFA78BFA),
+    };
 
     return Material(
       color: Colors.transparent,
@@ -349,7 +375,7 @@ class _ModeCard extends StatelessWidget {
               Row(
                 children: [
                   Icon(
-                    isBuild ? Icons.build_outlined : Icons.fact_check_outlined,
+                    icon,
                     size: 16,
                     color: accentColor,
                   ),

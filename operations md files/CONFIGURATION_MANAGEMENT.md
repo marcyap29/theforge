@@ -1,6 +1,6 @@
 # Configuration Management — The Forge
 
-**Last Updated:** 2026-06-20
+**Last Updated:** 2026-06-28
 **Status:** ✅ Synced
 
 ---
@@ -110,6 +110,17 @@
 
 
 ## Change Log
+
+### 2026-06-28 — §R1 Completion: Reverse Mode Wiring
+
+**Action:** Completed 3 missing wiring pieces for Reverse mode. 3 files changed, uncommitted (Marc reviews).
+
+**Key changes:**
+- `project_file_repository.dart` — `modeDisplay` ternary → switch for Build/Audit/Reverse; "What's Next" conditional on mode
+- `new_project_screen.dart` — Project Onboarding card (purple accent); `_ModeCard` icon/accent use switch on `ProjectMode`
+- `project_detail_screen.dart` — `_RepoIngestRow` loads `repoPath` from `project_config.json`; SnackBar guard if null; dynamic label shows linked repo name
+
+---
 
 ### 2026-06-18/20 — Interview UX + Bug Fixes + Model Catalog
 
