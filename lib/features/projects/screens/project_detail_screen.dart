@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -27,18 +28,53 @@ import '../providers/providers.dart';
 import 'reverse_ingestion_progress_screen.dart';
 import 'reverse_ingestion_summary_screen.dart';
 
-class ProjectDetailScreen extends ConsumerWidget {
+class ProjectDetailScreen extends ConsumerStatefulWidget {
   const ProjectDetailScreen({super.key, required this.project});
-
   final Project project;
+  @override
+  ConsumerState<ProjectDetailScreen> createState() =>
+      _ProjectDetailScreenState();
+}
+
+class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
+  double _sidebarWidth = 220;
+  bool _sidebarCollapsed = false;
+
+  int _bannerIndex = 0;
+  Timer? _bannerTimer;
+
+  static const _bannerMessages = [
+    'Ready for {next}?',
+    'What\'s the next feature?',
+    '{next} is up — what are we building?',
+    'Time to scope {next}.',
+    'Momentum is yours — what\'s next?',
+    'What should we work on next?',
+  ];
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  void initState() {
+    super.initState();
+    _bannerTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (mounted) setState(() {
+        _bannerIndex = (_bannerIndex + 1) % _bannerMessages.length;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _bannerTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Watch project list to get live phase/specVersion after generation
     final projects = ref.watch(projectListProvider).valueOrNull ?? [];
     final live = projects.firstWhere(
-      (p) => p.id == project.id,
-      orElse: () => project,
+      (p) => p.id == widget.project.id,
+      orElse: () => widget.project,
     );
 
     final active = ref.watch(activeProjectProvider);
@@ -72,8 +108,23 @@ class ProjectDetailScreen extends ConsumerWidget {
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _FilesSidebar(projectPath: live.path),
-          Container(width: 1, color: const Color(0xFF2C2C2E)),
+          // Collapsible sidebar
+          if (!_sidebarCollapsed)
+            SizedBox(
+              width: _sidebarWidth,
+              child: _FilesSidebar(projectPath: live.path),
+            ),
+          // Drag-to-resize handle + collapse toggle
+          _SidebarDivider(
+            collapsed: _sidebarCollapsed,
+            onToggle: () => setState(() {
+              _sidebarCollapsed = !_sidebarCollapsed;
+            }),
+            onDrag: (dx) => setState(() {
+              _sidebarWidth =
+                  (_sidebarWidth + dx).clamp(140.0, 420.0);
+            }),
+          ),
           Expanded(
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
@@ -91,13 +142,13 @@ class ProjectDetailScreen extends ConsumerWidget {
                   _ReadmeContent(raw: active.readmeContent),
                 const SizedBox(height: 24),
                 const _SectionHeader('Reference Documents'),
-                _ReferenceDocsRow(projectPath: project.path),
+                _ReferenceDocsRow(projectPath: widget.project.path),
                 const SizedBox(height: 24),
                 if (mode == ProjectMode.reverse) ...[
-                  _RepoIngestRow(projectPath: project.path, projectName: project.name),
+                  _RepoIngestRow(projectPath: widget.project.path, projectName: widget.project.name),
                   const SizedBox(height: 24),
                 ],
-                _RepoPathRow(projectPath: project.path, projectName: project.name),
+                _RepoPathRow(projectPath: widget.project.path, projectName: widget.project.name),
                 if (_stageOf(live.phase) == 'worksheet_complete') ...[
                   _BuildSequenceSection(project: live),
                   const SizedBox(height: 8),
@@ -225,41 +276,94 @@ class ProjectDetailScreen extends ConsumerWidget {
                 );
               }
             }
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
+            return FutureBuilder<List<String>>(
+              future: ProjectFileRepository.readValidatedVersions(live.path),
+              builder: (context, validSnap) {
+                final validatedVersions = validSnap.data ?? [];
+                final isValidated =
+                    validatedVersions.contains(latestCompletedV);
+
+                final badge = Container(
                   height: 44,
                   decoration: BoxDecoration(
                     color: const Color(0xFF0F0F10),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF22C55E)),
+                    border: Border.all(
+                      color: isValidated
+                          ? const Color(0xFF22C55E)
+                          : const Color(0xFFE8A04C),
+                    ),
                   ),
                   child: Center(
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.check_circle,
-                            color: Color(0xFF22C55E), size: 14),
+                        Icon(
+                          isValidated
+                              ? Icons.check_circle
+                              : Icons.schedule,
+                          color: isValidated
+                              ? const Color(0xFF22C55E)
+                              : const Color(0xFFE8A04C),
+                          size: 14,
+                        ),
                         const SizedBox(width: 8),
                         Text(
-                          '${latestCompletedV.toUpperCase()} ready for executor',
-                          style: const TextStyle(
+                          isValidated
+                              ? '${latestCompletedV.toUpperCase()} validated ✓'
+                              : '${latestCompletedV.toUpperCase()} awaiting validation',
+                          style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             fontFamily: 'Menlo',
-                            color: Color(0xFF22C55E),
+                            color: isValidated
+                                ? const Color(0xFF22C55E)
+                                : const Color(0xFFE8A04C),
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
-                if (actionButton != null) ...[
-                  const SizedBox(height: 10),
-                  actionButton,
-                ],
-              ],
+                );
+
+                if (!isValidated) {
+                  return badge;
+                }
+
+                final bannerText = _bannerMessages[_bannerIndex]
+                    .replaceAll('{next}', info!.nextVersion.toUpperCase());
+
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    badge,
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F0F10),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF2C2C2E)),
+                      ),
+                      child: Text(
+                        bannerText,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontFamily: 'Menlo',
+                          fontSize: 13,
+                          color: Color(0xFF9CA3AF),
+                        ),
+                      ),
+                    ),
+                    if (actionButton != null) ...[
+                      const SizedBox(height: 10),
+                      actionButton,
+                    ],
+                  ],
+                );
+              },
             );
           },
         ),
@@ -754,6 +858,7 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
   int _diskLatestN = 1;
   // stage ('spec_locked' | 'worksheet_complete') for disk-extra versions
   final Map<String, String> _diskExtraStages = {};
+  final Set<String> _validatedVersions = {};
 
   @override
   void initState() {
@@ -767,6 +872,7 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
     );
     _loadProgress();
     _loadComponents();
+    _loadValidatedVersions();
   }
 
   Future<void> _loadComponents() async {
@@ -877,7 +983,11 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
   }
 
   @override
-  void didPopNext() => _loadProgress();
+  void didPopNext() {
+    _loadProgress();
+    _loadComponents();
+    _loadValidatedVersions();
+  }
 
   void _loadProgress() {
     final repo = ProjectFileRepository();
@@ -886,6 +996,18 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
         .then((data) {
       if (mounted) setState(() => _progress = data);
     });
+  }
+
+  Future<void> _loadValidatedVersions() async {
+    final validated =
+        await ProjectFileRepository.readValidatedVersions(widget.project.path);
+    if (mounted) {
+      setState(() {
+        _validatedVersions
+          ..clear()
+          ..addAll(validated);
+      });
+    }
   }
 
   @override
@@ -1017,14 +1139,20 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
     BuildContext context, {
     required String version,
     required bool isShipped,
+    required bool isValidated,
     required Widget expandedContent,
     Widget? collapsedTrailing,
   }) {
     final isExpanded = _expanded[version] ?? !isShipped;
-    final color =
-        isShipped ? const Color(0xFF22C55E) : const Color(0xFFE8A04C);
+    final color = isShipped
+        ? (isValidated
+            ? const Color(0xFF22C55E)
+            : const Color(0xFFE8A04C))
+        : const Color(0xFF4B5563);
     final label = isShipped
-        ? '${version.toUpperCase()} SHIPPED'
+        ? (isValidated
+            ? '${version.toUpperCase()} VALIDATED'
+            : '${version.toUpperCase()} SHIPPED')
         : '${version.toUpperCase()} IN PROGRESS';
 
     return Padding(
@@ -1048,8 +1176,11 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
                   ),
                   const SizedBox(width: 4),
                   if (isShipped) ...[
-                    const Icon(Icons.check_circle,
-                        size: 11, color: Color(0xFF22C55E)),
+                    Icon(Icons.check_circle,
+                        size: 11,
+                        color: isValidated
+                            ? const Color(0xFF22C55E)
+                            : const Color(0xFFE8A04C)),
                     const SizedBox(width: 4),
                   ],
                   Text(
@@ -1110,6 +1241,7 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
       context,
       version: v,
       isShipped: vIsShipped,
+      isValidated: _validatedVersions.contains(v),
       collapsedTrailing: !vIsShipped && mode == ProjectMode.build
           ? _LayerSubRow(
               progress: _progress,
@@ -1140,6 +1272,29 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
                 if (chips.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   _buildChips(chips),
+                ],
+                if (vIsShipped && !_validatedVersions.contains(v)) ...[
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      await ProjectFileRepository.markVersionValidated(
+                          pj.path, v);
+                      await _loadValidatedVersions();
+                    },
+                    icon: const Icon(Icons.check_circle_outline, size: 14),
+                    label: Text(
+                      'Mark ${v.toUpperCase()} as Executed & Validated',
+                      style: const TextStyle(
+                          fontFamily: 'Menlo',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFE8A04C)),
+                      foregroundColor: const Color(0xFFE8A04C),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                  ),
                 ],
               ],
             )
@@ -1410,15 +1565,68 @@ ArtifactViewMode _modeForFolder(String folder) => switch (folder) {
       _ => ArtifactViewMode.audit,
     };
 
-class _FilesSidebar extends StatefulWidget {
+class _SidebarDivider extends StatelessWidget {
+  final bool collapsed;
+  final VoidCallback onToggle;
+  final void Function(double dx) onDrag;
+
+  const _SidebarDivider({
+    required this.collapsed,
+    required this.onToggle,
+    required this.onDrag,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onHorizontalDragUpdate: (details) => onDrag(details.delta.dx),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.resizeColumn,
+        child: SizedBox(
+          width: 12,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(width: 1, color: const Color(0xFF2C2C2E)),
+              Positioned(
+                top: 40,
+                child: GestureDetector(
+                  onTap: onToggle,
+                  child: Container(
+                    width: 16,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1C1C1E),
+                      border: Border.all(color: const Color(0xFF3C3C3E)),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Icon(
+                      collapsed
+                          ? Icons.chevron_right
+                          : Icons.chevron_left,
+                      size: 12,
+                      color: const Color(0xFF6B7280),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FilesSidebar extends ConsumerStatefulWidget {
   const _FilesSidebar({required this.projectPath});
   final String projectPath;
 
   @override
-  State<_FilesSidebar> createState() => _FilesSidebarState();
+  ConsumerState<_FilesSidebar> createState() => _FilesSidebarState();
 }
 
-class _FilesSidebarState extends State<_FilesSidebar> with RouteAware {
+class _FilesSidebarState extends ConsumerState<_FilesSidebar> with RouteAware {
   String? _selected;
   // folder → version ('' for flat files) → filenames
   Future<Map<String, Map<String, List<String>>>>? _scanFuture;
@@ -1498,6 +1706,9 @@ class _FilesSidebarState extends State<_FilesSidebar> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AsyncValue<List<Project>>>(projectListProvider, (_, __) {
+      setState(() { _scanFuture = _scan(); });
+    });
     return SizedBox(
       width: 220,
       child: Container(
@@ -2016,9 +2227,9 @@ class _BuildSequenceSection extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'BUILD SEQUENCE',
-              style: TextStyle(
+            Text(
+              'BUILD SEQUENCE — ${sv.toUpperCase()}',
+              style: const TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.8,
@@ -2034,9 +2245,9 @@ class _BuildSequenceSection extends ConsumerWidget {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Generate an LLM-narrated build order from your spec.',
-                          style: TextStyle(
+                        Text(
+                          'Generate an LLM-narrated build order from your ${sv.toUpperCase()} spec.',
+                          style: const TextStyle(
                             fontFamily: 'Menlo',
                             fontSize: 12,
                             color: Color(0xFF9CA3AF),

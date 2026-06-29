@@ -368,6 +368,23 @@ class ProjectFileRepository {
     return null;
   }
 
+  static Future<List<String>> readValidatedVersions(String projectPath) async {
+    final config = await readProjectConfig(projectPath);
+    final raw = config['validatedVersions'];
+    if (raw is List) return raw.cast<String>();
+    return [];
+  }
+
+  static Future<void> markVersionValidated(
+      String projectPath, String version) async {
+    final config = await readProjectConfig(projectPath);
+    final current =
+        (config['validatedVersions'] as List?)?.cast<String>() ?? [];
+    if (current.contains(version)) return;
+    config['validatedVersions'] = [...current, version];
+    await writeProjectConfig(projectPath, config);
+  }
+
   /// Gets list of changed files from git history in a repository
   /// Returns empty list on any error (not throwing)
   static Future<Set<String>> getGitChangedFiles(String repoPath, {required String since}) async {
