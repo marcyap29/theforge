@@ -105,7 +105,11 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('$modeLabel Interview — ${args.name}'),
+        title: Text(
+          args.priorSpecVersion != null
+              ? '$modeLabel Interview — ${args.name} · ${nextSpecVersion(args.priorSpecVersion!).toUpperCase()}'
+              : '$modeLabel Interview — ${args.name}',
+        ),
         actions: [
           _DocCountChip(projectPath: args.path),
           IconButton(

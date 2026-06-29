@@ -1103,7 +1103,11 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
                   : () => Navigator.of(context).push(MaterialPageRoute(
                         builder: (_) => InterviewScreen(
                           args: InterviewArgs(
-                              path: pj.path, name: pj.name, mode: mode),
+                            path: pj.path,
+                            name: pj.name,
+                            mode: mode,
+                            priorSpecVersion: sv != 'v1' ? _previousVersion(sv) : null,
+                          ),
                         ),
                       )),
             ),
