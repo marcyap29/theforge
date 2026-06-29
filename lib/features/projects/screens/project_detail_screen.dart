@@ -764,10 +764,18 @@ File? _findSpecFile(String projectPath, String version) {
   }
   final flatDir = Directory(p.join(projectPath, 'specs'));
   if (flatDir.existsSync()) {
-    return flatDir
+    final hit = flatDir
         .listSync()
         .whereType<File>()
         .where((f) => p.basename(f.path).endsWith(suffix))
+        .firstOrNull;
+    if (hit != null) return hit;
+  }
+  if (nestedDir.existsSync()) {
+    return nestedDir
+        .listSync()
+        .whereType<File>()
+        .where((f) => f.path.endsWith('.md'))
         .firstOrNull;
   }
   return null;
@@ -801,6 +809,13 @@ File? _findWorksheetFile(String projectPath, String version) {
 
 bool _worksheetFileExistsOnDisk(String projectPath, String version) =>
     _findWorksheetFile(projectPath, version) != null;
+
+bool _handoffDirHasFiles(String projectPath, String version) {
+  final dir = Directory(p.join(projectPath, 'handoffs', version));
+  if (!dir.existsSync()) return false;
+  return dir.listSync().whereType<File>().any(
+      (f) => f.path.endsWith('.md'));
+}
 
 enum _DiskNextState { none, specLocked }
 
@@ -891,9 +906,11 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
       final vNext = 'v${n + 1}';
       if (!_specFileExistsOnDisk(pj.path, vNext)) break;
       await _loadVersionComponents(pj, vNext);
-      extraStages[vNext] = _worksheetFileExistsOnDisk(pj.path, vNext)
-          ? 'worksheet_complete'
-          : 'spec_locked';
+      extraStages[vNext] =
+          (_worksheetFileExistsOnDisk(pj.path, vNext) ||
+                  _handoffDirHasFiles(pj.path, vNext))
+              ? 'worksheet_complete'
+              : 'spec_locked';
       n++;
     }
     // Default expansion: active version expanded, shipped ones collapsed.
@@ -1143,7 +1160,7 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
     required Widget expandedContent,
     Widget? collapsedTrailing,
   }) {
-    final isExpanded = _expanded[version] ?? !isShipped;
+    final isExpanded = _expanded[version] ?? (!isShipped || !isValidated);
     final color = isShipped
         ? (isValidated
             ? const Color(0xFF22C55E)
@@ -2213,7 +2230,11 @@ class _BuildSequenceSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(executorTimelineProvider(project.path));
-    final sv = project.specVersion ?? 'v1';
+    int _latestSpecN = 1;
+    while (_specFileExistsOnDisk(project.path, 'v${_latestSpecN + 1}')) {
+      _latestSpecN++;
+    }
+    final sv = 'v$_latestSpecN';
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
