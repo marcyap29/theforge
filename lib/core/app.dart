@@ -5,7 +5,10 @@ import '../features/interview/ui/interview_screen.dart';
 import '../features/projects/screens/projects_list_screen.dart';
 import '../features/projects/screens/reverse_ingestion_progress_screen.dart';
 import '../features/projects/screens/reverse_ingestion_summary_screen.dart';
+import '../features/reverse_interview/state/reverse_interview_state.dart';
+import '../features/reverse_interview/ui/reverse_interview_screen.dart';
 import '../features/settings/settings_screen.dart';
+import '../features/spec_generation/as_built_spec_screen.dart';
 import '../features/watch/briefing_screen.dart';
 import '../features/watch/decision_screen.dart';
 import '../features/watch/spec_drift_screen.dart';
@@ -60,6 +63,27 @@ class TheForgeApp extends StatelessWidget {
           }
           return const Scaffold(
             body: Center(child: Text('Invalid arguments')),
+          );
+        },
+        '/reverse-interview': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          if (args is ReverseInterviewArgs) {
+            return ReverseInterviewScreen(args: args);
+          }
+          return const Scaffold(
+            body: Center(child: Text('Invalid reverse interview args')),
+          );
+        },
+        '/as-built-spec': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          if (args is Map<String, String>) {
+            return AsBuiltSpecScreen(
+              projectPath: args['projectPath']!,
+              projectName: args['projectName']!,
+            );
+          }
+          return const Scaffold(
+            body: Center(child: Text('Invalid as-built spec args')),
           );
         },
       },

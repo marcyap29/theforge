@@ -14,6 +14,8 @@ import '../../../data/local_db/forge_database.dart';
 import '../../artifacts/artifact_viewer_screen.dart';
 import '../../interview/providers/interview_providers.dart';
 import '../../interview/ui/interview_screen.dart';
+import '../../reverse_interview/state/reverse_interview_state.dart';
+import '../../reverse_interview/ui/reverse_interview_screen.dart';
 import '../../spec_generation/compliance/spec_compliance_screen.dart';
 import '../../spec_generation/executor_timeline_notifier.dart';
 import '../../spec_generation/worksheet_generation_screen.dart';
@@ -262,7 +264,7 @@ class ProjectDetailScreen extends ConsumerWidget {
           },
         ),
        'interview_active' => mode == ProjectMode.reverse
-           ? const _ReverseModeWarningButton()
+            ? _ReverseModeCta(projectPath: live.path, projectName: live.name)
            : FilledButton(
                onPressed: () => Navigator.of(context).push(
                  MaterialPageRoute(
@@ -288,8 +290,20 @@ class ProjectDetailScreen extends ConsumerWidget {
                      fontWeight: FontWeight.w600, fontFamily: 'Menlo'),
                ),
              ),
-       _ => mode == ProjectMode.reverse
-           ? const _ReverseModeWarningButton()
+        'as_built' => FilledButton(
+            onPressed: () {/* view as-built spec — artifact viewer */},
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(44),
+              backgroundColor: const Color(0xFF22C55E),
+              foregroundColor: const Color(0xFF0F0F10),
+            ),
+            child: const Text(
+              'View As-Built Spec →',
+              style: TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Menlo'),
+            ),
+          ),
+        _ => mode == ProjectMode.reverse
+            ? _ReverseModeCta(projectPath: live.path, projectName: live.name)
            : FilledButton(
                onPressed: () => Navigator.of(context).push(
                  MaterialPageRoute(
@@ -2536,29 +2550,46 @@ class _ReadmeContent extends StatelessWidget {
   }
 }
 
-class _ReverseModeWarningButton extends StatelessWidget {
-  const _ReverseModeWarningButton();
+
+class _ReverseModeCta extends ConsumerWidget {
+  final String projectPath;
+  final String projectName;
+
+  const _ReverseModeCta({
+    required this.projectPath,
+    required this.projectName,
+  });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ingestionState = ref.watch(reverseIngestionNotifierProvider);
+    final ingestionDone =
+        ingestionState.state == rev_ingest.IngestionState.done;
+
     return FilledButton(
-      onPressed: null,
+      onPressed: ingestionDone
+          ? () => Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => ReverseInterviewScreen(
+                  args: ReverseInterviewArgs(
+                    projectPath: projectPath,
+                    projectName: projectName,
+                  ),
+                ),
+              ))
+          : null,
       style: FilledButton.styleFrom(
         minimumSize: const Size.fromHeight(44),
-        backgroundColor: const Color(0xFF2C2C2E),
-        foregroundColor: const Color(0xFF6B7280),
+        backgroundColor:
+            ingestionDone ? const Color(0xFFE8A04C) : const Color(0xFF2C2C2E),
+        foregroundColor:
+            ingestionDone ? const Color(0xFF0F0F10) : const Color(0xFF6B7280),
       ),
-      child: const Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.info_outline, size: 16, color: Color(0xFF6B7280)),
-          SizedBox(width: 8),
-          Text(
-            'Reverse Mode — Ingest Repo First',
-            style: TextStyle(
-                fontWeight: FontWeight.w600, fontFamily: 'Menlo'),
-          ),
-        ],
+      child: Text(
+        ingestionDone
+            ? 'Start Reverse Interview →'
+            : 'Ingest Repo First',
+        style: const TextStyle(
+            fontWeight: FontWeight.w600, fontFamily: 'Menlo'),
       ),
     );
   }

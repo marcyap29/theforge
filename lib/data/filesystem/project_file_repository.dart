@@ -636,4 +636,36 @@ class ProjectFileRepository {
       return null;
     }
   }
+
+  Future<void> writeAsBuiltSpec(
+      String projectPath, String projectName, String content) async {
+    final versionDir = Directory(p.join(projectPath, 'specs', 'v1'));
+    await versionDir.create(recursive: true);
+    final specPath =
+        p.join(versionDir.path, '${projectName}_AsBuiltSpec_v1.md');
+    final tmpPath = '$specPath.tmp';
+    await File(tmpPath).writeAsString(content);
+    File(tmpPath).renameSync(specPath);
+  }
+
+  Future<void> writeReverseInterviewLog(String projectPath, String projectName,
+      List<Map<String, dynamic>> turns) async {
+    final auditDir = Directory(p.join(projectPath, 'audit'));
+    final file =
+        File(p.join(auditDir.path, '${projectName}_ReverseInterview.json'));
+    await file.writeAsString(jsonEncode(turns));
+  }
+
+  Future<List<Map<String, dynamic>>> readReverseInterviewLog(
+      String projectPath, String projectName) async {
+    final file = File(
+        p.join(projectPath, 'audit', '${projectName}_ReverseInterview.json'));
+    if (!file.existsSync()) return [];
+    try {
+      return (jsonDecode(await file.readAsString()) as List<dynamic>)
+          .cast<Map<String, dynamic>>();
+    } on FormatException {
+      return [];
+    }
+  }
 }
