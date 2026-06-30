@@ -35,7 +35,7 @@ class SpecComplianceScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('V$priorSpecVersion Compliance Check'),
+        title: Text('${priorSpecVersion.toUpperCase()} Compliance Check'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
@@ -94,9 +94,9 @@ class SpecComplianceScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'V1 Build Compliance Summary',
-                style: TextStyle(
+              Text(
+                '${priorSpecVersion.toUpperCase()} Build Compliance Summary',
+                style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                 ),
@@ -259,7 +259,7 @@ class SpecComplianceScreen extends ConsumerWidget {
                 ),
               );
             },
-            child: const Text('Continue to V2 Interview →'),
+            child: Text('Continue to ${nextVersion.toUpperCase()} Interview →'),
           ),
         ),
         const SizedBox(height: 12),
