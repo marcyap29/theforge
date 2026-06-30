@@ -578,26 +578,42 @@ class ProjectFileRepository {
 
   Future<String?> readFeatureContext(
       String projectPath, String projectName, String priorSpecVersion) async {
-    final specFile = File(p.join(
-        projectPath, 'specs', '${projectName}_LockedSpec_$priorSpecVersion.md'));
-    final seedsFile = File(p.join(
-        projectPath, 'ingested', '${projectName}_V2Seeds.md'));
-
-    final specContent =
-        specFile.existsSync() ? await specFile.readAsString() : null;
-    final seedsContent =
-        seedsFile.existsSync() ? await seedsFile.readAsString() : null;
-
-    if (specContent == null && seedsContent == null) return null;
+    final versionMatch = RegExp(r'^v(\d+)$').firstMatch(priorSpecVersion);
+    if (versionMatch == null) return null;
+    final priorN = int.parse(versionMatch.group(1)!);
 
     final parts = <String>[];
-    if (specContent != null) {
-      parts.add('PRIOR LOCKED SPEC ($priorSpecVersion — immutable):\n$specContent');
+
+    // Read ALL locked specs v1 → priorSpecVersion so the LLM has the full
+    // product history (who it's for, what shipped, what was deferred).
+    for (int i = 1; i <= priorN; i++) {
+      final version = 'v$i';
+      // Versioned subfolder first, flat fallback (mirrors readLockedSpec).
+      final versionedPath = p.join(
+          projectPath, 'specs', version, '${projectName}_LockedSpec_$version.md');
+      final flatPath = p.join(
+          projectPath, 'specs', '${projectName}_LockedSpec_$version.md');
+      final specFile = File(versionedPath).existsSync()
+          ? File(versionedPath)
+          : File(flatPath);
+      if (!specFile.existsSync()) continue;
+      final specContent = await specFile.readAsString();
+      final label = i == priorN
+          ? 'PRIOR LOCKED SPEC ($version — immutable, most recent shipped)'
+          : 'SHIPPED SPEC ($version — immutable)';
+      parts.add('$label:\n$specContent');
     }
-    if (seedsContent != null) {
-      parts.add('V2 SEEDS (features deferred from $priorSpecVersion):\n$seedsContent');
+
+    // Backlog seeds are always from the most recent prior version.
+    final seedsFile =
+        File(p.join(projectPath, 'ingested', '${projectName}_V2Seeds.md'));
+    if (seedsFile.existsSync()) {
+      final seedsContent = await seedsFile.readAsString();
+      parts.add(
+          'BACKLOG SEEDS (features deferred from $priorSpecVersion, candidates for this version):\n$seedsContent');
     }
-    return parts.join('\n\n---\n\n');
+
+    return parts.isEmpty ? null : parts.join('\n\n---\n\n');
   }
 
   Future<List<Map<String, dynamic>>> scanProjectCodebase(
