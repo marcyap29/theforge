@@ -38,7 +38,7 @@ class AsBuiltSpecNotifier extends AutoDisposeNotifier<AsBuiltGenState> {
       }
 
       final interviewLog =
-          await repo.readReverseInterviewLog(projectPath, projectName);
+          await repo.readPullInterviewLog(projectPath, projectName);
 
       final prompt = buildAsBuiltSpecPrompt(summary, interviewLog);
 

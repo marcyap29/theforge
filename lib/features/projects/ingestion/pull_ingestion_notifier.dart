@@ -1,34 +1,34 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../services/llm/llm_service_provider.dart';
-import '../models/reverse_ingestion_summary.dart';
+import '../models/pull_ingestion_summary.dart';
 import '../providers/providers.dart';
-import 'reverse_codebase_ingestion_engine.dart';
+import 'pull_codebase_ingestion_engine.dart';
 
-class ReverseIngestionState {
+class PullIngestionState {
   final IngestionState state;
   final String? error;
 
-  const ReverseIngestionState({
+  const PullIngestionState({
     required this.state,
     this.error,
   });
 
-  ReverseIngestionState copyWith({
+  PullIngestionState copyWith({
     IngestionState? state,
     String? error,
   }) {
-    return ReverseIngestionState(
+    return PullIngestionState(
       state: state ?? this.state,
       error: error ?? this.error,
     );
   }
 }
 
-class ReverseIngestionNotifier extends Notifier<ReverseIngestionState> {
+class PullIngestionNotifier extends Notifier<PullIngestionState> {
   @override
-  ReverseIngestionState build() {
-    return const ReverseIngestionState(state: IngestionState.idle);
+  PullIngestionState build() {
+    return const PullIngestionState(state: IngestionState.idle);
   }
 
   Future<void> startIngestion(String projectPath) async {
@@ -91,7 +91,7 @@ class ReverseIngestionNotifier extends Notifier<ReverseIngestionState> {
   }
 
   Future<void> clearIngestion() async {
-    state = const ReverseIngestionState(state: IngestionState.idle);
+    state = const PullIngestionState(state: IngestionState.idle);
   }
 
   String _extractProjectName(String projectPath) {
@@ -100,7 +100,7 @@ class ReverseIngestionNotifier extends Notifier<ReverseIngestionState> {
   }
 }
 
-final reverseIngestionNotifierProvider =
-    NotifierProvider<ReverseIngestionNotifier, ReverseIngestionState>(
-  ReverseIngestionNotifier.new,
+final pullIngestionNotifierProvider =
+    NotifierProvider<PullIngestionNotifier, PullIngestionState>(
+  PullIngestionNotifier.new,
 );

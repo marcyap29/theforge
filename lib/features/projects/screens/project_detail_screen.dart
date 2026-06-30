@@ -15,18 +15,18 @@ import '../../../data/local_db/forge_database.dart';
 import '../../artifacts/artifact_viewer_screen.dart';
 import '../../interview/providers/interview_providers.dart';
 import '../../interview/ui/interview_screen.dart';
-import '../../reverse_interview/state/reverse_interview_state.dart';
-import '../../reverse_interview/ui/reverse_interview_screen.dart';
+import '../../pull_interview/state/pull_interview_state.dart';
+import '../../pull_interview/ui/pull_interview_screen.dart';
 import '../../spec_generation/compliance/spec_compliance_screen.dart';
 import '../../spec_generation/executor_timeline_notifier.dart';
 import '../../spec_generation/worksheet_generation_screen.dart';
 import '../ingestion/ingestion_notifier.dart';
+import '../ingestion/pull_ingestion_notifier.dart';
 import '../ingestion/reference_docs_screen.dart';
-import '../ingestion/reverse_ingestion_notifier.dart';
-import '../models/reverse_ingestion_summary.dart' as rev_ingest;
+import '../models/pull_ingestion_summary.dart' as rev_ingest;
 import '../providers/providers.dart';
-import 'reverse_ingestion_progress_screen.dart';
-import 'reverse_ingestion_summary_screen.dart';
+import 'pull_ingestion_progress_screen.dart';
+import 'pull_ingestion_summary_screen.dart';
 
 class ProjectDetailScreen extends ConsumerStatefulWidget {
   const ProjectDetailScreen({super.key, required this.project});
@@ -144,7 +144,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 const _SectionHeader('Reference Documents'),
                 _ReferenceDocsRow(projectPath: widget.project.path),
                 const SizedBox(height: 24),
-                if (mode == ProjectMode.reverse) ...[
+                if (mode == ProjectMode.pull) ...[
                   _RepoIngestRow(projectPath: widget.project.path, projectName: widget.project.name),
                   const SizedBox(height: 24),
                 ],
@@ -367,7 +367,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             );
           },
         ),
-       'interview_active' => mode == ProjectMode.reverse
+       'interview_active' => mode == ProjectMode.pull
             ? _ReverseModeCta(projectPath: live.path, projectName: live.name)
            : FilledButton(
                onPressed: () => Navigator.of(context).push(
@@ -406,7 +406,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               style: TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Menlo'),
             ),
           ),
-        _ => mode == ProjectMode.reverse
+        _ => mode == ProjectMode.pull
             ? _ReverseModeCta(projectPath: live.path, projectName: live.name)
            : FilledButton(
                onPressed: () => Navigator.of(context).push(
@@ -2200,15 +2200,15 @@ class _RepoIngestRowState extends ConsumerState<_RepoIngestRow> {
           }
 
           await ref
-              .read(reverseIngestionNotifierProvider.notifier)
+              .read(pullIngestionNotifierProvider.notifier)
               .startIngestion(_repoPath!);
 
           if (!mounted) return;
-          final ingestionState = ref.read(reverseIngestionNotifierProvider);
+          final ingestionState = ref.read(pullIngestionNotifierProvider);
           if (ingestionState.state == rev_ingest.IngestionState.done) {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => ReverseIngestionSummaryScreen(
+                builder: (_) => PullIngestionSummaryScreen(
                   projectPath: widget.projectPath,
                   projectName: widget.projectName,
                 ),
@@ -2217,7 +2217,7 @@ class _RepoIngestRowState extends ConsumerState<_RepoIngestRow> {
           } else {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => ReverseIngestionProgressScreen(
+                builder: (_) => PullIngestionProgressScreen(
                   projectPath: widget.projectPath,
                 ),
               ),
@@ -2836,15 +2836,15 @@ class _ReverseModeCta extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ingestionState = ref.watch(reverseIngestionNotifierProvider);
+    final ingestionState = ref.watch(pullIngestionNotifierProvider);
     final ingestionDone =
         ingestionState.state == rev_ingest.IngestionState.done;
 
     return FilledButton(
       onPressed: ingestionDone
           ? () => Navigator.of(context).push(MaterialPageRoute<void>(
-                builder: (_) => ReverseInterviewScreen(
-                  args: ReverseInterviewArgs(
+                builder: (_) => PullInterviewScreen(
+                  args: PullInterviewArgs(
                     projectPath: projectPath,
                     projectName: projectName,
                   ),
@@ -2860,7 +2860,7 @@ class _ReverseModeCta extends ConsumerWidget {
       ),
       child: Text(
         ingestionDone
-            ? 'Start Reverse Interview →'
+            ? 'Start Pull Interview →'
             : 'Ingest Repo First',
         style: const TextStyle(
             fontWeight: FontWeight.w600, fontFamily: 'Menlo'),

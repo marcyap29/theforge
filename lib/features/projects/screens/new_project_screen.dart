@@ -244,7 +244,7 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
                   : () => setState(() => _mode = ProjectMode.audit),
             ),
             _ModeCard(
-              mode: ProjectMode.reverse,
+              mode: ProjectMode.pull,
               title: 'PROJECT ONBOARDING',
               tagline: 'Map an existing codebase.',
               description:
@@ -256,10 +256,10 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
                 'API surface',
                 'Dependencies',
               ],
-              selected: _mode == ProjectMode.reverse,
+              selected: _mode == ProjectMode.pull,
               onTap: _creating
                   ? null
-                  : () => setState(() => _mode = ProjectMode.reverse),
+                  : () => setState(() => _mode = ProjectMode.pull),
             ),
             const SizedBox(height: 32),
             SizedBox(
@@ -348,12 +348,12 @@ class _ModeCard extends StatelessWidget {
     final icon = switch (mode) {
       ProjectMode.build => Icons.build_outlined,
       ProjectMode.audit => Icons.fact_check_outlined,
-      ProjectMode.reverse => Icons.search_outlined,
+      ProjectMode.pull => Icons.search_outlined,
     };
     final accentColor = switch (mode) {
       ProjectMode.build => _amberBorder,
       ProjectMode.audit => const Color(0xFF94A3B8),
-      ProjectMode.reverse => const Color(0xFFA78BFA),
+      ProjectMode.pull => const Color(0xFFA78BFA),
     };
 
     return Material(

@@ -1,24 +1,24 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../features/projects/models/reverse_ingestion_summary.dart';
+import '../../../features/projects/models/pull_ingestion_summary.dart';
 import '../../../features/projects/providers/providers.dart';
 import '../../../services/llm/llm_provider.dart';
 import '../../../services/llm/llm_service_provider.dart';
-import 'reverse_interview_state.dart';
+import 'pull_interview_state.dart';
 
-class ReverseInterviewNotifier
-    extends FamilyAsyncNotifier<ReverseInterviewState, ReverseInterviewArgs> {
+class PullInterviewNotifier
+    extends FamilyAsyncNotifier<PullInterviewState, PullInterviewArgs> {
   @override
-  Future<ReverseInterviewState> build(ReverseInterviewArgs arg) async {
+  Future<PullInterviewState> build(PullInterviewArgs arg) async {
     final repo = ref.watch(projectFileRepositoryProvider);
     final summary =
         await repo.readIngestionSummary(arg.projectPath, arg.projectName);
 
     final greeting = _buildGreeting(summary, arg.projectName);
-    return ReverseInterviewState(
+    return PullInterviewState(
       projectPath: arg.projectPath,
       projectName: arg.projectName,
-      turns: [ReverseInterviewTurn(isUser: false, text: greeting)],
+      turns: [PullInterviewTurn(isUser: false, text: greeting)],
     );
   }
 
@@ -29,7 +29,7 @@ class ReverseInterviewNotifier
     final withUser = current.copyWith(
       turns: [
         ...current.turns,
-        ReverseInterviewTurn(isUser: true, text: text),
+        PullInterviewTurn(isUser: true, text: text),
       ],
       isLoading: true,
     );
@@ -56,7 +56,7 @@ class ReverseInterviewNotifier
       state = AsyncData(withUser.copyWith(
         turns: [
           ...withUser.turns,
-          ReverseInterviewTurn(isUser: false, text: response),
+          PullInterviewTurn(isUser: false, text: response),
         ],
         isLoading: false,
       ));
@@ -71,7 +71,7 @@ class ReverseInterviewNotifier
   Future<void> markComplete() async {
     final current = state.requireValue;
     final repo = ref.read(projectFileRepositoryProvider);
-    await repo.writeReverseInterviewLog(
+    await repo.writePullInterviewLog(
       current.projectPath,
       current.projectName,
       current.turns
@@ -105,7 +105,7 @@ class ReverseInterviewNotifier
             '${summary!.gapList.map((g) => '- $g').join('\n')}'
         : '';
 
-    return 'You are The Forge reverse engineer. You are interviewing an '
+    return 'You are The Forge pull mode engineer. You are interviewing an '
         'engineer about an existing codebase called "$projectName" to capture '
         'context the code alone cannot provide.\n\n'
         '$summaryBlock$gapsBlock\n\n'

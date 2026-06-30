@@ -4,9 +4,9 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../features/projects/models/reverse_ingestion_summary.dart';
+import '../../features/projects/models/pull_ingestion_summary.dart';
 
-enum ProjectMode { build, audit, reverse }
+enum ProjectMode { build, audit, pull }
 
 class ProjectAlreadyExistsException implements Exception {
   final String path;
@@ -79,7 +79,7 @@ class ProjectFileRepository {
     final modeDisplay = switch (mode) {
       ProjectMode.build => 'Build',
       ProjectMode.audit => 'Audit',
-      ProjectMode.reverse => 'Reverse',
+      ProjectMode.pull => 'Pull',
     };
 
     final readmeContent = '# $projectName — Project State\n'
@@ -92,7 +92,7 @@ class ProjectFileRepository {
         '## What\'s Done\n'
         '- Project folder created\n'
         '## What\'s Next\n'
-        '${mode == ProjectMode.reverse ? '- Ingest target codebase (link repo via Repo Path row)\n' : '- Begin $modeDisplay Interview\n'}'
+        '${mode == ProjectMode.pull ? '- Ingest target codebase (link repo via Repo Path row)\n' : '- Begin $modeDisplay Interview\n'}'
         '## Open Flags\n'
         '- (none)\n';
 
@@ -691,18 +691,18 @@ class ProjectFileRepository {
     File(tmpPath).renameSync(specPath);
   }
 
-  Future<void> writeReverseInterviewLog(String projectPath, String projectName,
+  Future<void> writePullInterviewLog(String projectPath, String projectName,
       List<Map<String, dynamic>> turns) async {
     final auditDir = Directory(p.join(projectPath, 'audit'));
     final file =
-        File(p.join(auditDir.path, '${projectName}_ReverseInterview.json'));
+        File(p.join(auditDir.path, '${projectName}_PullInterview.json'));
     await file.writeAsString(jsonEncode(turns));
   }
 
-  Future<List<Map<String, dynamic>>> readReverseInterviewLog(
+  Future<List<Map<String, dynamic>>> readPullInterviewLog(
       String projectPath, String projectName) async {
     final file = File(
-        p.join(projectPath, 'audit', '${projectName}_ReverseInterview.json'));
+        p.join(projectPath, 'audit', '${projectName}_PullInterview.json'));
     if (!file.existsSync()) return [];
     try {
       return (jsonDecode(await file.readAsString()) as List<dynamic>)
