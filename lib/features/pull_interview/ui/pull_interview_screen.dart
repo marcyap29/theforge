@@ -3,20 +3,20 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../features/spec_generation/as_built_spec_screen.dart';
-import '../state/reverse_interview_state.dart';
+import '../state/pull_interview_state.dart';
 
-class ReverseInterviewScreen extends ConsumerStatefulWidget {
-  const ReverseInterviewScreen({super.key, required this.args});
+class PullInterviewScreen extends ConsumerStatefulWidget {
+  const PullInterviewScreen({super.key, required this.args});
 
-  final ReverseInterviewArgs args;
+  final PullInterviewArgs args;
 
   @override
-  ConsumerState<ReverseInterviewScreen> createState() =>
-      _ReverseInterviewScreenState();
+  ConsumerState<PullInterviewScreen> createState() =>
+      _PullInterviewScreenState();
 }
 
-class _ReverseInterviewScreenState
-    extends ConsumerState<ReverseInterviewScreen> {
+class _PullInterviewScreenState
+    extends ConsumerState<PullInterviewScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   late final FocusNode _composerFocus;
@@ -66,14 +66,14 @@ class _ReverseInterviewScreenState
     _controller.clear();
     _composerFocus.requestFocus();
     await ref
-        .read(reverseInterviewProvider(widget.args).notifier)
+        .read(pullInterviewProvider(widget.args).notifier)
         .addUserMessage(text);
     _scrollToBottom();
   }
 
-  Future<void> _generateSpec(ReverseInterviewState state) async {
+  Future<void> _generateSpec(PullInterviewState state) async {
     await ref
-        .read(reverseInterviewProvider(widget.args).notifier)
+        .read(pullInterviewProvider(widget.args).notifier)
         .markComplete();
     if (!mounted) return;
     Navigator.of(context).push(MaterialPageRoute<void>(
@@ -86,17 +86,17 @@ class _ReverseInterviewScreenState
 
   @override
   Widget build(BuildContext context) {
-    final stateAsync = ref.watch(reverseInterviewProvider(widget.args));
+    final stateAsync = ref.watch(pullInterviewProvider(widget.args));
     final state = stateAsync.valueOrNull;
     _isLoading = state?.isLoading ?? false;
 
-    ref.listen(reverseInterviewProvider(widget.args), (_, next) {
+    ref.listen(pullInterviewProvider(widget.args), (_, next) {
       if (next.valueOrNull?.turns.isNotEmpty ?? false) _scrollToBottom();
     });
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Reverse Interview — ${widget.args.projectName}'),
+        title: Text('Pull Interview — ${widget.args.projectName}'),
       ),
       body: stateAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -165,7 +165,7 @@ class _ReverseInterviewScreenState
 }
 
 class _ChatBubble extends StatelessWidget {
-  final ReverseInterviewTurn turn;
+  final PullInterviewTurn turn;
   const _ChatBubble({required this.turn});
 
   @override

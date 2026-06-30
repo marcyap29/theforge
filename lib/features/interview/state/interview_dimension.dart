@@ -108,9 +108,9 @@ List<DimensionDef> dimensionsFor(ProjectMode mode) {
       return buildDimensions;
     case ProjectMode.audit:
       return auditDimensions;
-    case ProjectMode.reverse:
-      // Reverse Mode doesn't use the Build/Audit interview flow
-      // This is a fallback - Reverse Mode projects should use codebase ingestion first
+    case ProjectMode.pull:
+      // Pull Mode doesn't use the Build/Audit interview flow
+      // This is a fallback - Pull Mode projects should use codebase ingestion first
       return auditDimensions;
   }
 }

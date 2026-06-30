@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../ingestion/reverse_ingestion_notifier.dart';
-import '../models/reverse_ingestion_summary.dart';
-import 'reverse_ingestion_summary_screen.dart';
+import '../ingestion/pull_ingestion_notifier.dart';
+import '../models/pull_ingestion_summary.dart';
+import 'pull_ingestion_summary_screen.dart';
 
-class ReverseIngestionProgressScreen extends ConsumerWidget {
+class PullIngestionProgressScreen extends ConsumerWidget {
   final String projectPath;
 
-  const ReverseIngestionProgressScreen({
+  const PullIngestionProgressScreen({
     super.key,
     required this.projectPath,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final s = ref.watch(reverseIngestionNotifierProvider);
+    final s = ref.watch(pullIngestionNotifierProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -46,7 +46,7 @@ class ReverseIngestionProgressScreen extends ConsumerWidget {
                   onPressed: () => Navigator.pushReplacement(
                     context,
                     MaterialPageRoute<void>(
-                      builder: (_) => ReverseIngestionSummaryScreen(
+                      builder: (_) => PullIngestionSummaryScreen(
                         projectPath: projectPath,
                         projectName: projectPath.split('/').last,
                       ),
@@ -73,7 +73,7 @@ class ReverseIngestionProgressScreen extends ConsumerWidget {
                 const SizedBox(height: 24),
                 OutlinedButton(
                   onPressed: () => ref
-                      .read(reverseIngestionNotifierProvider.notifier)
+                      .read(pullIngestionNotifierProvider.notifier)
                       .startIngestion(projectPath),
                   child: const Text('Retry'),
                 ),

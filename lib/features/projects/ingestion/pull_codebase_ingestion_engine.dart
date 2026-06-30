@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import '../../../services/llm/llm_provider.dart';
 import '../../../services/llm/llm_service.dart';
-import '../models/reverse_ingestion_summary.dart';
+import '../models/pull_ingestion_summary.dart';
 
 const _extractionPrompt = '''
 You are a codebase structure analyzer. Extract component metadata from the provided Dart file.

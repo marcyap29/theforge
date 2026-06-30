@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../models/reverse_ingestion_summary.dart';
+import '../models/pull_ingestion_summary.dart';
 import '../providers/providers.dart';
 
-class ReverseIngestionSummaryScreen extends ConsumerWidget {
+class PullIngestionSummaryScreen extends ConsumerWidget {
   final String projectPath;
   final String projectName;
 
-  const ReverseIngestionSummaryScreen({
+  const PullIngestionSummaryScreen({
     super.key,
     required this.projectPath,
     required this.projectName,

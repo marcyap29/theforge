@@ -95,7 +95,7 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen>
         ? 'Build'
         : args.mode == ProjectMode.audit
             ? 'Audit'
-            : 'Reverse';
+            : 'Pull';
 
     ref.listen(interviewProvider(args), (prev, next) {
       final prevLen = prev?.valueOrNull?.turns.length ?? 0;

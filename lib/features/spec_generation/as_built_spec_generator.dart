@@ -1,4 +1,4 @@
-import '../projects/models/reverse_ingestion_summary.dart';
+import '../projects/models/pull_ingestion_summary.dart';
 
 String buildAsBuiltSpecPrompt(
     IngestionSummary summary, List<Map<String, dynamic>> interviewLog) {
@@ -10,7 +10,7 @@ String buildAsBuiltSpecPrompt(
 
   return 'INGESTION SUMMARY:\n'
       '${summary.toMarkdown()}\n\n'
-      'REVERSE INTERVIEW TRANSCRIPT:\n'
+      'PULL INTERVIEW TRANSCRIPT:\n'
       '$transcript\n\n'
       '$_asBuiltSpecStructure';
 }

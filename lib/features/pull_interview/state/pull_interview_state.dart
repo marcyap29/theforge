@@ -1,26 +1,26 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'reverse_interview_notifier.dart';
+import 'pull_interview_notifier.dart';
 
 @immutable
-class ReverseInterviewTurn {
+class PullInterviewTurn {
   final bool isUser;
   final String text;
 
-  const ReverseInterviewTurn({required this.isUser, required this.text});
+  const PullInterviewTurn({required this.isUser, required this.text});
 }
 
 @immutable
-class ReverseInterviewState {
+class PullInterviewState {
   final String projectPath;
   final String projectName;
-  final List<ReverseInterviewTurn> turns;
+  final List<PullInterviewTurn> turns;
   final bool isLoading;
   final bool isComplete;
   final String? error;
 
-  const ReverseInterviewState({
+  const PullInterviewState({
     required this.projectPath,
     required this.projectName,
     this.turns = const [],
@@ -33,13 +33,13 @@ class ReverseInterviewState {
   bool get canGenerateSpec =>
       turns.where((t) => t.isUser).length >= 4 || isComplete;
 
-  ReverseInterviewState copyWith({
-    List<ReverseInterviewTurn>? turns,
+  PullInterviewState copyWith({
+    List<PullInterviewTurn>? turns,
     bool? isLoading,
     bool? isComplete,
     String? error,
   }) =>
-      ReverseInterviewState(
+      PullInterviewState(
         projectPath: projectPath,
         projectName: projectName,
         turns: turns ?? this.turns,
@@ -50,11 +50,11 @@ class ReverseInterviewState {
 }
 
 @immutable
-class ReverseInterviewArgs {
+class PullInterviewArgs {
   final String projectPath;
   final String projectName;
 
-  const ReverseInterviewArgs({
+  const PullInterviewArgs({
     required this.projectPath,
     required this.projectName,
   });
@@ -62,7 +62,7 @@ class ReverseInterviewArgs {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is ReverseInterviewArgs &&
+      (other is PullInterviewArgs &&
           other.projectPath == projectPath &&
           other.projectName == projectName);
 
@@ -72,9 +72,9 @@ class ReverseInterviewArgs {
 
 // Provider declared ONLY in this file. The screen and notifier import it from here.
 // Riverpod pair: FamilyAsyncNotifier<T,Arg> ↔ AsyncNotifierProvider.family<N,T,Arg>
-final reverseInterviewProvider = AsyncNotifierProvider.family<
-    ReverseInterviewNotifier,
-    ReverseInterviewState,
-    ReverseInterviewArgs>(
-  ReverseInterviewNotifier.new,
+final pullInterviewProvider = AsyncNotifierProvider.family<
+    PullInterviewNotifier,
+    PullInterviewState,
+    PullInterviewArgs>(
+  PullInterviewNotifier.new,
 );
