@@ -15,7 +15,7 @@ Three operating modes:
 |---|---|---|
 | **Plan Mode** | Structured interview → locked spec → /goal artifact → executor handoff | ✅ Fully implemented |
 | **Watch Mode** | Token spend + git activity + CI correlation + alerts + SwarmSpace briefings | ✅ §W1–§W4 complete; §W5 next |
-| **Reverse Mode** | Reads existing codebase, generates as-built spec | 🔲 Not yet started |
+| **Pull Mode** | Reads existing codebase, generates as-built spec | 🔲 Not yet started |
 
 The three modes share one artifact: the locked spec. It is the universal language connecting everything.
 

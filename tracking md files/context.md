@@ -4,13 +4,67 @@ Newest session first. Each block is prepended.
 
 ---
 
-## Session: 2026-06-28 — Claude Code [§R1 Completion: Reverse Mode Wiring]
+## Session: 2026-06-29 — Claude Code [Hotfixes + Forkit v3 Implementation]
+
+**Branch:** main (The Forge) · `wt/forkit-v1-multiplayer` (Forkit)
+
+### Done — The Forge
+
+**Safe-write archive system (committed `d6c3c9c`):**
+- `project_file_repository.dart` — `_archiveIfExists(File)` helper; called before writes in `writeHandoff`, `writeWorksheet`, `writeHandoffPackage`, `writeAsBuiltSpec`. Renames existing file to `{stem}{letter}-{M-D-YYYY}{ext}` before overwriting. `writeLockedSpec` unchanged (already throws `SpecAlreadyExistsException`).
+
+**Regenerate button per version panel (committed `d6c3c9c`):**
+- `project_detail_screen.dart` — `_buildVersionPanel` header row restructured to `Row(mainAxisSize: max)` with the chevron/label on the left and a `↻ Regenerate` button on the right (via `Spacer()`). Tapping navigates to `WorksheetGenerationScreen` with the correct `specVersion`. Shown only for shipped versions.
+
+**Compliance screen version labels (committed `9768350`):**
+- `spec_compliance_screen.dart` — 3 hardcoded strings replaced: AppBar title was `'V$priorSpecVersion Compliance Check'` (produced "Vv2"), summary header was hardcoded `'V1 Build Compliance Summary'`, CTA button was hardcoded `'Continue to V2 Interview'`. All now use `priorSpecVersion.toUpperCase()` / `nextVersion.toUpperCase()`.
+
+**Earlier in session (from prior context):**
+- Timeline `didPopNext()` re-discovers disk versions on return navigation
+- BUILD SEQUENCE header shows correct disk-scanned version (`V{n}`)
+- Unvalidated panels default to expanded; validated + shipped panels collapse
+- `_findSpecFile` broader detection with `.md` fallback
+- `_handoffDirHasFiles()` helper for handoff-only version detection
+- Interview version bug: `_buildTimelineRow` passes `priorSpecVersion` so V3 interviews generate V3 files
+- Interview AppBar title shows target version (e.g. "Build Interview — Forkit · V3")
+- Execution validation flow: amber/green timeline colors, "Mark as Executed & Validated" button, rotating banner CTA, `readValidatedVersions()`/`markVersionValidated()` written to `project_config.json`
+
+### Done — Forkit (committed `622fd8f` on `wt/forkit-v1-multiplayer`)
+
+- `deep_link_service.dart` — `sessionIdStream` broadcast stream; `_extractSessionId()` helper extracted; emits to stream on both cold-start (`getInitialLink`) and runtime (`uriLinkStream`) links; `dispose()` closes controller
+- `session_manager.dart` — `_linkSub` subscribes to `DeepLinkService.sessionIdStream` in `initState()`; host nickname dialog (`_HostNicknameDialog`) before session creation; button text "CREATE GROUP SESSION"
+- `firestore_service.dart` — match detection bug fix: was checking `data.votes` (pre-transaction state), now checks `updatedVotes` (includes the current swipe). Without this, a mutual yes-swipe never fired a match on the vote that caused it.
+
+### Key Technical Findings
+- `_archiveIfExists` uses sync `renameSync` — fast and atomic on the same volume; no data loss window
+- `Spacer()` in a `Row(mainAxisSize: max)` is the correct way to push a button to the far right inside a panel header
+- DeepSeek agent directory confusion: always include working directory explicitly in the prompt header; DeepSeek will scan for files and if it can't find them it creates stubs from scratch in whatever CWD it has
+- Firestore transaction bug pattern: reads inside `runTransaction` return a snapshot (`data`); any field you update goes into a separate `updated` map — always check membership against the updated map, not the original snapshot
+
+### Modified (The Forge)
+- `lib/data/filesystem/project_file_repository.dart` — safe-write archive
+- `lib/features/projects/screens/project_detail_screen.dart` — regenerate button + all fixes above
+- `lib/features/spec_generation/compliance/spec_compliance_screen.dart` — dynamic version labels
+
+### Modified (Forkit)
+- `lib/deep_link_service.dart` — sessionIdStream
+- `lib/session_manager.dart` — live deep link + host nickname dialog
+- `lib/firestore_service.dart` — match detection fix
+
+### Next
+- §R2 — Pull Interview (not started, requires §R1 ✅)
+- §D1 — Disk-First Status (backlog)
+- Forkit v3: PR review + merge `wt/forkit-v1-multiplayer` → main
+
+---
+
+## Session: 2026-06-28 — Claude Code [§R1 Completion: Pull Mode Wiring]
 
 **Branch:** main
 
 ### Done
 
-**§R1 — Reverse Mode Wiring (uncommitted, Marc reviews):**
+**§R1 — Pull Mode Wiring (uncommitted, Marc reviews):**
 - R1-1: `project_file_repository.dart` — `modeDisplay` ternary → switch expression handling all 3 modes; "What's Next" section conditional on mode
 - R1-2: `new_project_screen.dart` — added Project Onboarding card (REVERSE MODE → PROJECT ONBOARDING) with purple accent; `_ModeCard` icon/accent now uses switch instead of boolean
 - R1-3: `project_detail_screen.dart` — `_RepoIngestRow` loads `repoPath` from `project_config.json` on init; shows SnackBar if no repo linked; uses `_repoPath` for ingestion instead of `widget.projectPath`; dynamic label shows linked repo name
@@ -21,7 +75,7 @@ Newest session first. Each block is prepended.
 
 ### Next
 - Marc reviews changes, then commits
-- §R2 — Reverse Interview (separate plan, not started)
+- §R2 — Pull Interview (separate plan, not started)
 
 ### Modified
 - `lib/data/filesystem/project_file_repository.dart` — modeDisplay switch, What's Next conditional
@@ -744,7 +798,7 @@ Newest session first. Each block is prepended.
 ### Next
 1. First end-to-end Plan Mode run: Project → Interview → Spec → Worksheet → Artifacts
 2. Gate opens for Watch Mode (§W1 Token Ingestion Engine)
-3. Then: §W2–§W6 → Reverse Mode → Configuration C pilot (Qualcomm)
+3. Then: §W2–§W6 → Pull Mode → Configuration C pilot (Qualcomm)
 
 ### Modified
 - `lib/features/spec_generation/spec_generator.dart` — added §9 builders
@@ -791,14 +845,14 @@ Newest session first. Each block is prepended.
 
 ---
 
-## Session: 2026-06-03 — Platform merge: Vigilint absorbed; SuperSpec v1 filed; Watch + Reverse Mode backlog added
+## Session: 2026-06-03 — Platform merge: Vigilint absorbed; SuperSpec v1 filed; Watch + Pull Mode backlog added
 
 ### What was done
 - **Product merger decision:** Vigilint retired as standalone product name. Its capabilities become Watch Mode within The Forge. Brand rationale in `audit/The_Forge_AuditLog.md` entry 002.
 - **SuperSpec filed:** `DOCS/forge/The_Forge_SuperSpec_v1.md` — defines the merged three-mode platform (Plan / Watch / Reverse), 19 modules, 4 activation configurations (A=Plan only, B=Watch only, C=Watch+Reverse, D=Full)
 - **Backlog appendation filed:** `DOCS/forge/The_Forge_SuperSpec_Backlog_v1.md` — two backlog items: first-party decision simulation engine (long-term moat), Monte Carlo naming disambiguation
 - **Audit log created:** `audit/The_Forge_AuditLog.md` — entry 002 documents merger decision and the open platform flag
-- **Backlog updated:** Critical path now shows Plan Mode → Watch Mode (§W1–§W6) → Reverse Mode (§R1–§R2) → Qualcomm pilot gate; all 8 new phase specs added
+- **Backlog updated:** Critical path now shows Plan Mode → Watch Mode (§W1–§W6) → Pull Mode (§R1–§R2) → Qualcomm pilot gate; all 8 new phase specs added
 - **Handoff created:** `DOCS/forge/The_Forge_BulletHandoff_v1_PlatformMerge.md` — ready for DeepSeek Flash (next: §6 Spec Generation)
 
 ### What does NOT change

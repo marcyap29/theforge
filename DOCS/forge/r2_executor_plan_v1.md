@@ -1,5 +1,5 @@
 # §R2 Executor Plan v1
-# Reverse Interview Engine + As-Built Spec Generator
+# Pull Interview Engine + As-Built Spec Generator
 
 **Date:** 2026-06-28
 **Status:** Ready to execute — §R1 ✅
@@ -10,9 +10,9 @@
 
 ## Overview
 
-§R2 builds the Reverse Interview and As-Built Spec Generator. A user with a "Project Onboarding" project:
+§R2 builds the Pull Interview and As-Built Spec Generator. A user with a "Project Onboarding" project:
 1. Links and ingests their repo (§R1 ✅)
-2. Runs a Reverse Interview — targeted questions to fill gaps the code can't answer
+2. Runs a Pull Interview — targeted questions to fill gaps the code can't answer
 3. Generates an As-Built Spec in the same 10-section format as a Locked Spec
 4. The spec is immediately usable by §W6 Spec Compliance Monitor
 
@@ -448,7 +448,7 @@ class _ReverseInterviewScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Reverse Interview — ${widget.args.projectName}'),
+        title: Text('Pull Interview — ${widget.args.projectName}'),
       ),
       body: stateAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -641,7 +641,7 @@ String buildAsBuiltSpecPrompt(
 
   return 'INGESTION SUMMARY:\n'
       '${summary.toMarkdown()}\n\n'
-      'REVERSE INTERVIEW TRANSCRIPT:\n'
+      'PULL INTERVIEW TRANSCRIPT:\n'
       '$transcript\n\n'
       '$_asBuiltSpecStructure';
 }
@@ -960,7 +960,7 @@ import '../features/spec_generation/as_built_spec_screen.dart';
     return ReverseInterviewScreen(args: args);
   }
   return const Scaffold(
-    body: Center(child: Text('Invalid reverse interview args')),
+    body: Center(child: Text('Invalid pull interview args')),
   );
 },
 '/as-built-spec': (context) {
@@ -1052,7 +1052,7 @@ class _ReverseModeCta extends ConsumerWidget {
       ),
       child: Text(
         ingestionDone
-            ? 'Start Reverse Interview →'
+            ? 'Start Pull Interview →'
             : 'Ingest Repo First',
         style: const TextStyle(
             fontWeight: FontWeight.w600, fontFamily: 'Menlo'),
@@ -1069,13 +1069,13 @@ At the top of the file, in the import section (alphabetical order by path), add:
 import '../ingestion/reverse_interview_state.dart';
 ```
 
-Wait — the correct import path from `project_detail_screen.dart` to the reverse interview state is:
+Wait — the correct import path from `project_detail_screen.dart` to the pull interview state is:
 ```dart
 import '../../reverse_interview/state/reverse_interview_state.dart';
 import '../../reverse_interview/ui/reverse_interview_screen.dart';
 ```
 
-**Important:** `project_detail_screen.dart` is at `lib/features/projects/screens/`. The reverse interview is at `lib/features/reverse_interview/`. So the relative path from `screens/` goes up two levels (`../../`) to `features/`, then into `reverse_interview/`.
+**Important:** `project_detail_screen.dart` is at `lib/features/projects/screens/`. The pull interview is at `lib/features/reverse_interview/`. So the relative path from `screens/` goes up two levels (`../../`) to `features/`, then into `reverse_interview/`.
 
 Add these two imports in alphabetical order with the existing imports.
 

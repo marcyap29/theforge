@@ -33,8 +33,8 @@ Long-term feature pool. Active sprint work lives in `planner.md`.
    → §W5 Watch Mode: SwarmSpace Briefing + Decision Simulation ✅
   → §W6 Watch Mode: Spec Compliance Monitor + Drift Detector ✅
        ↓
-  → §R1 Reverse Mode: Codebase Ingestion Engine
-  → §R2 Reverse Mode: Reverse Interview Engine + As-Built Spec Generator
+  → §R1 Pull Mode: Codebase Ingestion Engine
+  → §R2 Pull Mode: Pull Interview Engine + As-Built Spec Generator
        ↓
   → Configuration C pilot (Qualcomm) — Watch + Reverse on existing codebase
 ```
@@ -681,14 +681,14 @@ EngineerUsage {
 
 ---
 
-## Reverse Mode — gated on Watch Mode §W1-§W4
+## Pull Mode — gated on Watch Mode §W1-§W4
 
 ### §R1 — Codebase Ingestion Engine
-✅ Complete 2026-06-28 — Engine + models + notifier + progress/summary screens existed from prior session; 3 wiring pieces completed: `project_file_repository.dart` modeDisplay switch for Reverse mode + "What's Next" conditional; `new_project_screen.dart` "PROJECT ONBOARDING" card with purple accent + `_ModeCard` icon/accent switch; `project_detail_screen.dart` `_RepoIngestRow` loads `repoPath` from `project_config.json` on mount (was scanning Forge project folder instead of linked repo); `dart analyze lib/` zero issues
+✅ Complete 2026-06-28 — Engine + models + notifier + progress/summary screens existed from prior session; 3 wiring pieces completed: `project_file_repository.dart` modeDisplay switch for Pull mode + "What's Next" conditional; `new_project_screen.dart` "PROJECT ONBOARDING" card with purple accent + `_ModeCard` icon/accent switch; `project_detail_screen.dart` `_RepoIngestRow` loads `repoPath` from `project_config.json` on mount (was scanning Forge project folder instead of linked repo); `dart analyze lib/` zero issues
 
 ---
 
-### §R2 — Reverse Interview Engine + As-Built Spec Generator
+### §R2 — Pull Interview Engine + As-Built Spec Generator
 
 **What it is:** Takes the codebase ingestion summary and runs a targeted interview to fill gaps. Produces an as-built spec in the identical format as a Plan Mode spec — Watch Mode can immediately use it as a reference document.
 

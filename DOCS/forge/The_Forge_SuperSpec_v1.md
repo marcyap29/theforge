@@ -37,7 +37,7 @@ Interview engine runs until 100% confidence. Produces: locked spec, /goal artifa
 
 Ingests token spend from the Anthropic API, git activity from GitHub, and CI outcomes from GitHub Actions. Correlates token sessions to failed runs, surfacing loop detection and bug introduction signals in real time. Evaluates activity against the locked spec if one exists, flagging out-of-scope commits and component boundary violations. Generates weekly briefings and runs Monte Carlo decision simulations via SwarmSpace.
 
-### Reverse Mode (new)
+### Pull Mode (new)
 
 **Trigger:** You have an existing codebase with no locked spec and want a formal reference document, or you want to onboard an existing project into Watch mode.
 
@@ -77,13 +77,13 @@ Every mode reads and writes the same artifact format. This is the integration po
 
 ```
 Plan mode    → produces locked spec
-Reverse mode → produces locked spec (as-built variant)
+Pull mode → produces locked spec (as-built variant)
 Watch mode   → ingests locked spec as reference document
 /goal output → derived view of locked spec, formatted for harness
 Amendment    → produces new versioned locked spec
 ```
 
-A customer who starts in Watch mode with no spec can run Reverse mode to generate one. A customer who starts in Plan mode automatically has a reference document for Watch mode. A customer who only uses one mode gets full value from that mode — the spec is optional for Watch, powerful when present.
+A customer who starts in Watch mode with no spec can run Pull mode to generate one. A customer who starts in Plan mode automatically has a reference document for Watch mode. A customer who only uses one mode gets full value from that mode — the spec is optional for Watch, powerful when present.
 
 ### Locked Spec Format (v1.1 — updated from ForkIt v1.1)
 
@@ -177,13 +177,13 @@ Infrastructure: SwarmSpace MCP on Cloudflare Workers. No additional infrastructu
 Owns: Decision framing interface, context and data package assembly, SwarmSpace simulation call, results rendering (recommended path, confidence, regret risk, trajectories, key insights, watch-fors).
 Does not own: Raw data ingestion, briefing generation.
 
-### Reverse Mode Components
+### Pull Mode Components
 
 **15. Codebase Ingestion Engine**
 Owns: Repository read, component structure extraction, interface contract inference from implementation, infrastructure pattern detection, dependency mapping, gap identification (what cannot be determined from code alone).
 Does not own: Interview logic, spec writing, question generation.
 
-**16. Reverse Interview Engine**
+**16. Pull Interview Engine**
 Owns: Targeted question generation from ingestion gaps, as-built spec production in standard format, decision rationale capture for what code shows but doesn't explain.
 Does not own: Codebase reading, monitoring, forward interview logic.
 
@@ -214,21 +214,21 @@ Optional add: Amendment Engine (activate when requirements change mid-build).
 For teams already building who want management-layer visibility without spec compliance.
 
 Active: Token Ingestion Engine, Git Activity Engine, CI Outcome Correlator, Failure Signal Engine, Project Status Aggregator, Alert Engine, SwarmSpace Briefing, Decision Simulation Engine.
-Spec Compliance Monitor and Drift Detector: inactive (no spec to compare against — run Reverse mode to generate one).
+Spec Compliance Monitor and Drift Detector: inactive (no spec to compare against — run Pull mode to generate one).
 
 ### Configuration C — Watch + Reverse (Qualcomm entry point)
 
 For teams with existing codebases who want both visibility and spec compliance.
 
-Phase 1: Run Reverse mode on existing repos to generate as-built specs.
+Phase 1: Run Pull mode on existing repos to generate as-built specs.
 Phase 2: Activate Watch mode with spec compliance against the as-built specs.
 Result: Full drift detection without requiring any prior Forge usage.
 
-Active: All Watch modules + Codebase Ingestion Engine + Reverse Interview Engine.
+Active: All Watch modules + Codebase Ingestion Engine + Pull Interview Engine.
 
 ### Configuration D — Full Platform
 
-All modules active. Plan mode for new builds. Watch mode running continuously. Reverse mode available for legacy repos or when a new repo is added to the workspace.
+All modules active. Plan mode for new builds. Watch mode running continuously. Pull mode available for legacy repos or when a new repo is added to the workspace.
 
 This is the configuration that creates the flywheel: Plan specs become Watch benchmarks. Watch outcomes inform Amendment interviews. Reverse specs bring legacy repos into compliance. Every build cycle tightens.
 
@@ -352,7 +352,7 @@ Output: {
 | Platform architecture | Three modes, modular activation | Two separate products — rejected: creates go-to-market complexity, misses flywheel compounding. One mode with all features always on — rejected: over-scopes every customer | Customers who only need one mode pay for capability they don't use unless priced correctly | High |
 | Integration artifact | Locked spec JSON as universal language | API-based integration — rejected: creates tight coupling. Database-based — rejected: over-engineers for current scale | Spec format changes require migration across all modes | High |
 | CI correlation | v1 feature (moved from v2) | Keep as v2 — rejected: APIs already in scope, correlation logic is straightforward, dramatically strengthens the token-to-outcome signal | Adds engineering scope to v1 | High |
-| Reverse mode | Separate mode, same spec format output | Different spec format for as-built specs — rejected: breaks Watch mode compatibility | As-built specs thinner on alternatives considered and rejected decisions | High |
+| Pull mode | Separate mode, same spec format output | Different spec format for as-built specs — rejected: breaks Watch mode compatibility | As-built specs thinner on alternatives considered and rejected decisions | High |
 | /goal artifact | Required output of Plan mode | Optional add-on — rejected: /goal is the activation mechanism for executor agents; making it optional creates a gap in the workflow | Completion Criteria section adds interview time | High |
 
 ---
@@ -363,7 +363,7 @@ Output: {
 |---|---|---|---|
 | CI correlation window | CI Outcome Correlator | 2h, 4h, 8h | 4h |
 | Spec compliance strictness | Spec Compliance Monitor | Warn only / Block alert / Hard block | Warn only — customer decides escalation |
-| Reverse mode interview depth | Reverse Interview Engine | Structural only / Structural + decision rationale | Structural + decision rationale |
+| Pull mode interview depth | Pull Interview Engine | Structural only / Structural + decision rationale | Structural + decision rationale |
 | Pre-mortem activation | Pre-Mortem Engine | Always on / Opt-in | Opt-in — some customers don't want the risk list |
 | Module activation granularity | Workspace Config | Per-workspace / Per-repo | Per-workspace in v1 |
 | Spec format version | Spec Generator | Lock at v1.1 or allow iteration | Lock at v1.1 until v2 interview |
@@ -378,7 +378,7 @@ Output: {
 - Automated amendment trigger: when Drift Detector crosses a configurable threshold, surface a prompt to run an Amendment Interview rather than requiring the manager to notice and initiate it.
 - Multi-tool aggregation (Cursor, Codex, Windsurf): Token Ingestion Engine's internal data model already uses provider-agnostic cost-in-USD units. Multi-provider expansion does not require schema migration.
 - Pattern library: accumulated spec data across projects becomes calibration input for the interview engine. The Forge should know that ephemeral session apps consistently underestimate deep link cold-start complexity. That signal should surface in the interview before the customer discovers it.
-- The Qualcomm pilot is the first real-world test of Configuration C (Watch + Reverse). The as-built spec generated from his existing repos is the first Reverse mode output. Document everything. It becomes the reference implementation.
+- The Qualcomm pilot is the first real-world test of Configuration C (Watch + Reverse). The as-built spec generated from his existing repos is the first Pull mode output. Document everything. It becomes the reference implementation.
 
 ---
 

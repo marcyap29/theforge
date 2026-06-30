@@ -16,11 +16,11 @@
 
 - **Plan Mode** (what you are building now): Structured interview → locked spec → /goal artifact → executor handoff. The Forge defines what gets built.
 - **Watch Mode** (future — gated on Plan Mode completion): Token spend + git activity + CI correlation. The Forge monitors whether it is being built correctly.
-- **Reverse Mode** (future): Reads an existing codebase and generates a locked spec for it. The Forge reverse-engineers the spec from code that already exists.
+- **Pull Mode** (future): Reads an existing codebase and generates a locked spec for it. The Forge reverse-engineers the spec from code that already exists.
 
 The three modes share one artifact format: the locked spec. It is the universal language connecting everything.
 
-**You are not building Watch Mode or Reverse Mode.** Your job is Plan Mode §6 and §7. Watch Mode begins only after a complete end-to-end Plan Mode run exists.
+**You are not building Watch Mode or Pull Mode.** Your job is Plan Mode §6 and §7. Watch Mode begins only after a complete end-to-end Plan Mode run exists.
 
 ---
 
@@ -259,7 +259,7 @@ When §6 and §7 are complete:
 ## What NOT to Build
 
 - Watch Mode — not yet. Gated on first end-to-end Plan Mode run.
-- Reverse Mode — not yet.
+- Pull Mode — not yet.
 - Monte Carlo (3-temperature parallel calls) — that is §14 (Low Priority).
 - SwarmSpace billing — §13.
 - Setup Worksheet generation — §8 (do §6+§7 first).

@@ -559,7 +559,7 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 
 ---
 
-## §R1 — Reverse Mode Wiring — COMPLETE ✅
+## §R1 — Pull Mode Wiring — COMPLETE ✅
 
 **Completed:** 2026-06-28 (uncommitted, Marc reviews)
 
@@ -575,7 +575,7 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 
 ---
 
-## Next Up — §R2: Reverse Interview
+## Next Up — §R2: Pull Interview
 
 **Status:** Not started — requires §R1 ✅
 - See `backlog.md` §R2 for scope
