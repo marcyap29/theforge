@@ -121,6 +121,26 @@ class ProjectFileRepository {
     await readmeFile.writeAsString(content);
   }
 
+  /// Before a caller overwrites [file], renames the existing copy to
+  /// {stem}{letter}-{M-D-YYYY}{ext} so no data is lost.
+  /// Letters cycle a→z. Sync rename — fast, atomic on the same volume.
+  Future<void> _archiveIfExists(File file) async {
+    if (!file.existsSync()) return;
+    final dir = file.parent;
+    final stem = p.basenameWithoutExtension(file.path);
+    final ext = p.extension(file.path);
+    final now = DateTime.now();
+    final date = '${now.month}-${now.day}-${now.year}';
+    for (final letter in 'abcdefghijklmnopqrstuvwxyz'.split('')) {
+      final archive = File(p.join(dir.path, '$stem$letter-$date$ext'));
+      if (!archive.existsSync()) {
+        file.renameSync(archive.path);
+        return;
+      }
+    }
+    // All 26 letters taken on this date — let the caller overwrite.
+  }
+
   Future<void> writeLockedSpec(
       String projectPath,
       String projectName,
@@ -160,7 +180,9 @@ class ProjectFileRepository {
         ? Directory(p.join(projectPath, 'handoffs', version))
         : Directory(p.join(projectPath, 'handoffs'));
     await dir.create(recursive: true);
-    await File(p.join(dir.path, filename)).writeAsString(content);
+    final handoffFile = File(p.join(dir.path, filename));
+    await _archiveIfExists(handoffFile);
+    await handoffFile.writeAsString(content);
   }
 
   Future<void> writeForgeFiles(
@@ -188,7 +210,9 @@ class ProjectFileRepository {
         ? Directory(p.join(projectPath, 'worksheets', version))
         : Directory(p.join(projectPath, 'worksheets'));
     await dir.create(recursive: true);
-    await File(p.join(dir.path, filename)).writeAsString(content);
+    final worksheetFile = File(p.join(dir.path, filename));
+    await _archiveIfExists(worksheetFile);
+    await worksheetFile.writeAsString(content);
   }
 
   Future<void> writeHandoffPackage(
@@ -196,6 +220,7 @@ class ProjectFileRepository {
     final versionDir = Directory(p.join(projectPath, 'handoffs', version));
     await versionDir.create(recursive: true);
     final packageFile = File(p.join(versionDir.path, '${projectName}_HandoffPackage_$version.json'));
+    await _archiveIfExists(packageFile);
     await packageFile.writeAsString(const JsonEncoder.withIndent('  ').convert(data));
   }
 
@@ -660,6 +685,7 @@ class ProjectFileRepository {
     await versionDir.create(recursive: true);
     final specPath =
         p.join(versionDir.path, '${projectName}_AsBuiltSpec_v1.md');
+    await _archiveIfExists(File(specPath));
     final tmpPath = '$specPath.tmp';
     await File(tmpPath).writeAsString(content);
     File(tmpPath).renameSync(specPath);

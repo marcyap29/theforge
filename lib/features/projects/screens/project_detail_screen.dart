@@ -1183,45 +1183,83 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
         mainAxisSize: MainAxisSize.min,
         children: [
           // ── Chevron header ──────────────────────────────────
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () => setState(() => _expanded[version] = !isExpanded),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    isExpanded ? Icons.expand_more : Icons.chevron_right,
-                    size: 14,
-                    color: color,
+          Row(
+            mainAxisSize: MainAxisSize.max,
+            children: [
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: () => setState(() => _expanded[version] = !isExpanded),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isExpanded ? Icons.expand_more : Icons.chevron_right,
+                        size: 14,
+                        color: color,
+                      ),
+                      const SizedBox(width: 4),
+                      if (isShipped) ...[
+                        Icon(Icons.check_circle,
+                            size: 11,
+                            color: isValidated
+                                ? const Color(0xFF22C55E)
+                                : const Color(0xFFE8A04C)),
+                        const SizedBox(width: 4),
+                      ],
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontFamily: 'Menlo',
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.4,
+                          color: color,
+                        ),
+                      ),
+                      // In-progress: show mini L-dots inline when collapsed
+                      if (!isShipped && !isExpanded && collapsedTrailing != null) ...[
+                        const SizedBox(width: 10),
+                        collapsedTrailing,
+                      ],
+                    ],
                   ),
-                  const SizedBox(width: 4),
-                  if (isShipped) ...[
-                    Icon(Icons.check_circle,
-                        size: 11,
-                        color: isValidated
-                            ? const Color(0xFF22C55E)
-                            : const Color(0xFFE8A04C)),
-                    const SizedBox(width: 4),
-                  ],
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontFamily: 'Menlo',
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.4,
-                      color: color,
+                ),
+              ),
+              if (isShipped) ...[
+                const Spacer(),
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => WorksheetGenerationScreen(
+                        projectPath: widget.project.path,
+                        projectName: widget.project.name,
+                        specVersion: version,
+                      ),
+                    )),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.refresh,
+                            size: 11, color: Color(0xFF6B7280)),
+                        SizedBox(width: 4),
+                        Text(
+                          '↻ Regenerate',
+                          style: TextStyle(
+                            fontFamily: 'Menlo',
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.3,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  // In-progress: show mini L-dots inline when collapsed
-                  if (!isShipped && !isExpanded && collapsedTrailing != null) ...[
-                    const SizedBox(width: 10),
-                    collapsedTrailing,
-                  ],
-                ],
-              ),
-            ),
+                ),
+              ],
+            ],
           ),
           // ── Expanded body ───────────────────────────────────
           if (isExpanded)
