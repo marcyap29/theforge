@@ -3224,7 +3224,7 @@ class _CoderPackageSection extends StatefulWidget {
 
 class _CoderPackageSectionState extends State<_CoderPackageSection> {
   bool _working = false;
-  late final Future<({String? version, List<_CoderItem> items})> _discovery;
+  late Future<({String? version, List<_CoderItem> items})> _discovery;
 
   @override
   void initState() {
