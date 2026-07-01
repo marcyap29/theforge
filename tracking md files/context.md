@@ -4,6 +4,42 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-07-01 — Claude Code [V1 Interview Redesign (§VI)]
+
+**Branch:** main
+
+### Done
+
+**§VI — V1 Build Interview redesigned:**
+- **Root problem fixed:** Previous L1 forced a one-sentence outcome; L3 forced a single capability choice. Result: specs that captured only a UI layer (e.g. swipe UI) with no end-to-end user flow (no invite logic, no connection, no backend). App looked right but couldn't be used.
+- `lib/features/interview/state/interview_state.dart` — `InterviewState.empty()` extracted map now includes `userScenarios`, `userStories`, `storyAmendments`, `detectedHoles`, `v1UserStories` (all default `<String>[]`)
+- `lib/features/interview/state/interview_notifier.dart`:
+  - **Build openers** — invite the full story ("tell me the story of how you imagine someone using this app…") instead of asking for a one-liner
+  - **L1 — Vision Capture** — accept freewheeling full vision; multiple scenarios; ask "any other scenarios?" until user confirms done; extracts `outcome`, `primaryUser`, `userScenarios`
+  - **L2 — Story Synthesis + Hole Detection** — three steps in order: (A) synthesize into titled numbered stories showing full both-sides flow, (B) detect logical gaps (missing invite flow, no post-match communication, unspecified data source) and ask permission before filling each one, give 1-3 recommendations + state recommended one, (C) confirm the final story map; extracts `userStories`, `capabilities`, `detectedHoles`
+  - **L3 — Version Scoping** — V1 = minimum COMPLETE working slice end-to-end (not one screen), propose V1/V2/V3+ breakdown, demo script covers full primary flow including any invite/connection steps; extracts `v1UserStories`, `chosenCapability`, `demoScript`, `v2Seeds`
+  - **L4** — unchanged
+  - **Story Amendments** — at any point in L2/L3, user can modify a confirmed story; AI tracks changes as V1a → V1b → V1c (count of existing `storyAmendments` determines next letter); entries: "V1a: what changed and why"
+  - `parseForgeState()` — parses all 5 new fields with `is List<dynamic>` safety checks
+  - `_layerGateMet()` — L1 requires `userScenarios.isNotEmpty`, L2 requires `userStories.isNotEmpty && capabilities.length >= 2`, L3 requires `v1UserStories.isNotEmpty`; all backward-compatible (old states without new fields fall back to previous gate logic)
+  - `_extractedAtLayerStart()` — resets new fields at correct layer boundaries on rewind
+
+### Key Technical Findings
+- The L3 "pick ONE capability" rule was the structural cause of incomplete specs. The fix isn't relaxing scope — it's reordering: capture full vision first (L1), synthesize (L2), THEN scope what the minimum complete V1 is (L3). Now V1 must include everything the primary user story depends on.
+- Backward compat is handled by checking `null` vs empty list: `stories == null` means old state → old gate logic. `stories is List && stories.isEmpty` means new state not yet populated → gate not met. This avoids breaking in-flight interviews.
+- Story amendment notation (V1a/V1b) is derived from `storyAmendments.length` — the AI counts existing entries and picks the next ASCII letter. No separate counter field needed.
+
+### Modified
+- `lib/features/interview/state/interview_state.dart`
+- `lib/features/interview/state/interview_notifier.dart`
+
+### Next
+- Dogfood the new interview flow with a real project to validate L2 hole detection
+- Consider UI panel in InterviewScreen showing confirmed user stories and their amendment trail
+- §PERSIST — Interview state persistence — backlog
+
+---
+
 ## Session: 2026-07-01 — Claude Code [Cross-Cutting Invariant Extraction (§CCI)]
 
 **Branch:** main

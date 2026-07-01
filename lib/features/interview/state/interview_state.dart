@@ -98,6 +98,11 @@ class InterviewState {
       extracted: const <String, dynamic>{
         'outcome': null,
         'primaryUser': null,
+        'userScenarios': <String>[],
+        'userStories': <String>[],
+        'storyAmendments': <String>[],
+        'detectedHoles': <String>[],
+        'v1UserStories': <String>[],
         'capabilities': <String>[],
         'chosenCapability': null,
         'demoScript': <String>[],

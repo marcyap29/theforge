@@ -4,6 +4,15 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 
 ---
 
+## §VI — V1 Interview Redesign — COMPLETE ✅
+
+**Completed:** 2026-07-01
+
+- [x] `lib/features/interview/state/interview_state.dart` — Added `userScenarios`, `userStories`, `storyAmendments`, `detectedHoles`, `v1UserStories` to `InterviewState.empty()` extracted map
+- [x] `lib/features/interview/state/interview_notifier.dart` — New full-vision build openers; redesigned L1 (vision capture), L2 (story synthesis + hole detection), L3 (minimum complete V1 scope); `parseForgeState()` parses 5 new fields; `_layerGateMet()` updated for new gate conditions with backward compat; `_extractedAtLayerStart()` resets new fields on rewind; story amendment tracking (V1a/V1b) in system prompt and extracted map
+
+---
+
 ## §CCI — Cross-Cutting Invariant Extraction — COMPLETE ✅
 
 **Completed:** 2026-07-01

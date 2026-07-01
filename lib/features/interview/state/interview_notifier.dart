@@ -92,6 +92,21 @@ ForgeStateParse parseForgeState(String llmRaw) {
       // Safe list parsing: LLMs sometimes emit strings ("none", "TBD") for
       // list fields. Hard cast as List<dynamic>? throws TypeError → degrades
       // the entire parse. Use 'is' check and normalize to empty list.
+      'userScenarios': extractedRaw['userScenarios'] is List<dynamic>
+          ? (extractedRaw['userScenarios'] as List<dynamic>).cast<String>()
+          : <String>[],
+      'userStories': extractedRaw['userStories'] is List<dynamic>
+          ? (extractedRaw['userStories'] as List<dynamic>).cast<String>()
+          : <String>[],
+      'storyAmendments': extractedRaw['storyAmendments'] is List<dynamic>
+          ? (extractedRaw['storyAmendments'] as List<dynamic>).cast<String>()
+          : <String>[],
+      'detectedHoles': extractedRaw['detectedHoles'] is List<dynamic>
+          ? (extractedRaw['detectedHoles'] as List<dynamic>).cast<String>()
+          : <String>[],
+      'v1UserStories': extractedRaw['v1UserStories'] is List<dynamic>
+          ? (extractedRaw['v1UserStories'] as List<dynamic>).cast<String>()
+          : <String>[],
       'capabilities': extractedRaw['capabilities'] is List<dynamic>
           ? (extractedRaw['capabilities'] as List<dynamic>).cast<String>()
           : <String>[],
@@ -247,54 +262,152 @@ String _buildInterviewSystemPrompt(InterviewState state,
 
   return '''You are The Forge interviewer — a sharp, direct product architect
 running a Build Interview for a project called "${state.projectName}". Your
-job is to reach a locked V1 spec an autonomous executor can build in one
-pass. You are the user's product manager: push back on scope, force the
-proof-of-concept cut, keep every deferred idea on the record.
+job is to capture the user\'s FULL vision, synthesize it into ordered user
+stories, detect logical gaps, and then scope a V1 that is a minimum COMPLETE
+working experience — not just a UI layer.
 $refBlock$userContextBlock
 THE FUNNEL — you are currently at ${state.currentLayer}. Do not advance until
 the exit condition is met. Never ask about a later layer early.
 
-L1 OUTCOME: Establish the one thing this app does for its user that nothing
-they use today does, and who that user is. Exit: you restate it as "For
-[user], this app [outcome]" and the user confirms.
+L1 VISION CAPTURE: Do NOT ask for a one-sentence outcome. Do NOT scope yet.
+Your job is to understand the user\'s complete vision — every scenario, every
+user type, every feature they imagine. Just listen.
 
-L2 DECOMPOSITION: Get the 3-5 capabilities required to deliver L1. Push back
-on lists over 5 and on anything that doesn't trace to the outcome. Exit:
-confirmed list.
+Invite the full story: "Tell me how you envision ${state.projectName} working.
+Walk me through it from when a user opens the app: who are they, what do they
+do step by step, what happens between them and other users or the system, and
+what do they get at the end?" Accept paragraphs, rambling thoughts, multiple
+ideas — capture all of it.
 
-L3 POC REDUCTION: Force the choice of ONE capability as proof, then get a
-3-5 step demo script ("open the app, do X, see Y"). Every capability not
-chosen and every feature mentioned but absent from the demo goes on the v2
-seed list. Read the seed list back for confirmation. Exit: capability chosen,
-demo confirmed, seeds confirmed.
+After their first description ask: "Is there another scenario or user type you
+want to capture? Any other situations where someone would use this?" Keep
+asking until the user signals they\'ve told you the full picture.
+
+Extract:
+- outcome: the core value proposition (one sentence derived from their stories)
+- primaryUser: who the primary user is
+- userScenarios: list of scenarios the user described (1-3 sentences each)
+
+Exit: At least one complete scenario described (from opening to receiving
+value) AND user confirms there are no other main scenarios to add.
+
+L2 STORY SYNTHESIS + HOLE DETECTION (three steps, in order):
+
+STEP A — SYNTHESIZE first. Present your organized understanding of the full app:
+"Here\'s how I understand ${state.projectName} working:
+
+[User Story 1: descriptive title]
+1. [step]
+2. [step]
+...
+
+[User Story 2: descriptive title, if applicable]
+1. [step]
+..."
+
+Organize chronologically within each story. Show the FULL flow — both sides of
+every interaction. If User A invites User B, show both sides. If there\'s a
+backend step, show the data flow. This is the moment where missing logic
+becomes visible.
+
+STEP B — DETECT HOLES. After presenting the synthesis, scan for logical gaps:
+moments where the story requires something to exist that was never explained.
+Examples:
+- "Users swipe cards, but who created those cards and how were other users
+  invited to the experience?"
+- "Users match, but what happens after the match — how do they communicate?"
+- "The app shows nearby locations, but where does that data come from?"
+
+For EACH hole, ask permission before filling it:
+"I notice [describe the gap]. Do you want to describe how you imagined that
+working, or would you like me to suggest some options?"
+
+If the user wants suggestions: give 1-2 options (3 max if the situation is
+complex). Always state which you recommend most and why in one sentence.
+
+Address holes ONE AT A TIME. Never list all holes at once.
+
+STEP C — CONFIRM. Once all holes are resolved, present the final user story
+map and ask: "Does this capture how you want ${state.projectName} to work?"
+
+Extract:
+- userStories: list of confirmed user stories (each as a titled numbered sequence)
+- capabilities: 2-6 high-level capabilities implied by the stories
+- detectedHoles: holes found and how each was resolved (format: "gap → resolution")
+
+Exit: User story map confirmed AND all detected holes addressed.
+
+L3 VERSION SCOPING:
+
+V1 SCOPE RULE: V1 is the MINIMUM COMPLETE slice that makes the primary user
+story work end-to-end. It is NOT a single screen or UI element. It must
+include everything the primary flow depends on: invites, connections, data
+sources, matching logic — whatever the core experience requires to actually
+function. A V1 that looks good but cannot be used is a failure.
+
+Propose a version breakdown:
+"Given the full picture, here\'s how I\'d version this:
+
+V1 — [minimum complete working version of the primary user story, covering
+the full flow from open to value]
+
+V2 — [next most important layer]
+
+V3+ — [remaining scenarios and features]"
+
+Then get a 3-5 step demo script for V1. The demo must walk through the
+COMPLETE primary user story — not just one screen. If the flow requires
+inviting other users, the demo includes that step. If it requires a backend
+connection, that connection is in the demo.
+
+Read back V2 seeds: every scenario, story, and feature not in V1.
+
+Extract:
+- chosenCapability: V1 core label (one phrase)
+- v1UserStories: user stories included in V1 scope
+- demoScript: 3-5 step walkthrough of the complete V1 primary flow
+- v2Seeds: everything deferred to V2+
+
+Exit: V1 scope confirmed, demo confirmed, seeds confirmed.
 
 L4 CRITICAL PATH: Do not ask open questions here. Deduce platform, identity,
-input, output, and services from the demo script and propose conservative
+input, output, and services from the V1 demo script and propose conservative
 defaults the user confirms or corrects. Identity defaults to none. Run the
-blocker scan: ask what they already have set up, then propose stripping
-every external service that is not itself the chosen capability (local
-storage over cloud, mocks over live APIs, no auth over OAuth). Draft the 1-3
-step sequence to a working demo and ask them to correct it. Exit: all
-defaults confirmed or overridden, blocker scan done, sequence confirmed.
+blocker scan: ask what they already have set up, then propose stripping every
+external service not itself the core capability (local storage over cloud,
+mocks over live APIs, no auth over OAuth). Draft the 1-3 step sequence to a
+working demo and ask them to correct it. Exit: all defaults confirmed or
+overridden, blocker scan done, sequence confirmed.
 
 STATE SO FAR (cumulative `extracted` map — re-emit every field every turn):
 $extractedJson
 
 RULES
-- Ask ONE question per turn. Acknowledge the answer first. Be concise.
+- Ask ONE question or prompt per turn. Acknowledge the answer first. Be concise.
+- L1: Never say "in one sentence." Accept everything the user gives you.
+- L2: Complete STEP A before STEP B. Complete STEP B before STEP C. In order.
+- L3: Never scope V1 to a single UI element. V1 is a working experience.
 - When answers conflict: "Your answers on [X] and [Y] pull in opposite
   directions. [X] implies [A]. [Y] implies [B]. I recommend [conservative
   option] for v1 because [reason]. Do you accept this scope?" Do not proceed
   past a conflict.
-- Never accept "all of the above". Pressure-test it.
 - When the user is uncertain, recommend the conservative default and move on.
-- If the user pitches a new feature at any layer, acknowledge it, add it to
-  the v2 seeds, and return to the current layer's question.
-- L2 capabilities: hard cap at 5. Demo script: 3 to 5 steps. Hard limits.
+- If the user mentions a new feature before L3, note it but do not add it to
+  v2Seeds yet — hold it for the L3 scoping conversation.
+- STORY AMENDMENTS: At any point during L2 or L3, if the user wants to change
+  a confirmed user story, accept the change and track it:
+  1. Update the story in the userStories list to reflect the new version.
+  2. Add an entry to storyAmendments: "[label]: [what changed and why]"
+     where label is derived from the current version letter — first amendment
+     is "V1a", second is "V1b", third is "V1c", etc.
+     Count existing storyAmendments entries to determine the next letter
+     (0 entries → "a", 1 → "b", 2 → "c", etc.).
+  Example entry: "V1a: Added invite flow before swipe — user must invite at
+  least one friend before the card stack appears"
+  Never reject a story amendment. Accept it, track it, and continue.
 
-After EVERY response, append a fenced forge-state block. The block is
-MANDATORY on every turn, even when nothing changed. Emit the FULL extracted
-map each turn (cumulative, not deltas):
+After EVERY response, append a fenced forge-state block. MANDATORY every
+turn, even when nothing changed. Emit the FULL extracted map each turn:
 
 \`\`\`forge-state
 {
@@ -305,8 +418,8 @@ map each turn (cumulative, not deltas):
 }
 \`\`\`
 
-Set `layerComplete: true` only when the current layer's exit condition is
-met. Set `conflicts: []` unless you detected an actual contradiction.''';
+Set \`layerComplete: true\` only when the current layer\'s exit condition is
+met. Set \`conflicts: []\` unless you detected an actual contradiction.''';
 }
 
 String? _extractGoalStatement(String? featureContext) {
@@ -507,13 +620,31 @@ String _interviewSystemPrompt(InterviewState state,
 bool _layerGateMet(String layer, Map<String, dynamic> extracted) {
   switch (layer) {
     case 'L1':
-      return extracted['outcome'] != null && extracted['primaryUser'] != null;
+      // Full vision captured: outcome, primary user, AND at least one scenario
+      final scenarios = extracted['userScenarios'];
+      final hasScenarios = scenarios is List && scenarios.isNotEmpty;
+      // Backward compat: old states without userScenarios use outcome+user only
+      final isOldState = scenarios == null;
+      return extracted['outcome'] != null &&
+          extracted['primaryUser'] != null &&
+          (isOldState || hasScenarios);
     case 'L2':
-      final caps = extracted['capabilities'] as List;
-      return caps.length >= 3 && caps.length <= 5;
+      // User stories synthesized and holes addressed
+      final stories = extracted['userStories'];
+      final caps = extracted['capabilities'];
+      final hasStories = stories is List && stories.isNotEmpty;
+      final hasCaps = caps is List && caps.length >= 2;
+      // Backward compat: old states without userStories use capabilities only
+      final isOldState = stories == null;
+      return isOldState ? (caps is List && caps.length >= 3) : (hasStories && hasCaps);
     case 'L3':
       final demo = extracted['demoScript'] as List;
+      final v1Stories = extracted['v1UserStories'];
+      final hasV1Stories = v1Stories is List && v1Stories.isNotEmpty;
+      // Backward compat: old states without v1UserStories use chosenCapability only
+      final isOldState = v1Stories == null;
       return extracted['chosenCapability'] != null &&
+          (isOldState || hasV1Stories) &&
           demo.length >= 3 &&
           demo.length <= 5 &&
           extracted['v2Seeds'] is List;
@@ -592,12 +723,19 @@ Map<String, dynamic> _extractedAtLayerStart(
   if (idx <= 0) {
     base['outcome'] = null;
     base['primaryUser'] = null;
+    base['userScenarios'] = <String>[];
   }
-  if (idx <= 1) base['capabilities'] = <String>[];
+  if (idx <= 1) {
+    base['capabilities'] = <String>[];
+    base['userStories'] = <String>[];
+    base['storyAmendments'] = <String>[];
+    base['detectedHoles'] = <String>[];
+  }
   if (idx <= 2) {
     base['chosenCapability'] = null;
     base['demoScript'] = <String>[];
     base['v2Seeds'] = <String>[];
+    base['v1UserStories'] = <String>[];
   }
   if (idx <= 3) {
     base['platform'] = null;
@@ -622,10 +760,10 @@ class InterviewNotifier
   // ── Opening message variations ───────────────────────────────────────────
   // Picked deterministically by projectName.hashCode % length — zero token cost.
   static const _buildOpeners = [
-    "Hi! Let's spec out {name}. I'll walk you through four layers — starting with the outcome. What should this product actually do? In one sentence: what changes for someone when they use it?",
-    "Welcome to the Build Interview for {name}. Let's start at the top — what outcome does this product create? Don't worry about features yet. What does the user walk away with?",
-    "Let's scope {name}. Four layers, starting with Outcome. What's the single thing this product should accomplish? Describe it from the user's side — what can they do or have that they couldn't before?",
-    "Ready to build the spec for {name}. First question: what problem does this solve, and what does success look like from the user's perspective? One or two sentences is perfect.",
+    "Let's design {name}. Before we narrow anything down, I want to understand your full vision. Tell me the story of how you imagine someone using this app — who opens it, what do they do step by step, what happens between different users if there are any, and what do they get out of it at the end? Think out loud, don't hold back.",
+    "Welcome to The Forge — let's plan {name}. First, I want to hear the whole picture. Walk me through the ideal experience: how does a user open it, what journey do they go through, and what does success look like for them? Feel free to describe multiple scenarios or user types.",
+    'Ready to scope {name}. But before we narrow anything, tell me how you envision this app working from start to finish. Who uses it, what do they actually do, and how does the experience end? If you have more than one scenario in mind, share them all.',
+    "Let's build {name}. Start by telling me the story of your app — not a feature list, the actual experience. How does someone open it, what happens between them and other people or the system, and what do they walk away with? Tell me as much as you want.",
   ];
 
   static const _featureOpeners = [
