@@ -4,6 +4,41 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-07-01 — Claude Code [Cross-Cutting Invariant Extraction (§CCI)]
+
+**Branch:** main
+
+### Done
+
+**§CCI — Cross-Cutting Invariant Extraction:**
+- `lib/features/projects/ingestion/invariant_extractor.dart` (NEW) — `InvariantConfidence` enum (high/medium/low); `ExtractedInvariant` `@immutable` class with `fromJson` (safe `is List<dynamic>` + `? ??` null guards), `toJson`, `toMarkdown`; `_invariantSystemPrompt` const; `_buildExtractionPrompt()` + `_parseInvariants()` top-level helpers (fence-stripping + `is List<dynamic>` safe decode); `InvariantExtractor` class calling `LlmService.complete()` at t=0.2, maxTokens 4096
+- `lib/features/projects/models/pull_ingestion_summary.dart` — added `import invariant_extractor.dart`; `final List<ExtractedInvariant> invariants` field (defaults `const []`); `copyWith({List<ExtractedInvariant>?})`; `lowConfidenceInvariants` getter; `toJson()` serialises invariants; `fromJson()` safe `is List<dynamic>` parse (backward-compatible — old JSON without `invariants` key falls back to `const []`); `toMarkdown()` appends `## Cross-Cutting Invariants` section when non-empty
+- `lib/features/projects/ingestion/pull_ingestion_notifier.dart` — import `invariant_extractor.dart`; `startIngestion()` now: sets `IngestionState.aggregating` → calls `InvariantExtractor(service).extract()` → `summary.copyWith(invariants: invariants)` → single `writeIngestionSummary()` call (was 0 invariants; now includes them)
+- `lib/features/spec_generation/as_built_spec_generator.dart` — added `§2a. Cross-Cutting Invariants` section to `_asBuiltSpecStructure` const; every as-built spec now includes the extracted rules
+- `lib/features/projects/screens/pull_ingestion_summary_screen.dart` — import `invariant_extractor.dart`; invariant count row in `_buildSummaryCard`; `_buildInvariantsSection()` (confidence badge + rule + appliesTo + enforcement + violationConsequence + source); `_confidenceBadge()` with color-coded `Container` (green/orange/red); wired into `build()` Column after gaps section
+- `lib/features/pull_interview/state/pull_interview_notifier.dart` — import `invariant_extractor.dart`; `_buildGreeting()` counts `low`-confidence invariants and adds confirmation note; `_buildSystemPrompt()` injects `LOW-CONFIDENCE INVARIANTS TO CONFIRM` block with targeted question guidance per rule
+
+### Key Technical Findings
+- DeepSeek swapped `systemPrompt`/`userPrompt` in the LLM call: put the data context (ingestion summary) as system and the instruction string as user — exactly backwards from the codebase pattern. Always verify the role assignment in LLM calls, not just the response parse.
+- DeepSeek omitted `_parseInvariants()` and used `jsonDecode(response) as Map<String, dynamic>` expecting `{"invariants": [...]}` — but the system prompt instructs the LLM to return a plain JSON array. Mismatch between what you tell the LLM to return and what you try to parse is a silent runtime crash. Write parse and prompt in the same review.
+- DeepSeek wrote the summary to disk twice: once before extraction (empty invariants) and once after. The correct pattern is a single write after invariant extraction. Extra disk writes are wasteful and the first write would contain stale/incomplete data.
+- DeepSeek didn't use `copyWith()` we added in Chunk 1 — manually reconstructed `IngestionSummary` with all fields. When you add `copyWith()` to a model specifically for downstream use, verify the downstream actually uses it.
+- `fromJson()` backward compat: old ingestion summaries on disk don't have an `invariants` key. Guard with `json['invariants'] is List<dynamic>` before casting — the `is` check returns false for null, so missing keys are handled automatically.
+
+### Modified
+- `lib/features/projects/ingestion/invariant_extractor.dart` (NEW)
+- `lib/features/projects/models/pull_ingestion_summary.dart`
+- `lib/features/projects/ingestion/pull_ingestion_notifier.dart`
+- `lib/features/spec_generation/as_built_spec_generator.dart`
+- `lib/features/projects/screens/pull_ingestion_summary_screen.dart`
+- `lib/features/pull_interview/state/pull_interview_notifier.dart`
+
+### Next
+- Dogfood The Forge (Pull Mode end-to-end) to generate a §CCI-enriched as-built spec
+- §PERSIST — Interview state persistence — backlog
+
+---
+
 ## Session: 2026-06-30 — Claude Code [Notes/Backlog Sidebar + Version-Aware Panel + Addendum Interview]
 
 **Branch:** main

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../ingestion/invariant_extractor.dart';
 import '../models/pull_ingestion_summary.dart';
 import '../providers/providers.dart';
 
@@ -76,6 +77,8 @@ class PullIngestionSummaryScreen extends ConsumerWidget {
                 const SizedBox(height: 24),
                 _buildGapsSection(summary),
                 const SizedBox(height: 24),
+                _buildInvariantsSection(summary),
+                const SizedBox(height: 24),
                 _buildMetadataSection(summary),
               ],
             ),
@@ -97,6 +100,11 @@ class PullIngestionSummaryScreen extends ConsumerWidget {
             _buildSummaryRow('Scanned', summary.scannedAt.toIso8601String().split('T')[0]),
             _buildSummaryRow('Files scanned', '${summary.fileCount} files'),
             _buildSummaryRow('Components found', '${summary.componentCount} components'),
+            if (summary.invariants.isNotEmpty)
+              _buildSummaryRow(
+                'Invariants found',
+                '${summary.invariants.length} cross-cutting rules',
+              ),
           ],
         ),
       ),
@@ -246,6 +254,65 @@ class PullIngestionSummaryScreen extends ConsumerWidget {
             ),
           ),
       ],
+    );
+  }
+
+  Widget _buildInvariantsSection(IngestionSummary summary) {
+    if (summary.invariants.isEmpty) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Text('No invariants extracted — codebase has no cross-cutting rules.'),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Cross-Cutting Invariants', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        for (final inv in summary.invariants)
+          Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(child: Text(inv.rule, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15))),
+                      const SizedBox(width: 8),
+                      _confidenceBadge(inv.confidence),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text('Applies to: ${inv.appliesTo.isEmpty ? 'unknown' : inv.appliesTo.join(", ")}'),
+                  Text('Enforcement: ${inv.enforcement}'),
+                  Text('If violated: ${inv.violationConsequence}'),
+                  Text('Source: ${inv.sourceRef}', style: const TextStyle(color: Colors.grey)),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _confidenceBadge(InvariantConfidence confidence) {
+    final color = switch (confidence) {
+      InvariantConfidence.high => Colors.green,
+      InvariantConfidence.medium => Colors.orange,
+      InvariantConfidence.low => Colors.red,
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(confidence.name, style: TextStyle(fontSize: 11, color: color)),
     );
   }
 

@@ -1,6 +1,6 @@
 # Configuration Management — The Forge
 
-**Last Updated:** 2026-06-30
+**Last Updated:** 2026-07-01
 **Status:** ✅ Synced
 
 ---
@@ -109,12 +109,36 @@
 | project_detail_screen.dart | lib/features/projects/screens/ | 2026-06-30 | ✅ Synced |
 | addendum_interview_notifier.dart | lib/features/addendum_interview/state/ | 2026-06-30 | ✅ Synced |
 | addendum_interview_screen.dart | lib/features/addendum_interview/ui/ | 2026-06-30 | ✅ Synced |
+| invariant_extractor.dart | lib/features/projects/ingestion/ | 2026-07-01 | ✅ Synced |
+| pull_ingestion_summary.dart | lib/features/projects/models/ | 2026-07-01 | ✅ Synced |
+| pull_ingestion_notifier.dart | lib/features/projects/ingestion/ | 2026-07-01 | ✅ Synced |
+| as_built_spec_generator.dart | lib/features/spec_generation/ | 2026-07-01 | ✅ Synced |
+| pull_ingestion_summary_screen.dart | lib/features/projects/screens/ | 2026-07-01 | ✅ Synced |
+| pull_interview_notifier.dart | lib/features/pull_interview/state/ | 2026-07-01 | ✅ Synced |
 
 
 ---
 
 
 ## Change Log
+
+### 2026-07-01 — §CCI: Cross-Cutting Invariant Extraction
+
+**Action:** New Pull Mode layer — extract cross-cutting rules during ingestion, surface in as-built spec + pull interview. 1 new file, 5 modified.
+
+**Files created:**
+- `lib/features/projects/ingestion/invariant_extractor.dart` — `InvariantConfidence` enum; `ExtractedInvariant` model; `InvariantExtractor` class; safe JSON array parse with fence-stripping
+
+**Files modified:**
+- `lib/features/projects/models/pull_ingestion_summary.dart` — `invariants` field + `copyWith` + `lowConfidenceInvariants` getter + `toJson`/`fromJson`/`toMarkdown`
+- `lib/features/projects/ingestion/pull_ingestion_notifier.dart` — `InvariantExtractor` wired after aggregation; `aggregating` state; single write
+- `lib/features/spec_generation/as_built_spec_generator.dart` — `§2a` CCI section in spec template
+- `lib/features/projects/screens/pull_ingestion_summary_screen.dart` — invariant count + `_buildInvariantsSection` + confidence badges
+- `lib/features/pull_interview/state/pull_interview_notifier.dart` — low-confidence invariants in greeting + system prompt
+
+**Verification:** `dart analyze lib/` → 0 errors, 1 pre-existing info (non-blocking)
+
+---
 
 ### 2026-06-30 — §NB1 + §VUI2 + §AI1: Notes/Backlog + Version-Aware Panel + Addendum Interview
 

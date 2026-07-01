@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../ingestion/invariant_extractor.dart';
+
 enum IngestionState { idle, scanning, processing, aggregating, done, error }
 
 @immutable
@@ -134,6 +136,7 @@ class IngestionSummary {
   final List<DependencyInfo> dependencyList;
   final List<InfrastructurePattern> infrastructureChoices;
   final List<String> gapList;
+  final List<ExtractedInvariant> invariants;
 
   const IngestionSummary({
     required this.projectName,
@@ -145,7 +148,26 @@ class IngestionSummary {
     required this.dependencyList,
     required this.infrastructureChoices,
     required this.gapList,
+    this.invariants = const [],
   });
+
+  IngestionSummary copyWith({List<ExtractedInvariant>? invariants}) {
+    return IngestionSummary(
+      projectName: projectName,
+      projectPath: projectPath,
+      scannedAt: scannedAt,
+      fileCount: fileCount,
+      componentCount: componentCount,
+      components: components,
+      dependencyList: dependencyList,
+      infrastructureChoices: infrastructureChoices,
+      gapList: gapList,
+      invariants: invariants ?? this.invariants,
+    );
+  }
+
+  List<ExtractedInvariant> get lowConfidenceInvariants =>
+      invariants.where((i) => i.confidence == InvariantConfidence.low).toList();
 
   Map<String, dynamic> toJson() => {
         'projectName': projectName,
@@ -157,6 +179,7 @@ class IngestionSummary {
         'dependencyList': dependencyList.map((e) => e.toJson()).toList(),
         'infrastructureChoices': infrastructureChoices.map((e) => e.toJson()).toList(),
         'gapList': gapList,
+        'invariants': invariants.map((e) => e.toJson()).toList(),
       };
 
   factory IngestionSummary.fromJson(Map<String, dynamic> json) => IngestionSummary(
@@ -175,6 +198,12 @@ class IngestionSummary {
             .map((e) => InfrastructurePattern.fromJson(e as Map<String, dynamic>))
             .toList(),
         gapList: (json['gapList'] as List<dynamic>).cast<String>(),
+        invariants: json['invariants'] is List<dynamic>
+            ? (json['invariants'] as List<dynamic>)
+                .whereType<Map<String, dynamic>>()
+                .map(ExtractedInvariant.fromJson)
+                .toList()
+            : const [],
       );
 
   String toMarkdown() {
@@ -237,6 +266,14 @@ class IngestionSummary {
       buffer.writeln('## Gaps (Need Interview to Resolve)\n');
       for (final gap in gapList) {
         buffer.writeln('- $gap');
+      }
+    }
+
+    if (invariants.isNotEmpty) {
+      buffer.writeln('## Cross-Cutting Invariants\n');
+      for (final inv in invariants) {
+        buffer.writeln(inv.toMarkdown());
+        buffer.writeln();
       }
     }
 

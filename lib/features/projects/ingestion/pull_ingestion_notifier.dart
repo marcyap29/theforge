@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../services/llm/llm_service_provider.dart';
 import '../models/pull_ingestion_summary.dart';
 import '../providers/providers.dart';
+import 'invariant_extractor.dart';
 import 'pull_codebase_ingestion_engine.dart';
 
 class PullIngestionState {
@@ -82,7 +83,14 @@ class PullIngestionNotifier extends Notifier<PullIngestionState> {
         gaps: gaps,
       );
 
-      await repo.writeIngestionSummary(projectPath, projectName, summary);
+      state = state.copyWith(state: IngestionState.aggregating);
+
+      final invariants = await InvariantExtractor(service).extract(
+        referenceContext: summary.toMarkdown(),
+        components: summary.components,
+      );
+      final summaryWithInvariants = summary.copyWith(invariants: invariants);
+      await repo.writeIngestionSummary(projectPath, projectName, summaryWithInvariants);
 
       state = state.copyWith(state: IngestionState.done);
     } catch (e) {

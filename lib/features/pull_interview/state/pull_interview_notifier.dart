@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../features/projects/ingestion/invariant_extractor.dart';
 import '../../../features/projects/models/pull_ingestion_summary.dart';
 import '../../../features/projects/providers/providers.dart';
 import '../../../services/llm/llm_provider.dart';
@@ -88,9 +89,17 @@ class PullInterviewNotifier
     }
     final gapCount = summary.gapList.length;
     final componentCount = summary.componentCount;
+    final lowCciCount = summary.invariants
+        .where((i) => i.confidence == InvariantConfidence.low)
+        .length;
+    final cciNote = lowCciCount > 0
+        ? ' I also found $lowCciCount potential cross-cutting rules that need '
+            'your confirmation — I\'ll ask about those as we go.'
+        : '';
     return 'I\'ve reviewed the ingestion summary for $projectName. '
         'Found $componentCount components. '
         '${gapCount > 0 ? 'There are $gapCount gaps to fill. ' : ''}'
+        '$cciNote'
         'Let\'s start: What was the primary business goal that drove '
         'this codebase\'s architecture?';
   }
@@ -105,10 +114,23 @@ class PullInterviewNotifier
             '${summary!.gapList.map((g) => '- $g').join('\n')}'
         : '';
 
+    final lowConfidenceInvariants = summary?.invariants
+            .where((i) => i.confidence == InvariantConfidence.low)
+            .toList() ??
+        [];
+
+    final invariantsBlock = lowConfidenceInvariants.isNotEmpty
+        ? '\n\nLOW-CONFIDENCE INVARIANTS TO CONFIRM:\n'
+            '${lowConfidenceInvariants.map((i) => '- "${i.rule}" (source: ${i.sourceRef})').join('\n')}\n\n'
+            'For each low-confidence invariant listed above, ask one targeted '
+            'question: does this rule apply everywhere, only in some contexts, '
+            'or was it specific to one file? What enforces it?'
+        : '';
+
     return 'You are The Forge pull mode engineer. You are interviewing an '
         'engineer about an existing codebase called "$projectName" to capture '
         'context the code alone cannot provide.\n\n'
-        '$summaryBlock$gapsBlock\n\n'
+        '$summaryBlock$gapsBlock$invariantsBlock\n\n'
         'RULES:\n'
         '- Ask only about what the code does NOT reveal\n'
         '- One question per turn, concise\n'

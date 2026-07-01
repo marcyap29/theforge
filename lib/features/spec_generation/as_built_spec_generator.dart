@@ -24,6 +24,11 @@ Produce an as-built spec in this exact 10-section format. Use the section header
 ## 2. Hard Constraints
 [Non-negotiable constraints visible in code or confirmed in interview]
 
+## 2a. Cross-Cutting Invariants
+[Rules extracted by the invariant extractor that apply across components.
+List each invariant, its enforcement mechanism, and violation consequence.
+Include the confidence level (high/medium/low).]
+
 ## 3. Component Map
 [Table: Component | Single Responsibility — derived from ingestion summary]
 

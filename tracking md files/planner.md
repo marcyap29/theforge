@@ -4,6 +4,20 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 
 ---
 
+## §CCI — Cross-Cutting Invariant Extraction — COMPLETE ✅
+
+**Completed:** 2026-07-01
+
+- [x] `lib/features/projects/ingestion/invariant_extractor.dart` (NEW) — `InvariantConfidence` enum; `ExtractedInvariant` class; `InvariantExtractor.extract()` LLM call at t=0.2; `_parseInvariants()` with fence-stripping + `is List<dynamic>` safe decode
+- [x] `lib/features/projects/models/pull_ingestion_summary.dart` — `invariants` field (default `const []`); `copyWith()`; `lowConfidenceInvariants` getter; `toJson`/`fromJson`/`toMarkdown` updated; backward-compatible `fromJson` (old files without `invariants` key fall back to `const []`)
+- [x] `lib/features/projects/ingestion/pull_ingestion_notifier.dart` — wired `InvariantExtractor` after `aggregateComponents()`; `IngestionState.aggregating` state transition; single write with `summary.copyWith(invariants: invariants)`
+- [x] `lib/features/spec_generation/as_built_spec_generator.dart` — `§2a. Cross-Cutting Invariants` section added to spec template
+- [x] `lib/features/projects/screens/pull_ingestion_summary_screen.dart` — invariant count in summary card; `_buildInvariantsSection()` with confidence badges; `_confidenceBadge()` color-coded widget
+- [x] `lib/features/pull_interview/state/pull_interview_notifier.dart` — greeting + system prompt surface low-confidence invariants for confirmation
+- [x] `dart analyze lib/` — 0 errors, 1 pre-existing info-level import ordering (non-blocking)
+
+---
+
 ## §1 — Flutter Bootstrap + Local Data Layer — COMPLETE ✅
 
 **Completed:** 2026-05-31

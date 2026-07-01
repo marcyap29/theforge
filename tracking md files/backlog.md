@@ -33,8 +33,9 @@ Long-term feature pool. Active sprint work lives in `planner.md`.
    → §W5 Watch Mode: SwarmSpace Briefing + Decision Simulation ✅
   → §W6 Watch Mode: Spec Compliance Monitor + Drift Detector ✅
        ↓
-  → §R1 Pull Mode: Codebase Ingestion Engine
-  → §R2 Pull Mode: Pull Interview Engine + As-Built Spec Generator
+  → §R1 Pull Mode: Codebase Ingestion Engine ✅
+  → §R2 Pull Mode: Pull Interview Engine + As-Built Spec Generator ✅
+  → §CCI Cross-Cutting Invariant Extraction ✅ (2026-07-01)
        ↓
   → Configuration C pilot (Qualcomm) — Watch + Reverse on existing codebase
 ```
