@@ -27,6 +27,8 @@ import '../models/pull_ingestion_summary.dart' as rev_ingest;
 import '../providers/providers.dart';
 import 'pull_ingestion_progress_screen.dart';
 import 'pull_ingestion_summary_screen.dart';
+import '../../addendum_interview/state/addendum_interview_notifier.dart';
+import '../../addendum_interview/ui/addendum_interview_screen.dart';
 
 class ProjectDetailScreen extends ConsumerStatefulWidget {
   const ProjectDetailScreen({super.key, required this.project});
@@ -39,6 +41,8 @@ class ProjectDetailScreen extends ConsumerStatefulWidget {
 class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   double _sidebarWidth = 220;
   bool _sidebarCollapsed = false;
+  double _contextPanelHeight = 200;
+  String? _selectedVersion;
 
   int _bannerIndex = 0;
   Timer? _bannerTimer;
@@ -108,11 +112,48 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Collapsible sidebar
+          // Collapsible sidebar — Files (top) + Context (bottom)
           if (!_sidebarCollapsed)
             SizedBox(
               width: _sidebarWidth,
-              child: _FilesSidebar(projectPath: live.path),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: _FilesSidebar(projectPath: live.path),
+                  ),
+                  GestureDetector(
+                    onVerticalDragUpdate: (details) => setState(() {
+                      _contextPanelHeight =
+                          (_contextPanelHeight - details.delta.dy)
+                              .clamp(80.0, MediaQuery.of(context).size.height - 160.0);
+                    }),
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.resizeRow,
+                      child: Container(
+                        height: 8,
+                        color: const Color(0xFF1C1C1E),
+                        child: Center(
+                          child: Container(
+                            width: 32,
+                            height: 2,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF3C3C3E),
+                              borderRadius: BorderRadius.circular(1),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    height: _contextPanelHeight,
+                    child: _ContextPanel(
+                      projectPath: live.path,
+                      projectName: live.name,
+                    ),
+                  ),
+                ],
+              ),
             ),
           // Drag-to-resize handle + collapse toggle
           _SidebarDivider(
@@ -130,7 +171,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
               children: [
                 _FixStructureBanner(projectPath: live.path),
-                _PhaseTimeline(project: live),
+                _PhaseTimeline(
+                  project: live,
+                  selectedVersion: _selectedVersion ?? _versionOf(live.phase),
+                  onVersionTap: (v) => setState(() => _selectedVersion = v),
+                ),
                 const SizedBox(height: 24),
                 const _SectionHeader('Project State'),
                 if (active.isLoading)
@@ -158,11 +203,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                     specVersion: sv,
                   ),
                 ],
-                _BacklogSection(
+                _CoderPackageSection(
                   projectPath: live.path,
                   projectName: live.name,
+                  targetVersion: _selectedVersion ?? _versionOf(live.phase),
                 ),
-                const SizedBox(height: 24),
                 // Phase-aware CTA
                 _SectionHeader(_ctaSectionLabel(live.phase)),
                 SizedBox(
@@ -853,8 +898,14 @@ String _previousVersion(String current) {
 // ── Phase Timeline ────────────────────────────────────────────────────────────
 
 class _PhaseTimeline extends StatefulWidget {
-  const _PhaseTimeline({required this.project});
+  const _PhaseTimeline({
+    required this.project,
+    required this.selectedVersion,
+    required this.onVersionTap,
+  });
   final Project project;
+  final String selectedVersion;
+  final void Function(String version) onVersionTap;
 
   @override
   State<_PhaseTimeline> createState() => _PhaseTimelineState();
@@ -1207,14 +1258,33 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
                                 : const Color(0xFFE8A04C)),
                         const SizedBox(width: 4),
                       ],
-                      Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontFamily: 'Menlo',
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.4,
-                          color: color,
+                      GestureDetector(
+                        onTap: () => widget.onVersionTap(version),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 4, vertical: 2),
+                          decoration: widget.selectedVersion == version
+                              ? const BoxDecoration(
+                                  border: Border(
+                                    bottom: BorderSide(
+                                      color: Color(0xFFE8A04C),
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                )
+                              : null,
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontFamily: 'Menlo',
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.4,
+                              color: widget.selectedVersion == version
+                                  ? const Color(0xFFE8A04C)
+                                  : color,
+                            ),
+                          ),
                         ),
                       ),
                       // In-progress: show mini L-dots inline when collapsed
@@ -1746,7 +1816,7 @@ class _FilesSidebarState extends ConsumerState<_FilesSidebar> with RouteAware {
       for (final entry in dir.listSync()) {
         if (entry is Directory) {
           final vName = p.basename(entry.path);
-          if (RegExp(r'^v\d+$').hasMatch(vName)) {
+          if (RegExp(r'^v(\d+(?:\.\d+)?)$').hasMatch(vName)) {
             final vFiles = entry.listSync()
                 .whereType<File>()
                 .map((e) => p.basename(e.path))
@@ -1778,6 +1848,29 @@ class _FilesSidebarState extends ConsumerState<_FilesSidebar> with RouteAware {
             final files = snapshot.data ?? {};
             final hasAny = files.values
                 .any((vMap) => vMap.values.any((l) => l.isNotEmpty));
+
+            // Find latest version across all folders
+            String? latestV;
+            for (final vMap in files.values) {
+              for (final v in vMap.keys) {
+                if (v.isEmpty) continue;
+                if (latestV == null || v.compareTo(latestV) > 0) latestV = v;
+              }
+            }
+            // Files that should go to the coder for the latest version
+            final coderFiles = <String>{};
+            if (latestV != null) {
+              for (final folderId in files.keys) {
+                for (final filename in files[folderId]![latestV] ?? []) {
+                  if (filename.contains('_LockedSpec_') ||
+                      filename.contains('_HandoffPackage_') ||
+                      filename.contains('_BulletHandoff_') ||
+                      filename.contains('_SetupWorksheet_')) {
+                    coderFiles.add('$folderId/$latestV/$filename');
+                  }
+                }
+              }
+            }
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1887,6 +1980,7 @@ class _FilesSidebarState extends ConsumerState<_FilesSidebar> with RouteAware {
                                       _FileRow(
                                         filename: filename,
                                         selected: _selected == '${folder.id}/$version/$filename',
+                                        highlighted: coderFiles.contains('${folder.id}/$version/$filename'),
                                         onTap: () => _open(context, folder.id, version, filename),
                                         filePath: version.isEmpty
                                             ? p.join(widget.projectPath, folder.id, filename)
@@ -1913,12 +2007,14 @@ class _FileRow extends StatelessWidget {
     required this.selected,
     required this.onTap,
     required this.filePath,
+    this.highlighted = false,
   });
 
   final String filename;
   final bool selected;
   final VoidCallback onTap;
   final String filePath;
+  final bool highlighted;
 
   void _showInFinder() {
     Process.run('open', ['-R', filePath]);
@@ -1966,16 +2062,34 @@ class _FileRow extends StatelessWidget {
                   )
                 : null,
           ),
-          child: Text(
-            filename,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontFamily: 'Menlo',
-              fontSize: 11,
-              color: selected
-                  ? const Color(0xFFE8A04C)
-                  : const Color(0xFFD1D5DB),
-            ),
+          child: Row(
+            children: [
+              if (highlighted && !selected)
+                Container(
+                  width: 5,
+                  height: 5,
+                  margin: const EdgeInsets.only(right: 5),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE8A04C),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              Expanded(
+                child: Text(
+                  filename,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'Menlo',
+                    fontSize: 11,
+                    color: selected
+                        ? const Color(0xFFE8A04C)
+                        : highlighted
+                            ? const Color(0xFFE5E5E7)
+                            : const Color(0xFFD1D5DB),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -2595,32 +2709,70 @@ class _FixStructureBannerState extends State<_FixStructureBanner> {
   }
 }
 
-// ── Backlog (deferred features) ───────────────────────────────────────────────
+// ── Context Panel (bottom sidebar) ───────────────────────────────────────────
 
-class _BacklogSection extends StatefulWidget {
-  const _BacklogSection({required this.projectPath, required this.projectName});
+class _ContextPanel extends StatefulWidget {
+  const _ContextPanel({required this.projectPath, required this.projectName});
   final String projectPath;
   final String projectName;
 
   @override
-  State<_BacklogSection> createState() => _BacklogSectionState();
+  State<_ContextPanel> createState() => _ContextPanelState();
 }
 
-class _BacklogSectionState extends State<_BacklogSection> {
-  // version string → list of deferred items
+class _ContextPanelState extends State<_ContextPanel> {
+  int _tab = 0; // 0 = Notes, 1 = Backlog
+
+  late final TextEditingController _notesCtrl;
+  bool _notesDirty = false;
+
+  List<String> _backlogItems = [];
+  final TextEditingController _addCtrl = TextEditingController();
+
   final Map<String, List<String>> _seedsByVersion = {};
-  bool _loaded = false;
+  bool _seedsLoaded = false;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _notesCtrl = TextEditingController();
+    _loadAll();
   }
 
-  Future<void> _load() async {
-    final handoffsDir = Directory(p.join(widget.projectPath, 'handoffs'));
+  @override
+  void dispose() {
+    _notesCtrl.dispose();
+    _addCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadAll() async {
+    await Future.wait([_loadNotes(), _loadBacklog(), _loadSeeds()]);
+  }
+
+  Future<void> _loadNotes() async {
+    final file = File(p.join(widget.projectPath, 'user_notes.md'));
+    if (!file.existsSync()) return;
+    final text = await file.readAsString();
+    if (mounted) setState(() => _notesCtrl.text = text);
+  }
+
+  Future<void> _loadBacklog() async {
+    final file = File(p.join(widget.projectPath, 'user_backlog.md'));
+    if (!file.existsSync()) return;
+    final items = (await file.readAsString())
+        .split('\n')
+        .map((l) => l.startsWith('- ') ? l.substring(2).trim() : l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
+    if (mounted) setState(() => _backlogItems = items);
+  }
+
+  Future<void> _loadSeeds() async {
+    final handoffsDir =
+        Directory(p.join(widget.projectPath, 'handoffs'));
     if (!handoffsDir.existsSync()) {
-      if (mounted) setState(() => _loaded = true);
+      if (mounted) setState(() => _seedsLoaded = true);
       return;
     }
     final result = <String, List<String>>{};
@@ -2631,89 +2783,268 @@ class _BacklogSectionState extends State<_BacklogSection> {
       for (final file in entry.listSync().whereType<File>()) {
         if (!p.basename(file.path).contains('_HandoffPackage_')) continue;
         try {
-          final data = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
-          final seeds = (data['v2SeedItems'] as List<dynamic>?)?.cast<String>() ?? [];
+          final data =
+              jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+          final seeds =
+              (data['v2SeedItems'] as List<dynamic>?)?.cast<String>() ?? [];
           if (seeds.isNotEmpty) result[vName] = seeds;
         } catch (_) {}
       }
     }
-    if (mounted) setState(() { _seedsByVersion.addAll(result); _loaded = true; });
+    if (mounted) {
+      setState(() {
+        _seedsByVersion.addAll(result);
+        _seedsLoaded = true;
+      });
+    }
+  }
+
+  Future<void> _saveNotes() async {
+    await File(p.join(widget.projectPath, 'user_notes.md'))
+        .writeAsString(_notesCtrl.text);
+    if (mounted) setState(() => _notesDirty = false);
+  }
+
+  Future<void> _addBacklogItem() async {
+    final text = _addCtrl.text.trim();
+    if (text.isEmpty) return;
+    _addCtrl.clear();
+    final updated = [..._backlogItems, text];
+    if (mounted) setState(() => _backlogItems = updated);
+    await File(p.join(widget.projectPath, 'user_backlog.md'))
+        .writeAsString(updated.map((i) => '- $i').join('\n'));
+  }
+
+  Future<void> _removeBacklogItem(int index) async {
+    final updated = [..._backlogItems]..removeAt(index);
+    if (mounted) setState(() => _backlogItems = updated);
+    await File(p.join(widget.projectPath, 'user_backlog.md'))
+        .writeAsString(updated.map((i) => '- $i').join('\n'));
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_loaded || _seedsByVersion.isEmpty) return const SizedBox.shrink();
-
-    // Deduplicate across versions; latest version's label wins.
-    final sortedVersions = _seedsByVersion.keys.toList()..sort();
-    final seen = <String>{};
-    // item text → version it was last deferred from
-    final items = <String, String>{};
-    for (final v in sortedVersions) {
-      for (final item in _seedsByVersion[v]!) {
-        if (seen.add(item)) items[item] = v;
-      }
-    }
-    if (items.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 24),
-        const _SectionHeader('Deferred Features'),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0F0F10),
-            border: Border.all(color: const Color(0xFF2C2C2E)),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: Color(0xFF2C2C2E))),
+        color: Color(0xFF0F0F10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
             children: [
-              for (final entry in items.entries)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 5),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.only(top: 1),
-                        child: Icon(Icons.schedule_outlined,
-                            size: 12, color: Color(0xFF4B5563)),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          entry.key,
-                          style: const TextStyle(
-                            fontFamily: 'Menlo',
-                            fontSize: 12,
-                            height: 1.4,
-                            color: Color(0xFF9CA3AF),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'deferred from ${entry.value}',
-                        style: const TextStyle(
-                          fontFamily: 'Menlo',
-                          fontSize: 10,
-                          color: Color(0xFF4B5563),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              _tabChip(0, 'NOTES'),
+              _tabChip(1, 'BACKLOG'),
             ],
           ),
+          const Divider(height: 1, color: Color(0xFF2C2C2E)),
+          Expanded(
+            child: _tab == 0 ? _buildNotesTab() : _buildBacklogTab(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tabChip(int index, String label) {
+    final active = _tab == index;
+    return GestureDetector(
+      onTap: () => setState(() => _tab = index),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: active ? const Color(0xFFE8A04C) : Colors.transparent,
+              width: 1.5,
+            ),
+          ),
         ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Menlo',
+            fontSize: 9,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.8,
+            color: active ? const Color(0xFFE8A04C) : const Color(0xFF6B7280),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNotesTab() {
+    return Padding(
+      padding: const EdgeInsets.all(8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _notesCtrl,
+              maxLines: null,
+              expands: true,
+              onChanged: (_) {
+                if (!_notesDirty) setState(() => _notesDirty = true);
+              },
+              style: const TextStyle(
+                fontFamily: 'Menlo',
+                fontSize: 11,
+                color: Color(0xFFE5E5E7),
+                height: 1.5,
+              ),
+              decoration: const InputDecoration(
+                hintText: 'Add notes for the AI…',
+                hintStyle: TextStyle(
+                    fontFamily: 'Menlo',
+                    fontSize: 11,
+                    color: Color(0xFF6B7280)),
+                border: InputBorder.none,
+                isDense: true,
+              ),
+            ),
+          ),
+          if (_notesDirty)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: _saveNotes,
+                style: TextButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text(
+                  'Save',
+                  style: TextStyle(
+                      fontFamily: 'Menlo',
+                      fontSize: 10,
+                      color: Color(0xFFE8A04C)),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBacklogTab() {
+    return ListView(
+      padding: const EdgeInsets.all(8),
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _addCtrl,
+                style: const TextStyle(
+                    fontFamily: 'Menlo',
+                    fontSize: 11,
+                    color: Color(0xFFE5E5E7)),
+                decoration: const InputDecoration(
+                  hintText: 'Add item…',
+                  hintStyle: TextStyle(
+                      fontFamily: 'Menlo',
+                      fontSize: 11,
+                      color: Color(0xFF6B7280)),
+                  border: InputBorder.none,
+                  isDense: true,
+                ),
+                onSubmitted: (_) => _addBacklogItem(),
+              ),
+            ),
+            GestureDetector(
+              onTap: _addBacklogItem,
+              child: const Icon(Icons.add, size: 14, color: Color(0xFF6B7280)),
+            ),
+          ],
+        ),
+        if (_backlogItems.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          const Divider(height: 1, color: Color(0xFF2C2C2E)),
+          const SizedBox(height: 4),
+          for (int i = 0; i < _backlogItems.length; i++)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('·',
+                      style: TextStyle(
+                          color: Color(0xFF6B7280),
+                          fontFamily: 'Menlo',
+                          fontSize: 11)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      _backlogItems[i],
+                      style: const TextStyle(
+                          fontFamily: 'Menlo',
+                          fontSize: 11,
+                          color: Color(0xFFE5E5E7),
+                          height: 1.4),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => _removeBacklogItem(i),
+                    child: const Icon(Icons.close,
+                        size: 10, color: Color(0xFF6B7280)),
+                  ),
+                ],
+              ),
+            ),
+        ],
+        if (_seedsLoaded && _seedsByVersion.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          const Text(
+            'AI DEFERRED',
+            style: TextStyle(
+              fontFamily: 'Menlo',
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.8,
+              color: Color(0xFF6B7280),
+            ),
+          ),
+          const SizedBox(height: 4),
+          for (final version in (_seedsByVersion.keys.toList()..sort()))
+            for (final item in _seedsByVersion[version]!)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$version ·',
+                      style: const TextStyle(
+                          color: Color(0xFF4B5563),
+                          fontFamily: 'Menlo',
+                          fontSize: 10),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        item,
+                        style: const TextStyle(
+                            fontFamily: 'Menlo',
+                            fontSize: 10,
+                            color: Color(0xFF9CA3AF),
+                            height: 1.4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+        ],
       ],
     );
   }
 }
+
+
 
 class _ReadmeContent extends StatelessWidget {
   const _ReadmeContent({required this.raw});
@@ -2864,6 +3195,359 @@ class _ReverseModeCta extends ConsumerWidget {
             : 'Ingest Repo First',
         style: const TextStyle(
             fontWeight: FontWeight.w600, fontFamily: 'Menlo'),
+      ),
+    );
+  }
+}
+
+// ── Coder Package ─────────────────────────────────────────────────────────────
+
+class _CoderItem {
+  const _CoderItem(this.label, this.file);
+  final String label;
+  final File file;
+}
+
+class _CoderPackageSection extends StatefulWidget {
+  const _CoderPackageSection({
+    required this.projectPath,
+    required this.projectName,
+    required this.targetVersion,
+  });
+  final String projectPath;
+  final String projectName;
+  final String targetVersion;
+
+  @override
+  State<_CoderPackageSection> createState() => _CoderPackageSectionState();
+}
+
+class _CoderPackageSectionState extends State<_CoderPackageSection> {
+  bool _working = false;
+  late final Future<({String? version, List<_CoderItem> items})> _discovery;
+
+  @override
+  void initState() {
+    super.initState();
+    _discovery = _discover();
+  }
+
+  @override
+  void didUpdateWidget(_CoderPackageSection old) {
+    super.didUpdateWidget(old);
+    if (old.targetVersion != widget.targetVersion) {
+      setState(() => _discovery = _discover());
+    }
+  }
+
+  Future<({String? version, List<_CoderItem> items})> _discover() async {
+    final v = widget.targetVersion;
+    final items = <_CoderItem>[];
+
+    final readme = File(p.join(widget.projectPath, 'README.md'));
+    if (readme.existsSync()) items.add(_CoderItem('README — Project State', readme));
+
+    for (final folder in ['specs', 'handoffs', 'worksheets']) {
+      final vDir = Directory(p.join(widget.projectPath, folder, v));
+      final scanDir = vDir.existsSync()
+          ? vDir
+          : Directory(p.join(widget.projectPath, folder));
+      if (!scanDir.existsSync()) continue;
+      for (final f in scanDir.listSync().whereType<File>()) {
+        final label = _label(p.basename(f.path));
+        if (label != null) items.add(_CoderItem(label, f));
+      }
+    }
+
+    return (version: v, items: items);
+  }
+
+  String? _label(String name) {
+    if (name.contains('_LockedSpec_')) return 'Locked Spec';
+    if (name.contains('_HandoffPackage_') || name.contains('_BulletHandoff_')) return 'Handoff Package';
+    if (name.contains('_SetupWorksheet_')) return 'Setup Worksheet';
+    return null;
+  }
+
+  Future<String> _bundle(String version, List<_CoderItem> items) async {
+    final now = DateTime.now();
+    final date =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final buf = StringBuffer(
+      '# ${widget.projectName} — Coder Package $version\n'
+      'Generated: $date\n\n'
+      'Everything the coder LLM needs to implement ${widget.projectName}.\n',
+    );
+    for (final item in items) {
+      buf.writeln('\n---\n');
+      buf.writeln('## ${item.label}');
+      buf.writeln();
+      buf.write(await item.file.readAsString());
+    }
+    return buf.toString();
+  }
+
+  Future<void> _copy() async {
+    if (_working) return;
+    setState(() => _working = true);
+    try {
+      final d = await _discovery;
+      if (d.items.isEmpty || d.version == null) {
+        _snack('No coder files found yet.');
+        return;
+      }
+      final text = await _bundle(d.version!, d.items);
+      await Clipboard.setData(ClipboardData(text: text));
+      _snack('Copied ${d.items.length} files to clipboard.');
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  Future<void> _export() async {
+    if (_working) return;
+    setState(() => _working = true);
+    try {
+      final d = await _discovery;
+      if (d.items.isEmpty || d.version == null) {
+        _snack('No coder files found yet.');
+        return;
+      }
+      final text = await _bundle(d.version!, d.items);
+      final exportsDir = Directory(p.join(widget.projectPath, 'exports'));
+      await exportsDir.create(recursive: true);
+      final out = File(p.join(
+        exportsDir.path,
+        '${widget.projectName}_CoderPack-${d.version}.md',
+      ));
+      await out.writeAsString(text);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+            'Saved → ${out.path}',
+            style: const TextStyle(fontFamily: 'Menlo', fontSize: 11),
+          ),
+          backgroundColor: const Color(0xFF1C1C1E),
+          duration: const Duration(seconds: 6),
+          action: SnackBarAction(
+            label: 'Show in Finder',
+            textColor: const Color(0xFFE8A04C),
+            onPressed: () => Process.run('open', ['-R', out.path]),
+          ),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content:
+          Text(msg, style: const TextStyle(fontFamily: 'Menlo', fontSize: 12)),
+      backgroundColor: const Color(0xFF1C1C1E),
+      duration: const Duration(seconds: 3),
+    ));
+  }
+
+  String? _latestVersionOnDisk() {
+    final specsDir = Directory(p.join(widget.projectPath, 'specs'));
+    if (!specsDir.existsSync()) return null;
+    String? latest;
+    for (final entry in specsDir.listSync()) {
+      if (entry is Directory) {
+        final vName = p.basename(entry.path);
+        if (RegExp(r'^v(\d+(?:\.\d+)?)$').hasMatch(vName)) {
+          if (latest == null || vName.compareTo(latest) > 0) latest = vName;
+        }
+      }
+    }
+    return latest;
+  }
+
+  Widget _buildUpdateCta(BuildContext context, String version) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: SizedBox(
+        width: double.infinity,
+        child: OutlinedButton(
+          onPressed: () async {
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (_) => AlertDialog(
+                backgroundColor: const Color(0xFF1C1C1E),
+                title: Text(
+                  'Create update for $version?',
+                  style: const TextStyle(
+                    fontFamily: 'Menlo',
+                    fontSize: 13,
+                    color: Color(0xFFE5E5E7),
+                  ),
+                ),
+                content: Text(
+                  'This will open an addendum interview to produce a '
+                  '${version.replaceFirst('v', 'v')}.1 spec. Continue?',
+                  style: const TextStyle(
+                    fontFamily: 'Menlo',
+                    fontSize: 13,
+                    color: Color(0xFF9CA3AF),
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Cancel',
+                        style: TextStyle(
+                            fontFamily: 'Menlo',
+                            color: Color(0xFF6B7280))),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFE8A04C),
+                      foregroundColor: const Color(0xFF0F0F10),
+                    ),
+                    child: const Text('Start',
+                        style: TextStyle(
+                            fontFamily: 'Menlo',
+                            fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed == true && context.mounted) {
+              Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => AddendumInterviewScreen(
+                  args: AddendumInterviewArgs(
+                    projectPath: widget.projectPath,
+                    projectName: widget.projectName,
+                    baseVersion: version,
+                  ),
+                ),
+              ));
+            }
+          },
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFFE8A04C),
+            side: const BorderSide(color: Color(0xFFE8A04C)),
+          ),
+          child: Text(
+            'Update $version',
+            style: const TextStyle(
+                fontFamily: 'Menlo', fontWeight: FontWeight.w600),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<({String? version, List<_CoderItem> items})>(
+      future: _discovery,
+      builder: (context, snap) {
+        final items = snap.data?.items ?? [];
+        if (items.isEmpty) return const SizedBox.shrink();
+        final latestVersion = _latestVersionOnDisk();
+        final isLatest = latestVersion == null || widget.targetVersion == latestVersion;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SectionHeader('Coder Package'),
+            const SizedBox(height: 8),
+            ...items.map((item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 5,
+                        height: 5,
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFE8A04C),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          p.basename(item.file.path),
+                          style: const TextStyle(
+                            fontFamily: 'Menlo',
+                            fontSize: 11,
+                            color: Color(0xFFD1D5DB),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _PackBtn(
+                  label: 'Copy ${widget.targetVersion.toUpperCase()} Bundle',
+                  icon: Icons.copy,
+                  onTap: _working ? null : _copy,
+                ),
+                const SizedBox(width: 8),
+                _PackBtn(
+                  label: 'Export ${widget.targetVersion.toUpperCase()} Pack',
+                  icon: Icons.download,
+                  onTap: _working ? null : _export,
+                ),
+              ],
+            ),
+            if (!isLatest) _buildUpdateCta(context, widget.targetVersion),
+            const SizedBox(height: 24),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _PackBtn extends StatelessWidget {
+  const _PackBtn({required this.label, required this.icon, this.onTap});
+  final String label;
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: enabled ? const Color(0xFF1C1C1E) : const Color(0xFF141414),
+          border: Border.all(color: const Color(0xFF3C3C3E)),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon,
+                size: 12,
+                color: enabled
+                    ? const Color(0xFFE8A04C)
+                    : const Color(0xFF4B5563)),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'Menlo',
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: enabled
+                    ? const Color(0xFFE8A04C)
+                    : const Color(0xFF4B5563),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

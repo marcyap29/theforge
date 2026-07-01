@@ -1,6 +1,6 @@
 # Configuration Management — The Forge
 
-**Last Updated:** 2026-06-28
+**Last Updated:** 2026-06-30
 **Status:** ✅ Synced
 
 ---
@@ -103,13 +103,36 @@
 | worksheet_notifier.dart | lib/features/spec_generation/ | 2026-06-19 | ✅ Synced |
 | settings_notifier.dart | lib/features/settings/ | 2026-06-20 | ✅ Synced |
 | llm_model_config.dart | lib/services/llm/ | 2026-06-20 | ✅ Synced |
-| project_file_repository.dart | lib/data/filesystem/ | 2026-06-19 | ✅ Synced |
+| project_file_repository.dart | lib/data/filesystem/ | 2026-06-30 | ✅ Synced |
+| interview_state.dart | lib/features/interview/state/ | 2026-06-30 | ✅ Synced |
+| interview_notifier.dart | lib/features/interview/state/ | 2026-06-30 | ✅ Synced |
+| project_detail_screen.dart | lib/features/projects/screens/ | 2026-06-30 | ✅ Synced |
+| addendum_interview_notifier.dart | lib/features/addendum_interview/state/ | 2026-06-30 | ✅ Synced |
+| addendum_interview_screen.dart | lib/features/addendum_interview/ui/ | 2026-06-30 | ✅ Synced |
 
 
 ---
 
 
 ## Change Log
+
+### 2026-06-30 — §NB1 + §VUI2 + §AI1: Notes/Backlog + Version-Aware Panel + Addendum Interview
+
+**Action:** Three features in one session. 4 files modified, 2 new files.
+
+**Files modified:**
+- `lib/features/interview/state/interview_state.dart` — `userNotes: String?` + `userBacklog: List<String>` fields; `clearUserNotes` flag
+- `lib/features/interview/state/interview_notifier.dart` — `_buildUserContextBlock()` injected into all 3 system prompts
+- `lib/features/projects/screens/project_detail_screen.dart` — `_selectedVersion` state; version-tappable `_PhaseTimeline`; versioned `_CoderPackageSection` with Copy/Export; `_FilesSidebar` orange-dot highlights; `findSpecFile`/`writeMinorLockedSpec` imports; `_latestVersionOnDisk()` + `_buildUpdateCta()`; minor-version regex fix
+- `lib/data/filesystem/project_file_repository.dart` — `findSpecFile()` + `writeMinorLockedSpec()`
+
+**Files created:**
+- `lib/features/addendum_interview/state/addendum_interview_notifier.dart` — `AddendumInterviewArgs`, `AddendumTurn`, `AddendumInterviewState`, `AddendumInterviewNotifier`, `addendumInterviewProvider`
+- `lib/features/addendum_interview/ui/addendum_interview_screen.dart` — chat UI, success screen, "Generate Spec" gate at ≥3 turns
+
+**Verification:** `dart analyze lib/` → 0 errors, 1 info-level import ordering (non-blocking)
+
+---
 
 ### 2026-06-28 — §R1 Completion: Reverse Mode Wiring
 

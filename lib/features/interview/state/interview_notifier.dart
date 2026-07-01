@@ -212,9 +212,11 @@ String _auditInterviewSystemPrompt(InterviewState state,
           '$ingestedContext'
       : '';
 
+  final userContextBlock = _buildUserContextBlock(state);
+
   return '''You are The Forge interviewer — a sharp, direct product architect
 running a $modeLabel for a project called "${state.projectName}".
-$refBlock
+$refBlock$userContextBlock
 Your goal: resolve ${state.dimensions.length} confidence dimensions through conversation.
 Ask ONE question per turn. Be concise. Acknowledge the user's answer first.
 
@@ -239,6 +241,8 @@ String _buildInterviewSystemPrompt(InterviewState state,
           '$ingestedContext\n'
       : '';
 
+  final userContextBlock = _buildUserContextBlock(state);
+
   final extractedJson = _compactExtractedJson(state.extracted);
 
   return '''You are The Forge interviewer — a sharp, direct product architect
@@ -246,7 +250,7 @@ running a Build Interview for a project called "${state.projectName}". Your
 job is to reach a locked V1 spec an autonomous executor can build in one
 pass. You are the user's product manager: push back on scope, force the
 proof-of-concept cut, keep every deferred idea on the record.
-$refBlock
+$refBlock$userContextBlock
 THE FUNNEL — you are currently at ${state.currentLayer}. Do not advance until
 the exit condition is met. Never ask about a later layer early.
 
@@ -374,6 +378,8 @@ String _featureInterviewSystemPrompt(InterviewState state,
           '$ingestedContext\n'
       : '';
 
+  final userContextBlock = _buildUserContextBlock(state);
+
   final contextBlock = state.featureContext != null
       ? '\n\nFEATURE CONTEXT — READ BEFORE ASKING ANYTHING:\n'
           'You are running a Feature Interview to scope $nextVersion.\n'
@@ -404,7 +410,7 @@ String _featureInterviewSystemPrompt(InterviewState state,
   return '''You are The Forge interviewer — a sharp, direct product architect
 running a Feature Interview for a project called "${state.projectName}".
 You are scoping $nextVersion. $priorSpecVersion is already shipped and immutable.
-$refBlock$contextBlock$goalRef$complianceBlock
+$refBlock$userContextBlock$contextBlock$goalRef$complianceBlock
 THE FUNNEL — you are currently at ${state.currentLayer}. Do not advance until
 the exit condition is met. Never ask about a later layer early.
 
@@ -468,6 +474,21 @@ After EVERY response, append a fenced forge-state block. MANDATORY every turn:
 \`\`\`
 
 Set layerComplete: true only when the current layer exit condition is met.''';
+}
+
+String _buildUserContextBlock(InterviewState state) {
+  final parts = <String>[];
+  if (state.userNotes != null && state.userNotes!.isNotEmpty) {
+    parts.add('USER NOTES (consider these when asking questions):\n${state.userNotes}');
+  }
+  if (state.userBacklog.isNotEmpty) {
+    parts.add(
+      'USER BACKLOG (prioritize and weave these into scope discussions):\n'
+      '${state.userBacklog.map((i) => '- $i').join('\n')}',
+    );
+  }
+  if (parts.isEmpty) return '';
+  return '\n\n${parts.join('\n\n')}';
 }
 
 String _interviewSystemPrompt(InterviewState state,
@@ -726,8 +747,15 @@ class InterviewNotifier
       );
     }
 
+    final userNotes = await repo.readUserNotes(args.path);
+    final userBacklog = await repo.readUserBacklog(args.path);
+
     final empty = InterviewState.empty(args.path, args.name, dims)
-        .copyWith(featureContext: featureContext);
+        .copyWith(
+          featureContext: featureContext,
+          userNotes: userNotes.isEmpty ? null : userNotes,
+          userBacklog: userBacklog,
+        );
 
     // Restore persisted turns so closing/reopening the app resumes the interview
     final saved = await repo.readInterviewProgress(args.path, args.name);

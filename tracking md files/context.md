@@ -4,6 +4,50 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-06-30 — Claude Code [Notes/Backlog Sidebar + Version-Aware Panel + Addendum Interview]
+
+**Branch:** main
+
+### Done
+
+**§NB1 — Notes + Manual Backlog in InterviewState:**
+- `interview_state.dart` — `userNotes: String?` + `userBacklog: List<String>` fields; `clearUserNotes` flag on `copyWith`
+- `interview_notifier.dart` — `_buildUserContextBlock()` top-level helper; injected into all three system prompts (build, audit, feature) so the LLM sees the user's notes and backlog items every turn
+
+**§VUI2 — Version-aware detail panel + Coder Package Export:**
+- `project_detail_screen.dart`:
+  - `_selectedVersion: String?` state var on `_ProjectDetailScreenState`; drives which version the right panel shows
+  - `_PhaseTimeline` — `selectedVersion` + `onVersionTap` params; tapping a version label selects it (orange underline on selected)
+  - `_CoderPackageSection` — `targetVersion` param + `didUpdateWidget` + rewritten `_discover()` targeting selected version; Copy Bundle / Export Pack buttons with "Show in Finder" snackbar to communicate export location
+  - `_FilesSidebar` — orange-dot highlight on files belonging to the latest version's coder package
+  - `_contextPanelHeight` min 200 px, clamp to `screenHeight - 160`
+
+**§AI1 — Addendum Interview (v1.1 minor spec):**
+- `lib/features/addendum_interview/state/addendum_interview_notifier.dart` (NEW) — `AddendumInterviewArgs`, `AddendumTurn`, `AddendumInterviewState`, `AddendumInterviewNotifier` (`FamilyAsyncNotifier`); `addUserMessage()` (LLM turn), `generateMinorSpec()` (produces v{N}.1 spec); `addendumInterviewProvider`
+- `lib/features/addendum_interview/ui/addendum_interview_screen.dart` (NEW) — `ConsumerStatefulWidget` chat UI; user/Forge bubbles; "Generate {minorVersion} Spec" button appears after ≥3 turns; success screen shows filename; matches Forge dark theme (Menlo, orange #E8A04C)
+- `lib/data/filesystem/project_file_repository.dart` — `findSpecFile(projectPath, version)` scans `specs/v{version}/` for locked spec; `writeMinorLockedSpec(...)` writes to `specs/v{minor}/`
+- `lib/features/projects/screens/project_detail_screen.dart` — addendum imports; regex fix (`^v(\d+(?:\.\d+)?)$` for minor version dirs); `_buildUpdateCta` method + `_latestVersionOnDisk()` helper; "Update v{N}" outlined button with confirmation dialog when viewing a non-latest version panel
+
+### Key Technical Findings
+- DeepSeek brace-count failure pattern: when replacing a method + class-closing `}` in one edit, DeepSeek dropped the class closing brace — `_PackBtn` ended up nested inside `_CoderPackageSectionState`. Python brace-count script (`{open} - {close} between two class markers`) is the fastest diagnosis. DeepSeek caught and fixed it without external prompting.
+- `AddendumInterviewArgs` lives in the notifier file, not the screen file — import the notifier directly when the screen calls `AddendumInterviewArgs(...)`.
+- `FamilyAsyncNotifier` with complex `args` objects: the `args` struct must implement `==` and `hashCode` for Riverpod family providers to key correctly. `AddendumInterviewArgs` uses Dart's default object identity — fine for this use case since a new `args` object is created per navigation push (no caching needed).
+- Minor version dirs (`v1.1`) need regex `^v(\d+(?:\.\d+)?)$` — the old `^v\d+$` would skip them entirely in the sidebar scan.
+
+### Modified
+- `lib/features/interview/state/interview_state.dart`
+- `lib/features/interview/state/interview_notifier.dart`
+- `lib/features/projects/screens/project_detail_screen.dart`
+- `lib/data/filesystem/project_file_repository.dart`
+- `lib/features/addendum_interview/state/addendum_interview_notifier.dart` (NEW)
+- `lib/features/addendum_interview/ui/addendum_interview_screen.dart` (NEW)
+
+### Next
+- Dogfood The Forge (Pull Mode) to spec next features
+- §PERSIST — Interview state persistence (survive spec gen failure) — backlog
+
+---
+
 ## Session: 2026-06-29 — Claude Code [Hotfixes + Forkit v3 Implementation]
 
 **Branch:** main (The Forge) · `wt/forkit-v1-multiplayer` (Forkit)

@@ -616,6 +616,33 @@ class ProjectFileRepository {
     return parts.isEmpty ? null : parts.join('\n\n---\n\n');
   }
 
+  Future<String> readUserNotes(String projectPath) async {
+    final file = File(p.join(projectPath, 'user_notes.md'));
+    if (!file.existsSync()) return '';
+    return file.readAsString();
+  }
+
+  Future<void> writeUserNotes(String projectPath, String content) async {
+    final file = File(p.join(projectPath, 'user_notes.md'));
+    await file.writeAsString(content);
+  }
+
+  Future<List<String>> readUserBacklog(String projectPath) async {
+    final file = File(p.join(projectPath, 'user_backlog.md'));
+    if (!file.existsSync()) return [];
+    final lines = await file.readAsString();
+    return lines
+        .split('\n')
+        .map((l) => l.startsWith('- ') ? l.substring(2).trim() : l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
+  }
+
+  Future<void> writeUserBacklog(String projectPath, List<String> items) async {
+    final file = File(p.join(projectPath, 'user_backlog.md'));
+    await file.writeAsString(items.map((i) => '- $i').join('\n'));
+  }
+
   Future<List<Map<String, dynamic>>> scanProjectCodebase(
       String projectPath, List<String> extensions) async {
     final rootDir = Directory(projectPath);
@@ -726,5 +753,40 @@ class ProjectFileRepository {
     } on FormatException {
       return [];
     }
+  }
+
+  /// Finds the locked spec file for [version] inside [projectPath]/specs/.
+  /// Searches specs/v{version}/ for a file ending in
+  /// `_LockedSpec_v{version}.md` or `_LockedSpec_{version}.md`.
+  /// Returns null if nothing found.
+  Future<File?> findSpecFile(String projectPath, String version) async {
+    final vDir = Directory('$projectPath/specs/v$version');
+    if (!await vDir.exists()) return null;
+    final suffix1 = '_LockedSpec_v$version.md';
+    final suffix2 = '_LockedSpec_$version.md';
+    await for (final entity in vDir.list()) {
+      if (entity is File) {
+        final name = p.basename(entity.path);
+        if (name.endsWith(suffix1) || name.endsWith(suffix2)) {
+          return entity;
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Writes a minor-version locked spec file at:
+  /// [projectPath]/specs/v[minorVersion]/[projectName]_LockedSpec_[minorVersion].md
+  Future<void> writeMinorLockedSpec(
+    String projectPath,
+    String projectName,
+    String minorVersion,
+    String content,
+  ) async {
+    final dir = Directory('$projectPath/specs/v$minorVersion');
+    await dir.create(recursive: true);
+    final file = File(
+        '${dir.path}/${projectName}_LockedSpec_$minorVersion.md');
+    await file.writeAsString(content);
   }
 }

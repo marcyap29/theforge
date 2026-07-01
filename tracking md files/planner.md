@@ -575,7 +575,69 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 
 ---
 
-## Next Up — §R2: Pull Interview
+## §R2 — Pull Interview Engine + As-Built Spec Generator — COMPLETE ✅
 
-**Status:** Not started — requires §R1 ✅
-- See `backlog.md` §R2 for scope
+**Completed:** 2026-06-28 (committed `eaf786a`)
+
+- [x] `lib/features/pull_interview/state/pull_interview_state.dart` — `PullInterviewTurn`, `PullInterviewState`, `PullInterviewArgs`, `pullInterviewProvider`
+- [x] `lib/features/pull_interview/state/pull_interview_notifier.dart` — `PullInterviewNotifier`; `addUserMessage`, `markComplete`, `_buildGreeting`, `_buildSystemPrompt`; gap-driven opening question
+- [x] `lib/features/pull_interview/ui/pull_interview_screen.dart` — chat UI (amber user / dark Forge bubbles); Enter-to-send; "Generate As-Built Spec →" enabled after 4 user turns
+- [x] `lib/features/spec_generation/as_built_spec_generator.dart` — `buildAsBuiltSpecPrompt()` with 10-section as-built spec structure
+- [x] `lib/features/spec_generation/as_built_spec_notifier.dart` — `AsBuiltSpecNotifier`; reads ingestion summary + interview log → LLM → writes spec
+- [x] `lib/features/spec_generation/as_built_spec_screen.dart` — generation UI (idle/generating/done/error); "Back to Projects" + Retry
+- [x] `lib/features/projects/screens/project_detail_screen.dart` — `_ReverseModeCta` replaced with real `_PullModeCta` wired to `PullInterviewScreen`
+- [x] `lib/data/filesystem/project_file_repository.dart` — `writePullInterviewLog`, `readPullInterviewLog`, `writeAsBuiltSpec` (archive-safe)
+- [x] `lib/core/app.dart` — `/pull-interview` + `/as-built-spec` routes
+- [x] `dart analyze lib/` — zero issues
+
+---
+
+## §NB1 — Notes + Manual Backlog in Interview State — COMPLETE ✅
+
+**Completed:** 2026-06-30
+
+- [x] `lib/features/interview/state/interview_state.dart` — `userNotes: String?` + `userBacklog: List<String>` fields; `clearUserNotes` flag on `copyWith`
+- [x] `lib/features/interview/state/interview_notifier.dart` — `_buildUserContextBlock()` helper injected into all 3 system prompts (build, audit, feature)
+- [x] `dart analyze lib/` — zero issues
+
+### Notes
+- `_buildUserContextBlock` is a top-level function (not a method) so it can be called from all three system prompt builders without threading state through
+- `clearUserNotes: bool` flag pattern on `copyWith` allows clearing nullable fields (Dart can't distinguish `null` meaning "unset" vs "clear" without an explicit flag)
+
+---
+
+## §VUI2 — Version-Aware Detail Panel + Coder Package Export — COMPLETE ✅
+
+**Completed:** 2026-06-30
+
+- [x] `lib/features/projects/screens/project_detail_screen.dart`:
+  - `_selectedVersion: String?` on `_ProjectDetailScreenState`; drives right-panel content
+  - `_PhaseTimeline` — `selectedVersion` + `onVersionTap` params; version labels tappable with orange underline when selected
+  - `_CoderPackageSection` — `targetVersion` param; `didUpdateWidget` triggers re-discovery on version change; versioned `_discover()` scans the correct version's files
+  - Copy Bundle + Export Pack buttons with "Show in Finder" snackbar (communicates export location to user)
+  - `_FilesSidebar` — orange-dot highlight on latest-version coder files
+  - `_contextPanelHeight` min 200 px, clamp to `screenHeight - 160`
+- [x] `dart analyze lib/` — zero issues
+
+---
+
+## §AI1 — Addendum Interview (v1.1 Minor Spec) — COMPLETE ✅
+
+**Completed:** 2026-06-30
+
+- [x] `lib/features/addendum_interview/state/addendum_interview_notifier.dart` (NEW) — `AddendumInterviewArgs`, `AddendumTurn`, `AddendumInterviewState`, `AddendumInterviewNotifier`; `addUserMessage()` LLM turn; `generateMinorSpec()` writes v{N}.1 locked spec; `addendumInterviewProvider`
+- [x] `lib/features/addendum_interview/ui/addendum_interview_screen.dart` (NEW) — chat UI; "Generate {minor} Spec" button after ≥3 turns; success screen; Forge dark theme
+- [x] `lib/data/filesystem/project_file_repository.dart` — `findSpecFile()` + `writeMinorLockedSpec()`
+- [x] `lib/features/projects/screens/project_detail_screen.dart` — addendum imports; minor-version regex fix; `_latestVersionOnDisk()` + `_buildUpdateCta()`; "Update v{N}" CTA with confirmation dialog on non-latest version panels
+- [x] `dart analyze lib/` — zero issues (1 info-level import ordering)
+
+### Notes
+- Minor version dirs (`v1.1`) require regex `^v(\d+(?:\.\d+)?)$`; old `^v\d+$` silently skipped them
+- `AddendumInterviewArgs` is in the notifier file — import the notifier when calling `AddendumInterviewArgs(...)` from the detail screen
+- "Generate Spec" button appears after ≥3 user turns — enough for the LLM to have gathered meaningful context
+
+---
+
+## Next Up — Use The Forge to pull next features
+
+**Status:** Marc is dogfooding The Forge (Pull Mode on existing repos) to spec next features.
