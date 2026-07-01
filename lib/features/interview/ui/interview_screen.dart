@@ -85,6 +85,26 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen>
     });
   }
 
+  void _showAmendDialog(List<String> stories, InterviewNotifier notifier) {
+    showDialog(
+      context: context,
+      builder: (_) => _AmendStoryDialog(
+        stories: stories,
+        onSubmit: (idx, amendment) {
+          final title = stories[idx]
+              .split('\n')
+              .first
+              .replaceAll(RegExp(r'^#+\s*'), '')
+              .trim();
+          final label = title.isNotEmpty ? title : 'Story ${idx + 1}';
+          notifier.addUserMessage(
+            'I want to amend Story ${idx + 1} ($label): $amendment',
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final args = widget.args;
@@ -96,6 +116,11 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen>
         : args.mode == ProjectMode.audit
             ? 'Audit'
             : 'Pull';
+
+    // Extract confirmed user stories for the amend button.
+    final rawStories = stateAsync.valueOrNull?.extracted['userStories'];
+    final userStories =
+        rawStories is List ? rawStories.cast<String>() : <String>[];
 
     ref.listen(interviewProvider(args), (prev, next) {
       final prevLen = prev?.valueOrNull?.turns.length ?? 0;
@@ -112,6 +137,14 @@ class _InterviewScreenState extends ConsumerState<InterviewScreen>
         ),
         actions: [
           _DocCountChip(projectPath: args.path),
+          if (args.mode == ProjectMode.build && userStories.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.edit_note_outlined),
+              tooltip: 'Amend a user story',
+              onPressed: _isLoading
+                  ? null
+                  : () => _showAmendDialog(userStories, notifier),
+            ),
           IconButton(
             icon: const Icon(Icons.restart_alt),
             tooltip: 'Restart interview',
@@ -878,6 +911,200 @@ class _V1BuiltHeader extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _AmendStoryDialog extends StatefulWidget {
+  const _AmendStoryDialog({required this.stories, required this.onSubmit});
+
+  final List<String> stories;
+  final void Function(int index, String amendment) onSubmit;
+
+  @override
+  State<_AmendStoryDialog> createState() => _AmendStoryDialogState();
+}
+
+class _AmendStoryDialogState extends State<_AmendStoryDialog> {
+  int _selected = 0;
+  final _ctrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  String _storyTitle(String story, int idx) {
+    final firstLine = story.split('\n').first.trim();
+    final clean = firstLine.replaceAll(RegExp(r'^#+\s*'), '').trim();
+    return clean.isEmpty ? 'Story ${idx + 1}' : clean;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: const Color(0xFF1C1C1E),
+      surfaceTintColor: Colors.transparent,
+      titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      contentPadding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      actionsPadding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+      title: const Text(
+        'AMEND USER STORY',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
+          fontFamily: 'Menlo',
+          color: Color(0xFFE5E5E7),
+        ),
+      ),
+      content: SizedBox(
+        width: 520,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Select the story to change:',
+              style: TextStyle(
+                fontSize: 11,
+                fontFamily: 'Menlo',
+                color: Color(0xFF9CA3AF),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...List.generate(widget.stories.length, (i) {
+              final isSelected = _selected == i;
+              return GestureDetector(
+                onTap: () => setState(() => _selected = i),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  margin: const EdgeInsets.only(bottom: 4),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? const Color(0xFF2A1F0A)
+                        : const Color(0xFF141416),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: isSelected
+                          ? const Color(0xFFE8A04C)
+                          : const Color(0xFF2C2C2E),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isSelected
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_unchecked,
+                        size: 14,
+                        color: isSelected
+                            ? const Color(0xFFE8A04C)
+                            : const Color(0xFF6B7280),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _storyTitle(widget.stories[i], i),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontFamily: 'Menlo',
+                            color: isSelected
+                                ? const Color(0xFFE8A04C)
+                                : const Color(0xFFE5E5E7),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+            const SizedBox(height: 16),
+            const Text(
+              'What changes?',
+              style: TextStyle(
+                fontSize: 11,
+                fontFamily: 'Menlo',
+                color: Color(0xFF9CA3AF),
+              ),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _ctrl,
+              autofocus: true,
+              maxLines: 4,
+              minLines: 2,
+              style: const TextStyle(
+                fontFamily: 'Menlo',
+                fontSize: 13,
+                color: Color(0xFFE5E5E7),
+              ),
+              decoration: const InputDecoration(
+                hintText: 'e.g. "Add an invite step before the swipe flow"',
+                hintStyle: TextStyle(
+                  color: Color(0xFF6B7280),
+                  fontFamily: 'Menlo',
+                  fontSize: 12,
+                ),
+                filled: true,
+                fillColor: Color(0xFF0F0F10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(6)),
+                  borderSide: BorderSide(color: Color(0xFF2C2C2E)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(6)),
+                  borderSide: BorderSide(color: Color(0xFF2C2C2E)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(6)),
+                  borderSide: BorderSide(color: Color(0xFFE8A04C)),
+                ),
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text(
+            'Cancel',
+            style: TextStyle(
+              color: Color(0xFF6B7280),
+              fontFamily: 'Menlo',
+              fontSize: 13,
+            ),
+          ),
+        ),
+        FilledButton(
+          onPressed: () {
+            final text = _ctrl.text.trim();
+            if (text.isEmpty) return;
+            Navigator.pop(context);
+            widget.onSubmit(_selected, text);
+          },
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFFE8A04C),
+            foregroundColor: const Color(0xFF0F0F10),
+          ),
+          child: const Text(
+            'Submit Amendment →',
+            style: TextStyle(
+              fontFamily: 'Menlo',
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
