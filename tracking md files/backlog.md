@@ -36,6 +36,7 @@ Long-term feature pool. Active sprint work lives in `planner.md`.
   → §R1 Pull Mode: Codebase Ingestion Engine ✅
   → §R2 Pull Mode: Pull Interview Engine + As-Built Spec Generator ✅
   → §CCI Cross-Cutting Invariant Extraction ✅ (2026-07-01)
+  → §MD Module-Aware Codebase Ingestion (discovery + multi-module pipeline + confirmation UI) ✅ (2026-07-02)
        ↓
   → Configuration C pilot (Qualcomm) — Watch + Reverse on existing codebase
 ```
@@ -708,6 +709,9 @@ EngineerUsage {
 ---
 
 ## Completed ✅
+
+### §MD — Module-Aware Codebase Ingestion
+✅ Complete 2026-07-02 — `module_discovery.dart` (NEW, deterministic), `module_ingestion_pipeline.dart` (NEW), `pull_ingestion_notifier.dart` (expanded with tier/detectedModules + confirmModules()), `pull_ingestion_progress_screen.dart` (ConsumerStatefulWidget + awaitingConfirmation arm), `as_built_spec_generator.dart` (added ModuleAware spec template const); `dart analyze lib/` zero new warnings/errors
 
 ### §1 — Flutter Bootstrap + Local Data Layer
 ✅ Complete 2026-05-31 — `dart analyze lib/` zero issues; `forge_database.g.dart` generated via `dart run build_runner build --force-jit`

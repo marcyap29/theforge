@@ -535,6 +535,44 @@ class ProjectFileRepository {
     await file.writeAsString(content);
   }
 
+  /// Appends a story amendment entry to ingested/{projectName}_StoryAmendments_{specVersion}.md.
+  /// Returns the label used (e.g. "V1a", "V1b").
+  Future<String> appendStoryAmendment({
+    required String projectPath,
+    required String projectName,
+    required String specVersion,
+    required String amendmentText,
+  }) async {
+    final ingestedDir = Directory(p.join(projectPath, 'ingested'));
+    await ingestedDir.create(recursive: true);
+    final file = File(p.join(ingestedDir.path,
+        '${projectName}_StoryAmendments_$specVersion.md'));
+
+    // Count existing amendments to derive the next label letter (a, b, c, ...).
+    int existingCount = 0;
+    if (await file.exists()) {
+      final content = await file.readAsString();
+      existingCount = RegExp(r'^## Amendment', multiLine: true)
+          .allMatches(content)
+          .length;
+    }
+    final letter = String.fromCharCode(
+        'a'.codeUnitAt(0) + existingCount);
+    final versionUpper = specVersion.toUpperCase();
+    final label = '$versionUpper$letter';
+    final date = DateTime.now().toIso8601String().substring(0, 10);
+
+    final entry = '\n## Amendment $label — $date\n$amendmentText\n';
+
+    if (await file.exists()) {
+      await file.writeAsString(entry, mode: FileMode.append);
+    } else {
+      await file.writeAsString('# $projectName — Story Amendments ($versionUpper)\n\n$entry');
+    }
+
+    return label;
+  }
+
   Future<void> writeInterviewProgress(
       String projectPath, String projectName, Map<String, dynamic> data) async {
     final auditDir = Directory(p.join(projectPath, 'audit'));

@@ -1,6 +1,6 @@
 # Configuration Management — The Forge
 
-**Last Updated:** 2026-07-01
+**Last Updated:** 2026-07-02
 **Status:** ✅ Synced
 
 ---
@@ -110,9 +110,12 @@
 | addendum_interview_notifier.dart | lib/features/addendum_interview/state/ | 2026-06-30 | ✅ Synced |
 | addendum_interview_screen.dart | lib/features/addendum_interview/ui/ | 2026-06-30 | ✅ Synced |
 | invariant_extractor.dart | lib/features/projects/ingestion/ | 2026-07-01 | ✅ Synced |
+| module_discovery.dart | lib/features/projects/ingestion/ | 2026-07-02 | ✅ Synced |
+| module_ingestion_pipeline.dart | lib/features/projects/ingestion/ | 2026-07-02 | ✅ Synced |
 | pull_ingestion_summary.dart | lib/features/projects/models/ | 2026-07-01 | ✅ Synced |
-| pull_ingestion_notifier.dart | lib/features/projects/ingestion/ | 2026-07-01 | ✅ Synced |
-| as_built_spec_generator.dart | lib/features/spec_generation/ | 2026-07-01 | ✅ Synced |
+| pull_ingestion_notifier.dart | lib/features/projects/ingestion/ | 2026-07-02 | ✅ Synced |
+| as_built_spec_generator.dart | lib/features/spec_generation/ | 2026-07-02 | ✅ Synced |
+| pull_ingestion_progress_screen.dart | lib/features/projects/screens/ | 2026-07-02 | ✅ Synced |
 | pull_ingestion_summary_screen.dart | lib/features/projects/screens/ | 2026-07-01 | ✅ Synced |
 | pull_interview_notifier.dart | lib/features/pull_interview/state/ | 2026-07-01 | ✅ Synced |
 
@@ -137,6 +140,29 @@
 - `lib/features/pull_interview/state/pull_interview_notifier.dart` — low-confidence invariants in greeting + system prompt
 
 **Verification:** `dart analyze lib/` → 0 errors, 1 pre-existing info (non-blocking)
+
+---
+
+### 2026-07-02 — §MD: Module-Aware Codebase Ingestion
+
+**Action:** Add multi-module ingestion pipeline with confirmation UI. 2 new files, 3 modified.
+
+**Files created:**
+- `lib/features/projects/ingestion/module_discovery.dart` — `ModuleDiscoveryResult` (single/moduleAware) + `ModuleDiscovery` class; `discover()` deterministic (ARCHITECTURE.md/README.md headings + lib/ folder walk); no LLM, no Riverpod
+- `lib/features/projects/ingestion/module_ingestion_pipeline.dart` — `ModuleIngestionPipeline`; `ingestModules()` calls shared `analyzeFileBatch()` per module; `synthesize()` produces unified overview via architect-role LLM call
+
+**Files modified:**
+- `lib/features/projects/ingestion/pull_ingestion_notifier.dart` — `PullIngestionState` gains `tier` + `detectedModules`; `startIngestion()` runs `ModuleDiscovery` first, returns early on `moduleAware`; new `confirmModules()` method (scans, runs pipeline, writes summary)
+- `lib/features/projects/screens/pull_ingestion_progress_screen.dart` — `ConsumerWidget` → `ConsumerStatefulWidget`; `awaitingConfirmation` arm with checkbox list + confirm button; `synthesizing` in progress text
+- `lib/features/spec_generation/as_built_spec_generator.dart` — `_asBuiltSpecStructureModuleAware` const added (section 3 = "Module Map" instead of "Component Map"); currently unreferenced in `buildAsBuiltSpecPrompt()`
+
+**Verification:** `dart analyze lib/` → zero new warnings or errors (1 pre-existing info-level import ordering in `project_detail_screen.dart`, unchanged)
+
+**4-Agent Review Fixes (2026-07-02):**
+- Fixed substring path matching in `ingestModules()` — now uses path segment matching (splits on `/` and `\`, checks each segment equals module name)
+- Wired `synthesize()` into `confirmModules()` — feeds synthesized overview into invariant extraction context
+- Fixed tautological confirm button check — now properly disables until user interacts with checkboxes
+- Ran `dart format` on all 5 files — all pass
 
 ---
 

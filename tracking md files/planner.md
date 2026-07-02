@@ -4,6 +4,27 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 
 ---
 
+## §MD — Module-Aware Codebase Ingestion — COMPLETE ✅
+
+**Completed:** 2026-07-02
+
+- [x] `lib/features/projects/ingestion/module_discovery.dart` (NEW) — `ModuleDiscoveryResult` + `ModuleDiscovery` (deterministic, no LLM); `discover()` classifies repos as `single` or `moduleAware` via `ARCHITECTURE.md`/`README.md` headings + `lib/` folder walk
+- [x] `lib/features/projects/ingestion/module_ingestion_pipeline.dart` (NEW) — `ModuleIngestionPipeline`; `ingestModules()` calls shared `analyzeFileBatch()` per module; `synthesize()` produces unified overview
+- [x] `lib/features/projects/ingestion/pull_ingestion_notifier.dart` — `PullIngestionState` gains `tier` + `detectedModules`; `startIngestion()` runs `ModuleDiscovery` first, returns early on `moduleAware`; new `confirmModules()` method
+- [x] `lib/features/projects/screens/pull_ingestion_progress_screen.dart` — `ConsumerWidget` → `ConsumerStatefulWidget`; `awaitingConfirmation` arm with module checkbox list; `synthesizing` in progress text
+- [x] `lib/features/spec_generation/as_built_spec_generator.dart` — `_asBuiltSpecStructureModuleAware` const added (section 3 = "Module Map" instead of "Component Map")
+- [x] `dart analyze lib/` — zero new warnings or errors (1 pre-existing info-level import ordering in `project_detail_screen.dart`)
+
+**Note:** `_asBuiltSpecStructureModuleAware` is currently unreferenced in `buildAsBuiltSpecPrompt()` — reserved for future wiring when `summary.tier == IngestionTier.moduleAware`.
+
+**4-Agent Review Fixes (2026-07-02):**
+- Fixed substring path matching bug in `ingestModules()` — now uses path segment matching instead of `contains()`
+- Wired `synthesize()` into `confirmModules()` — feeds synthesized overview into invariant extraction context
+- Fixed tautological confirm button check — now properly disables until user interacts with checkboxes
+- Ran `dart format` on all 5 files — all pass
+
+---
+
 ## §VI — V1 Interview Redesign — COMPLETE ✅
 
 **Completed:** 2026-07-01
@@ -658,6 +679,29 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 - Minor version dirs (`v1.1`) require regex `^v(\d+(?:\.\d+)?)$`; old `^v\d+$` silently skipped them
 - `AddendumInterviewArgs` is in the notifier file — import the notifier when calling `AddendumInterviewArgs(...)` from the detail screen
 - "Generate Spec" button appears after ≥3 user turns — enough for the LLM to have gathered meaningful context
+
+---
+
+## §VUI3 — Version-Aware Labels + Button Decoupling — COMPLETE ✅
+
+**Completed:** 2026-07-01 (Ornith + Claude Code review)
+
+- [x] `lib/features/projects/screens/project_detail_screen.dart` — `_BuildSequenceSection` header shows active version; `_CopyWorksheetButton` label version-aware; `_copying`/`_exporting` decoupled bools; expand tap sets active version; parent passes `_selectedVersion ?? _versionOf(live.phase)` to both widgets
+- [x] Bug fix: `setState(() => _discovery = _discover())` → block form (arrow fn returned Future)
+- [x] Bug fix: `setState` removed from `didUpdateWidget` (cascading build-scope assertion failures)
+- [x] Bug fix: two indentation drift issues corrected
+
+---
+
+## §UPD1 — Updates Section (replaces ✎ Amend Story dialog) — COMPLETE ✅
+
+**Completed:** 2026-07-01 (Ornith + Claude Code review)
+
+- [x] `lib/features/projects/screens/project_detail_screen.dart` — deleted `_AmendStoryDialog`, `_showAmendStoryDialog`, "✎ Amend Story" block; added `_UpdatesSection` between "Project State" and "Reference Documents"; reads/writes `ingested/{projectName}_StoryAmendments_{version}.md`; inline TextField + `+ Add` button; loading/saving spinners; `didUpdateWidget` no-setState pattern; try/finally in `_submit`
+- [x] `lib/data/filesystem/project_file_repository.dart` — `appendStoryAmendment()` already present; no changes needed
+- [x] `dart analyze` — 1 pre-existing info only
+
+**Note:** Changes uncommitted — Marc to commit when ready.
 
 ---
 

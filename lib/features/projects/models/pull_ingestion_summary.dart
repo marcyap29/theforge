@@ -2,7 +2,10 @@ import 'package:flutter/foundation.dart';
 
 import '../ingestion/invariant_extractor.dart';
 
-enum IngestionState { idle, scanning, processing, aggregating, done, error }
+enum IngestionState { idle, scanning, processing, aggregating, awaitingConfirmation, synthesizing, done, error }
+
+enum IngestionTier { single, moduleAware }
+enum ModuleSource { docs, folderWalk }
 
 @immutable
 class ComponentInfo {
@@ -126,6 +129,85 @@ class InfrastructurePattern {
       );
 }
 
+@immutable
+class ModuleIngestionResult {
+  final String moduleName;
+  final String moduleSummary;
+  final List<ComponentInfo> components;
+  final List<DependencyInfo> dependencies;
+
+  const ModuleIngestionResult({
+    required this.moduleName,
+    required this.moduleSummary,
+    this.components = const [],
+    this.dependencies = const [],
+  });
+
+  Map<String, dynamic> toJson() => {
+        'moduleName': moduleName,
+        'moduleSummary': moduleSummary,
+        'components': components.map((e) => e.toJson()).toList(),
+        'dependencies': dependencies.map((e) => e.toJson()).toList(),
+      };
+
+  factory ModuleIngestionResult.fromJson(Map<String, dynamic> json) => ModuleIngestionResult(
+        moduleName: json['moduleName'] as String? ?? '',
+        moduleSummary: json['moduleSummary'] as String? ?? '',
+        components: json['components'] is List<dynamic>
+            ? (json['components'] as List<dynamic>)
+                .whereType<Map<String, dynamic>>()
+                .map(ComponentInfo.fromJson)
+                .toList()
+            : const [],
+        dependencies: json['dependencies'] is List<dynamic>
+            ? (json['dependencies'] as List<dynamic>)
+                .whereType<Map<String, dynamic>>()
+                .map(DependencyInfo.fromJson)
+                .toList()
+            : const [],
+      );
+}
+
+@immutable
+class ModuleMapEntry {
+  final String name;
+  final String responsibility;
+  final List<String> owns;
+  final List<String> doesNotOwn;
+  final List<ComponentInfo> components;
+
+  const ModuleMapEntry({
+    required this.name,
+    required this.responsibility,
+    this.owns = const [],
+    this.doesNotOwn = const [],
+    this.components = const [],
+  });
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'responsibility': responsibility,
+        'owns': owns,
+        'doesNotOwn': doesNotOwn,
+        'components': components.map((e) => e.toJson()).toList(),
+      };
+
+  factory ModuleMapEntry.fromJson(Map<String, dynamic> json) => ModuleMapEntry(
+        name: json['name'] as String? ?? '',
+        responsibility: json['responsibility'] as String? ?? '',
+        owns: json['owns'] is List<dynamic>
+            ? (json['owns'] as List<dynamic>).cast<String>() : const [],
+        doesNotOwn: json['doesNotOwn'] is List<dynamic>
+            ? (json['doesNotOwn'] as List<dynamic>).cast<String>() : const [],
+        components: json['components'] is List<dynamic>
+            ? (json['components'] as List<dynamic>)
+                .whereType<Map<String, dynamic>>()
+                .map(ComponentInfo.fromJson)
+                .toList()
+            : const [],
+      );
+}
+
 class IngestionSummary {
   final String projectName;
   final String projectPath;
@@ -137,6 +219,9 @@ class IngestionSummary {
   final List<InfrastructurePattern> infrastructureChoices;
   final List<String> gapList;
   final List<ExtractedInvariant> invariants;
+  final IngestionTier tier;
+  final List<ModuleIngestionResult> moduleResults;
+  final List<ModuleMapEntry>? moduleMap;
 
   const IngestionSummary({
     required this.projectName,
@@ -149,9 +234,17 @@ class IngestionSummary {
     required this.infrastructureChoices,
     required this.gapList,
     this.invariants = const [],
+    this.tier = IngestionTier.single,
+    this.moduleResults = const [],
+    this.moduleMap,
   });
 
-  IngestionSummary copyWith({List<ExtractedInvariant>? invariants}) {
+  IngestionSummary copyWith({
+    IngestionTier? tier,
+    List<ModuleIngestionResult>? moduleResults,
+    List<ModuleMapEntry>? moduleMap,
+    List<ExtractedInvariant>? invariants,
+  }) {
     return IngestionSummary(
       projectName: projectName,
       projectPath: projectPath,
@@ -163,6 +256,9 @@ class IngestionSummary {
       infrastructureChoices: infrastructureChoices,
       gapList: gapList,
       invariants: invariants ?? this.invariants,
+      tier: tier ?? this.tier,
+      moduleResults: moduleResults ?? this.moduleResults,
+      moduleMap: moduleMap ?? this.moduleMap,
     );
   }
 
@@ -180,6 +276,9 @@ class IngestionSummary {
         'infrastructureChoices': infrastructureChoices.map((e) => e.toJson()).toList(),
         'gapList': gapList,
         'invariants': invariants.map((e) => e.toJson()).toList(),
+        'tier': tier.name,
+        'moduleResults': moduleResults.map((e) => e.toJson()).toList(),
+        'moduleMap': moduleMap?.map((e) => e.toJson()).toList(),
       };
 
   factory IngestionSummary.fromJson(Map<String, dynamic> json) => IngestionSummary(
@@ -204,6 +303,22 @@ class IngestionSummary {
                 .map(ExtractedInvariant.fromJson)
                 .toList()
             : const [],
+        tier: IngestionTier.values.firstWhere(
+          (e) => e.name == json['tier'],
+          orElse: () => IngestionTier.single,
+        ),
+        moduleResults: json['moduleResults'] is List<dynamic>
+            ? (json['moduleResults'] as List<dynamic>)
+                .whereType<Map<String, dynamic>>()
+                .map(ModuleIngestionResult.fromJson)
+                .toList()
+            : const [],
+        moduleMap: json['moduleMap'] is List<dynamic>
+            ? (json['moduleMap'] as List<dynamic>)
+                .whereType<Map<String, dynamic>>()
+                .map(ModuleMapEntry.fromJson)
+                .toList()
+            : null,
       );
 
   String toMarkdown() {
@@ -212,6 +327,15 @@ class IngestionSummary {
     buffer.writeln('**Scanned:** ${scannedAt.toIso8601String()}\n');
     buffer.writeln('**Files scanned:** $fileCount\n');
     buffer.writeln('**Components found:** $componentCount\n');
+
+    if (tier == IngestionTier.moduleAware && moduleResults.isNotEmpty) {
+      buffer.writeln('## Modules\n');
+      for (final module in moduleResults) {
+        buffer.writeln('### ${module.moduleName}\n');
+        buffer.writeln('${module.moduleSummary}\n');
+      }
+      buffer.writeln();
+    }
 
     buffer.writeln('## Components\n');
     for (final component in components) {

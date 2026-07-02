@@ -186,6 +186,12 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 else
                   _ReadmeContent(raw: active.readmeContent),
                 const SizedBox(height: 24),
+                _UpdatesSection(
+                  projectPath: widget.project.path,
+                  projectName: widget.project.name,
+                  version: _selectedVersion ?? _versionOf(live.phase),
+                ),
+                const SizedBox(height: 24),
                 const _SectionHeader('Reference Documents'),
                 _ReferenceDocsRow(projectPath: widget.project.path),
                 const SizedBox(height: 24),
@@ -195,12 +201,15 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 ],
                 _RepoPathRow(projectPath: widget.project.path, projectName: widget.project.name),
                 if (_stageOf(live.phase) == 'worksheet_complete') ...[
-                  _BuildSequenceSection(project: live),
+                  _BuildSequenceSection(
+                    project: live,
+                    targetVersion: _selectedVersion ?? _versionOf(live.phase),
+                  ),
                   const SizedBox(height: 8),
                   _CopyWorksheetButton(
                     projectPath: live.path,
                     projectName: live.name,
-                    specVersion: sv,
+                    specVersion: _selectedVersion ?? _versionOf(live.phase),
                   ),
                 ],
                 _CoderPackageSection(
@@ -481,6 +490,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     };
   }
 }
+
+
 
 // ── AppBar title with goal subtitle ──────────────────────────────────────────
 
@@ -770,6 +781,253 @@ class _VersionHistoryLaneState extends State<_VersionHistoryLane> {
           ],
         ],
       ),
+    );
+  }
+}
+
+// ── Updates Section ────────────────────────────────────────────────────────────
+
+class _UpdatesSection extends StatefulWidget {
+  const _UpdatesSection({
+    required this.projectPath,
+    required this.projectName,
+    required this.version,
+  });
+  final String projectPath;
+  final String projectName;
+  final String version;
+
+  @override
+  State<_UpdatesSection> createState() => _UpdatesSectionState();
+}
+
+class _UpdatesSectionState extends State<_UpdatesSection> {
+  List<({String label, String date, String text})> _amendments = [];
+  final TextEditingController _ctrl = TextEditingController();
+  bool _saving = false;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _UpdatesSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.version != widget.version) {
+      _ctrl.clear();
+      _amendments = [];
+      _loading = true;
+      _load();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final file = File(p.join(
+      widget.projectPath,
+      'ingested',
+      '${widget.projectName}_StoryAmendments_${widget.version}.md',
+    ));
+    if (!await file.exists()) {
+      if (mounted) setState(() { _amendments = []; _loading = false; });
+      return;
+    }
+    final content = await file.readAsString();
+    final parsed = <({String label, String date, String text})>[];
+    for (final m in RegExp(
+      r'## Amendment (\S+) — (\d{4}-\d{2}-\d{2})\n([\s\S]*?)(?=\n## Amendment |\s*$)',
+    ).allMatches(content)) {
+      parsed.add((
+        label: m.group(1)!,
+        date: m.group(2)!,
+        text: m.group(3)!.trim(),
+      ));
+    }
+    if (mounted) setState(() { _amendments = parsed; _loading = false; });
+  }
+
+  Future<void> _submit() async {
+    final text = _ctrl.text.trim();
+    if (text.isEmpty || _saving) return;
+    setState(() => _saving = true);
+    try {
+      await ProjectFileRepository().appendStoryAmendment(
+        projectPath: widget.projectPath,
+        projectName: widget.projectName,
+        specVersion: widget.version,
+        amendmentText: text,
+      );
+      _ctrl.clear();
+      await _load();
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final vLabel = widget.version.toUpperCase();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionHeader('Updates — $vLabel'),
+        const SizedBox(height: 8),
+        if (_loading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Center(
+              child: SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 1.5),
+              ),
+            ),
+          )
+        else if (_amendments.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: Text(
+              'No updates yet.',
+              style: TextStyle(
+                fontFamily: 'Menlo',
+                fontSize: 11,
+                color: Color(0xFF6B7280),
+              ),
+            ),
+          )
+        else
+          ..._amendments.map((a) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1C1C1E),
+                        border: Border.all(color: const Color(0xFF3C3C3E)),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        a.label,
+                        style: const TextStyle(
+                          fontFamily: 'Menlo',
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFE8A04C),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            a.date,
+                            style: const TextStyle(
+                              fontFamily: 'Menlo',
+                              fontSize: 9,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                          Text(
+                            a.text,
+                            style: const TextStyle(
+                              fontFamily: 'Menlo',
+                              fontSize: 11,
+                              color: Color(0xFFD1D5DB),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+        const SizedBox(height: 8),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _ctrl,
+                maxLines: 3,
+                minLines: 2,
+                style: const TextStyle(
+                  fontFamily: 'Menlo',
+                  fontSize: 12,
+                  color: Color(0xFFE5E5E7),
+                ),
+                decoration: InputDecoration(
+                  hintText:
+                      'Describe what you want to change about $vLabel...',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF4B5563),
+                    fontFamily: 'Menlo',
+                    fontSize: 12,
+                  ),
+                  filled: true,
+                  fillColor: const Color(0xFF0F0F10),
+                  border: const OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(6)),
+                    borderSide: BorderSide(color: Color(0xFF2C2C2E)),
+                  ),
+                  focusedBorder: const OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(6)),
+                    borderSide: BorderSide(color: Color(0xFFE8A04C)),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (_saving)
+              const Padding(
+                padding: EdgeInsets.only(top: 10),
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Color(0xFFE8A04C),
+                  ),
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: OutlinedButton(
+                  onPressed: _submit,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFE8A04C),
+                    side: const BorderSide(color: Color(0xFFE8A04C)),
+                    minimumSize: const Size(64, 40),
+                  ),
+                  child: const Text(
+                    '+ Add',
+                    style: TextStyle(
+                      fontFamily: 'Menlo',
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 24),
+      ],
     );
   }
 }
@@ -1240,7 +1498,11 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
               MouseRegion(
                 cursor: SystemMouseCursors.click,
                 child: GestureDetector(
-                  onTap: () => setState(() => _expanded[version] = !isExpanded),
+                  onTap: () {
+                    final nowExpanding = !isExpanded;
+                    setState(() => _expanded[version] = nowExpanding);
+                    if (nowExpanding) widget.onVersionTap(version);
+                  },
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                     children: [
@@ -2380,17 +2642,14 @@ class _RepoIngestRowState extends ConsumerState<_RepoIngestRow> {
 
 class _BuildSequenceSection extends ConsumerWidget {
   final Project project;
+  final String targetVersion;
 
-  const _BuildSequenceSection({required this.project});
+  const _BuildSequenceSection({required this.project, required this.targetVersion});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(executorTimelineProvider(project.path));
-    int _latestSpecN = 1;
-    while (_specFileExistsOnDisk(project.path, 'v${_latestSpecN + 1}')) {
-      _latestSpecN++;
-    }
-    final sv = 'v$_latestSpecN';
+    final sv = targetVersion;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -2588,9 +2847,9 @@ class _CopyWorksheetButton extends StatelessWidget {
           }
         },
         icon: const Icon(Icons.copy_outlined, size: 14),
-        label: const Text(
-          'Copy Handoff to Clipboard',
-          style: TextStyle(fontFamily: 'Menlo', fontWeight: FontWeight.w500),
+        label: Text(
+          'Copy ${specVersion.toUpperCase()} Handoff to Clipboard',
+          style: const TextStyle(fontFamily: 'Menlo', fontWeight: FontWeight.w500),
         ),
         style: OutlinedButton.styleFrom(
           minimumSize: const Size.fromHeight(40),
@@ -3223,7 +3482,8 @@ class _CoderPackageSection extends StatefulWidget {
 }
 
 class _CoderPackageSectionState extends State<_CoderPackageSection> {
-  bool _working = false;
+  bool _copying = false;
+  bool _exporting = false;
   late Future<({String? version, List<_CoderItem> items})> _discovery;
 
   @override
@@ -3236,7 +3496,7 @@ class _CoderPackageSectionState extends State<_CoderPackageSection> {
   void didUpdateWidget(_CoderPackageSection old) {
     super.didUpdateWidget(old);
     if (old.targetVersion != widget.targetVersion) {
-      setState(() => _discovery = _discover());
+      _discovery = _discover();
     }
   }
 
@@ -3288,8 +3548,8 @@ class _CoderPackageSectionState extends State<_CoderPackageSection> {
   }
 
   Future<void> _copy() async {
-    if (_working) return;
-    setState(() => _working = true);
+    if (_copying) return;
+    setState(() => _copying = true);
     try {
       final d = await _discovery;
       if (d.items.isEmpty || d.version == null) {
@@ -3300,13 +3560,13 @@ class _CoderPackageSectionState extends State<_CoderPackageSection> {
       await Clipboard.setData(ClipboardData(text: text));
       _snack('Copied ${d.items.length} files to clipboard.');
     } finally {
-      if (mounted) setState(() => _working = false);
+      if (mounted) setState(() => _copying = false);
     }
   }
 
   Future<void> _export() async {
-    if (_working) return;
-    setState(() => _working = true);
+    if (_exporting) return;
+    setState(() => _exporting = true);
     try {
       final d = await _discovery;
       if (d.items.isEmpty || d.version == null) {
@@ -3337,7 +3597,7 @@ class _CoderPackageSectionState extends State<_CoderPackageSection> {
         ));
       }
     } finally {
-      if (mounted) setState(() => _working = false);
+      if (mounted) setState(() => _exporting = false);
     }
   }
 
@@ -3489,13 +3749,13 @@ class _CoderPackageSectionState extends State<_CoderPackageSection> {
                 _PackBtn(
                   label: 'Copy ${widget.targetVersion.toUpperCase()} Bundle',
                   icon: Icons.copy,
-                  onTap: _working ? null : _copy,
+                  onTap: _copying ? null : _copy,
                 ),
                 const SizedBox(width: 8),
                 _PackBtn(
                   label: 'Export ${widget.targetVersion.toUpperCase()} Pack',
                   icon: Icons.download,
-                  onTap: _working ? null : _export,
+                  onTap: _exporting ? null : _export,
                 ),
               ],
             ),

@@ -4,6 +4,102 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-07-02 — Claude Code [Module Discovery + Ingestion Pipeline (§MD)]
+
+**Branch:** main
+
+### Done
+
+**§MD — Module-Aware Codebase Ingestion (Chunks 2–6):**
+- `lib/features/projects/ingestion/module_discovery.dart` (NEW) — `ModuleDiscoveryResult` + `ModuleDiscovery` class; `discover()` is deterministic (no LLM call), classifies repos as `single` or `moduleAware` based on `ARCHITECTURE.md`/`README.md` headings and `lib/` folder structure
+- `lib/features/projects/ingestion/module_ingestion_pipeline.dart` (NEW) — `ModuleIngestionPipeline`; `ingestModules()` calls shared `analyzeFileBatch()` per module, `synthesize()` produces unified codebase overview via architect-role LLM call
+- `lib/features/projects/ingestion/pull_ingestion_notifier.dart` (MODIFIED) — added `tier` + `detectedModules` fields to `PullIngestionState`; `startIngestion()` now runs `ModuleDiscovery` first and returns early on `moduleAware` tier; new `confirmModules()` method runs full multi-module pipeline
+- `lib/features/projects/screens/pull_ingestion_progress_screen.dart` (MODIFIED) — converted `ConsumerWidget` → `ConsumerStatefulWidget`; added `awaitingConfirmation` arm with module checkbox list; added `synthesizing` state to inner progress text
+- `lib/features/spec_generation/as_built_spec_generator.dart` (MODIFIED) — added `_asBuiltSpecStructureModuleAware` const (identical to `_asBuiltSpecStructure` except §3 is "Module Map" instead of "Component Map")
+
+### Key Technical Findings
+- `ModuleDiscovery` must be pure/deterministic — no LLM calls, no Riverpod providers. It's a utility that reads files and walks directories. This keeps it testable and fast.
+- `confirmModules()` is additive — it doesn't replace `startIngestion()`'s single-module path. Single-module repos flow through unchanged; only large repos (>40 files with module signals) trigger the confirmation screen.
+- Empty `_confirmedModules` set = "all modules confirmed" (lazy-init pattern). First checkbox interaction seeds the set from the full module list. This avoids initializing with all modules checked in the UI (which would render a confusing "all checked" state before the user has seen anything).
+- `ConsumerWidget → ConsumerStatefulWidget` conversion: all widget fields become `widget.field` in state; `ref` is available from `ConsumerState`; callbacks like `Navigator.pop(context)` work the same.
+- `_asBuiltSpecStructureModuleAware` is intentionally unreferenced in `buildAsBuiltSpecPrompt()` — it's a data asset for future wiring (Chunk 7+). The unused_element suppression is on a single declaration, not the whole file.
+
+### 4-Agent Review (2026-07-02)
+
+**Architecture Review:** PASS
+- Clean layering: ModuleDiscovery is pure/deterministic, no LLM/Riverpod
+- Correct dependency flow: discovery → state → UI confirmation → confirmModules() → pipeline → LLM → write
+- Proper state ownership: PullIngestionState surfaces tier/detectedModules for UI
+
+**Syntax Review:** PASS
+- `dart analyze` reports no issues across all 5 files
+
+**Functions Review:** FAIL (4 issues found, all fixed)
+1. **Substring path matching bug:** `contains('/$moduleName/')` would match "auth" against "authentication". Fixed: now splits path on `/` and `\` and checks each segment equals the module name.
+2. **`synthesize()` never wired in:** The method existed but wasn't called. Fixed: added synthesis step in `confirmModules()` between `ingestModules()` and `aggregating`, feeds synthesized overview into invariant extraction context.
+3. **Tautological confirm button check:** `_confirmedModules.isEmpty || _confirmedModules.isNotEmpty` is always true. Fixed: changed to `_confirmedModules.isNotEmpty` (button disabled until user interacts with at least one checkbox).
+4. **Silent module drop:** `if (moduleFiles.isEmpty) continue;` dropped modules with no matching files silently. Fixed: added `skippedModules` list to track (though currently not surfaced to user — future enhancement).
+
+**Formatting Review:** FAIL (all 5 files needed formatting)
+- Ran `dart format` on all 5 files — all pass now.
+- `dart analyze lib/` → zero new warnings/errors (1 pre-existing info in project_detail_screen.dart, unchanged).
+
+### Modified
+- `lib/features/projects/ingestion/module_discovery.dart` (NEW)
+- `lib/features/projects/ingestion/module_ingestion_pipeline.dart` (NEW)
+- `lib/features/projects/ingestion/pull_ingestion_notifier.dart` (MODIFIED)
+- `lib/features/projects/screens/pull_ingestion_progress_screen.dart` (MODIFIED)
+- `lib/features/spec_generation/as_built_spec_generator.dart` (MODIFIED)
+
+### Next
+- Dogfood module-aware ingestion: push a 50+ file repo, verify discovery triggers confirmation screen, confirm modules → multi-module pipeline runs end-to-end
+- Wire `_asBuiltSpecStructureModuleAware` into `buildAsBuiltSpecPrompt()` when `summary.tier == IngestionTier.moduleAware`
+- §MD post-review: run 4-agent review (Architecture, Syntax, Functions, Formatting)
+
+---
+
+## Session: 2026-07-01 — Claude Code [Version Labels + Updates Section (§VUI3 + §UPD1)]
+
+**Branch:** main
+
+### Done
+
+**§VUI3 — Version-Aware Labels + Button Decoupling (Ornith, reviewed + bug-fixed this session):**
+- `_BuildSequenceSection` now takes `targetVersion` prop; "Build Sequence — V*" header reflects active version
+- `_CopyWorksheetButton` label: `'Copy ${specVersion.toUpperCase()} Handoff to Clipboard'`
+- `_CoderPackageSectionState`: split `bool _working` → `bool _copying` / `bool _exporting`; each button has its own guard and spinner
+- Expand tap handler: `onVersionTap(version)` called on expand → last-clicked version is always active
+- Parent call sites pass `_selectedVersion ?? _versionOf(live.phase)` to both `_BuildSequenceSection` and `_CopyWorksheetButton`
+
+**Bug fixes (Ornith-introduced, caught in review):**
+- `setState(() => _discovery = _discover())` — arrow fn returned Future; fixed to block fn: `setState(() { _discovery = _discover(); })`
+- `setState` in `didUpdateWidget` caused cascading build-scope assertion failures (Duplicate GlobalKey, `_dependents.isEmpty`, sliver errors); fixed by removing `setState` entirely — assign field directly, parent rebuild calls `build()` anyway. **Invariant: never call setState synchronously in didUpdateWidget.**
+- Two indentation drift issues corrected (Ornith's known failure mode): `_buildCta` closing braces, expand tap handler body
+
+**§UPD1 — Updates Section (replaces ✎ Amend Story dialog):**
+- Deleted: `_AmendStoryDialog`, `_showAmendStoryDialog`, "✎ Amend Story" `MouseRegion` block (0 references remain)
+- Added: `_UpdatesSection` StatefulWidget between "Project State" and "Reference Documents" in right panel
+- Reads `ingested/{projectName}_StoryAmendments_{version}.md`; lists amendments (label badge + date + text)
+- Inline `TextField` + `+ Add` button → calls `ProjectFileRepository().appendStoryAmendment()`
+- `didUpdateWidget`: no setState — assigns `_amendments = []` + calls `_load()` directly
+- try/finally in `_submit`: `_saving` always cleared even if save/load throws
+- Loading spinner on initial `_load()`; saving spinner replaces "+ Add" button during write
+
+### Key Technical Findings
+- `setState(() => expr)` with an async expr returns a Future from the arrow fn — Flutter throws "setState() callback argument returned a Future". Always use block form for setState in async contexts.
+- `setState` from `didUpdateWidget` schedules a child rebuild during the parent's active build scope → cascading assertion failures. The pattern in this codebase is: assign fields directly in `didUpdateWidget` (no setState). `FutureBuilder` re-reads its `future:` prop on every `build()`, so updating `_discovery` directly is sufficient.
+
+### Uncommitted
+- `lib/features/projects/screens/project_detail_screen.dart` — all §VUI3 + §UPD1 changes
+- `lib/data/filesystem/project_file_repository.dart` — `appendStoryAmendment()` method
+
+### Next
+- Commit the uncommitted diff
+- Dogfood Updates Section with a real project
+- §PERSIST — Interview state persistence — backlog
+
+---
+
 ## Session: 2026-07-01 — Claude Code [V1 Interview Redesign (§VI)]
 
 **Branch:** main
