@@ -230,8 +230,9 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
               title: 'AUDIT INTERVIEW',
               tagline: 'Establish current state.',
               description:
-                  'For existing teams/codebases. Produces a Current State Spec '
-                  'and blocker registry.',
+                  'Identify the status of a project based on interviewing '
+                  'the team. Produces an auditable Current State Spec and '
+                  'Blocker Registry.',
               dimensions: const [
                 'Project goal',
                 'Active blockers',
@@ -248,8 +249,8 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
               title: 'PROJECT ONBOARDING',
               tagline: 'Map an existing codebase.',
               description:
-                  'Ingest a repo, fill knowledge gaps via interview, '
-                  'produce as-built spec.',
+                  'Onboard an existing repo for The Forge to analyze and '
+                  'start producing auditable specs.',
               dimensions: const [
                 'Architecture',
                 'Data flow',
