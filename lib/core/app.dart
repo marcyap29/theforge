@@ -9,6 +9,7 @@ import '../features/pull_interview/state/pull_interview_state.dart';
 import '../features/pull_interview/ui/pull_interview_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/spec_generation/as_built_spec_screen.dart';
+import '../features/tracker/screens/portfolio_dashboard_screen.dart';
 import '../features/watch/briefing_screen.dart';
 import '../features/watch/decision_screen.dart';
 import '../features/watch/spec_drift_screen.dart';
@@ -31,7 +32,8 @@ class TheForgeApp extends StatelessWidget {
       navigatorObservers: [routeObserver],
       initialRoute: '/',
       routes: {
-        '/': (context) => const ProjectsListScreen(),
+        '/': (context) => const PortfolioDashboardScreen(),
+        '/projects': (context) => const ProjectsListScreen(),
         '/interview': (context) {
           final args = ModalRoute.of(context)?.settings.arguments;
           if (args is InterviewArgs) {

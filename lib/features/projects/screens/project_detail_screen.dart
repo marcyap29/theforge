@@ -12,6 +12,8 @@ import 'package:path/path.dart' as p;
 import '../../../core/app.dart';
 import '../../../data/filesystem/project_file_repository.dart';
 import '../../../data/local_db/forge_database.dart';
+import '../../addendum_interview/state/addendum_interview_notifier.dart';
+import '../../addendum_interview/ui/addendum_interview_screen.dart';
 import '../../artifacts/artifact_viewer_screen.dart';
 import '../../interview/providers/interview_providers.dart';
 import '../../interview/ui/interview_screen.dart';
@@ -20,6 +22,7 @@ import '../../pull_interview/ui/pull_interview_screen.dart';
 import '../../spec_generation/compliance/spec_compliance_screen.dart';
 import '../../spec_generation/executor_timeline_notifier.dart';
 import '../../spec_generation/worksheet_generation_screen.dart';
+import '../../tracker/screens/project_tracker_screen.dart';
 import '../ingestion/ingestion_notifier.dart';
 import '../ingestion/pull_ingestion_notifier.dart';
 import '../ingestion/reference_docs_screen.dart';
@@ -27,8 +30,6 @@ import '../models/pull_ingestion_summary.dart' as rev_ingest;
 import '../providers/providers.dart';
 import 'pull_ingestion_progress_screen.dart';
 import 'pull_ingestion_summary_screen.dart';
-import '../../addendum_interview/state/addendum_interview_notifier.dart';
-import '../../addendum_interview/ui/addendum_interview_screen.dart';
 
 class ProjectDetailScreen extends ConsumerStatefulWidget {
   const ProjectDetailScreen({super.key, required this.project});
@@ -108,6 +109,17 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           projectPath: live.path,
           specVersion: live.specVersion,
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.checklist_rtl),
+            tooltip: 'Feature Tracker',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => ProjectTrackerScreen(project: live),
+              ),
+            ),
+          ),
+        ],
       ),
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
