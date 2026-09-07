@@ -2,8 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Unsandboxed: The Forge shells out to `git` (Watch Mode, tracker repo
+	     scan + check-ins) and reads arbitrary local repositories — neither is
+	     possible under the App Sandbox. Kept consistent with Release so debug
+	     and release behave the same. See DOCS/deploy/APP_STORE_SANDBOX_PLAN.md. -->
 	<key>com.apple.security.app-sandbox</key>
-	<true/>
+	<false/>
 	<key>com.apple.security.cs.allow-jit</key>
 	<true/>
 	<key>com.apple.security.network.client</key>
