@@ -10,7 +10,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/llm/llm_model_config.dart';
 import '../../services/llm/llm_provider.dart';
 import '../../services/llm/providers/claude_provider.dart';
-import '../../services/llm/providers/gemini_provider.dart';
 import '../../services/llm/providers/ollama_provider.dart';
 import '../../services/llm/providers/openai_provider.dart';
 
@@ -83,7 +82,7 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
         (config['api_keys'] as Map<String, dynamic>? ?? {});
 
     final baseUrl =
-        prefs.getString(_prefsKeyBaseUrl) ?? 'http://localhost:11434';
+        prefs.getString(_prefsKeyBaseUrl) ?? 'https://ollama.com';
 
     final assignments = <LlmRole, ModelAssignment>{};
     for (final role in LlmRole.values) {
@@ -91,26 +90,27 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
           prefs.getString('$_prefsKeyRoleProvider${role.name}');
       final savedModelId =
           prefs.getString('$_prefsKeyRoleModel${role.name}');
+      const defaultModelId = 'gpt-oss:120b-cloud';
       final isFirstRun = providerStr == null;
       final providerType = isFirstRun
-          ? LlmProviderType.gemini
+          ? LlmProviderType.ollama
           : LlmProviderType.values.firstWhere(
               (p) => p.name == providerStr,
-              orElse: () => LlmProviderType.gemini,
+              orElse: () => LlmProviderType.ollama,
             );
       // Validate stored model ID against the current catalog. Retired or
-      // misspelled IDs (e.g. gemini-3.5-flash, gpt-4-turbo) fall back to
-      // the first valid model for that provider so the app never starts
-      // with a model that the API will reject.
+      // misspelled IDs fall back to the first valid model for that provider so
+      // the app never starts with a model that the API will reject. Ollama
+      // accepts any model id (local or cloud), so it is not validated here.
       final validIds = modelsFor(providerType).map((m) => m.id).toSet();
       final fallbackId =
-          modelsFor(providerType).firstOrNull?.id ?? 'gemini-3.5-flash';
+          modelsFor(providerType).firstOrNull?.id ?? defaultModelId;
       final modelId = (savedModelId != null &&
               savedModelId.isNotEmpty &&
               (providerType == LlmProviderType.ollama ||
                   validIds.contains(savedModelId)))
           ? savedModelId
-          : (isFirstRun ? 'gemini-3.5-flash' : fallbackId);
+          : (isFirstRun ? defaultModelId : fallbackId);
       assignments[role] = ModelAssignment(
         providerType: providerType,
         modelId: modelId,
@@ -123,9 +123,9 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
     bool needsMigration = false;
 
     for (final type in LlmProviderType.values) {
-      if (type == LlmProviderType.ollama) {
-        apiKeys[type] = null;
-      } else {
+      {
+        // All providers (including Ollama, for Cloud API-key auth) resolve a
+        // key from the config file first, then SharedPreferences.
         final fromFile = savedKeys[type.name] as String?;
         final fromPrefs = prefs.getString('$_keychainKeyPrefix${type.name}');
         final resolved =
@@ -206,7 +206,6 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
   }
 
   Future<void> setApiKey(LlmProviderType type, String key) async {
-    if (type == LlmProviderType.ollama) return;
     final trimmed = key.trim();
     if (trimmed.isEmpty) return;
 
@@ -235,8 +234,6 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
   }
 
   Future<void> clearApiKey(LlmProviderType type) async {
-    if (type == LlmProviderType.ollama) return;
-
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('$_keychainKeyPrefix${type.name}');
 
@@ -309,10 +306,6 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
     String modelId;
 
     switch (type) {
-      case LlmProviderType.gemini:
-        if (key == null || key.isEmpty) return 'No API key configured.';
-        provider = GeminiProvider(apiKey: key);
-        modelId = 'gemini-3.5-flash';
       case LlmProviderType.claude:
         if (key == null || key.isEmpty) return 'No API key configured.';
         provider = ClaudeProvider(apiKey: key);
@@ -322,8 +315,15 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
         provider = OpenAiProvider(apiKey: key);
         modelId = 'gpt-4o-mini';
       case LlmProviderType.ollama:
-        provider = OllamaProvider(baseUrl: baseUrl);
-        modelId = current.ollamaModels.firstOrNull?.id ?? 'llama3';
+        // Cloud (https://ollama.com) needs a key; a local server does not.
+        final isCloud = baseUrl.contains('ollama.com');
+        if (isCloud && (key == null || key.isEmpty)) {
+          return 'No API key configured for Ollama Cloud.';
+        }
+        provider = OllamaProvider(baseUrl: baseUrl, apiKey: key);
+        modelId = current.ollamaModels.firstOrNull?.id ??
+            current.settings.roleAssignments[LlmRole.architect]?.modelId ??
+            'gpt-oss:120b-cloud';
     }
 
     try {
@@ -344,8 +344,10 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
     final current = state.valueOrNull;
     if (current == null) return;
     try {
-      final models =
-          await OllamaProvider.fetchModels(current.settings.ollamaBaseUrl);
+      final models = await OllamaProvider.fetchModels(
+        current.settings.ollamaBaseUrl,
+        apiKey: current.settings.apiKeys[LlmProviderType.ollama],
+      );
       if (state.valueOrNull == null) return;
       state = AsyncData(
         current.copyWith(

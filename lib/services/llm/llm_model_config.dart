@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import 'llm_provider.dart';
 
-enum LlmProviderType { ollama, claude, openai, gemini }
+enum LlmProviderType { ollama, claude, openai }
 
 @immutable
 class ModelInfo {
@@ -23,19 +23,23 @@ const openAiModels = <ModelInfo>[
   ModelInfo(id: 'gpt-4o-mini', displayName: 'GPT-4o mini'),
 ];
 
-const geminiModels = <ModelInfo>[
-  ModelInfo(id: 'gemini-3.5-flash', displayName: 'Gemini 3.5 Flash'),
-  ModelInfo(id: 'gemini-3.1-flash-lite', displayName: 'Gemini 3.1 Flash-Lite'),
-  ModelInfo(id: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash'),
-  ModelInfo(id: 'gemini-2.5-pro', displayName: 'Gemini 2.5 Pro'),
+/// Curated Ollama Cloud models (the `-cloud`/`:cloud` tags run on Ollama's
+/// hosted infrastructure via https://ollama.com with an API key). Users can
+/// also type any other Ollama model id; this list just seeds the picker.
+const ollamaCloudModels = <ModelInfo>[
+  ModelInfo(id: 'gpt-oss:120b-cloud', displayName: 'gpt-oss 120b (cloud)'),
+  ModelInfo(id: 'qwen3.5:cloud', displayName: 'Qwen3.5 (cloud)'),
+  ModelInfo(id: 'deepseek-v4-flash:cloud', displayName: 'DeepSeek V4 Flash (cloud)'),
+  ModelInfo(id: 'glm-5.2:cloud', displayName: 'GLM-5.2 (cloud)'),
+  ModelInfo(id: 'kimi-k2.6:cloud', displayName: 'Kimi K2.6 (cloud)'),
+  ModelInfo(id: 'minimax-m2.7:cloud', displayName: 'MiniMax M2.7 (cloud)'),
 ];
 
 List<ModelInfo> modelsFor(LlmProviderType type) {
   return switch (type) {
-    LlmProviderType.ollama => const [],
+    LlmProviderType.ollama => ollamaCloudModels,
     LlmProviderType.claude => claudeModels,
     LlmProviderType.openai => openAiModels,
-    LlmProviderType.gemini => geminiModels,
   };
 }
 
@@ -73,21 +77,20 @@ class LlmSettings {
   static const LlmSettings defaults = LlmSettings(
     roleAssignments: {
       LlmRole.architect: ModelAssignment(
-        providerType: LlmProviderType.gemini,
-        modelId: 'gemini-3.5-flash',
+        providerType: LlmProviderType.ollama,
+        modelId: 'gpt-oss:120b-cloud',
       ),
       LlmRole.executor: ModelAssignment(
-        providerType: LlmProviderType.gemini,
-        modelId: 'gemini-3.5-flash',
+        providerType: LlmProviderType.ollama,
+        modelId: 'gpt-oss:120b-cloud',
       ),
     },
     apiKeys: {
       LlmProviderType.ollama: null,
       LlmProviderType.claude: null,
       LlmProviderType.openai: null,
-      LlmProviderType.gemini: null,
     },
-    ollamaBaseUrl: 'http://localhost:11434',
+    ollamaBaseUrl: 'https://ollama.com',
   );
 
   LlmSettings copyWith({

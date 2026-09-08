@@ -1,7 +1,6 @@
 import 'llm_model_config.dart';
 import 'llm_provider.dart';
 import 'providers/claude_provider.dart';
-import 'providers/gemini_provider.dart';
 import 'providers/ollama_provider.dart';
 import 'providers/openai_provider.dart';
 
@@ -38,7 +37,10 @@ class LlmService {
   LlmProvider _buildProvider(LlmProviderType type) {
     switch (type) {
       case LlmProviderType.ollama:
-        return OllamaProvider(baseUrl: settings.ollamaBaseUrl);
+        return OllamaProvider(
+          baseUrl: settings.ollamaBaseUrl,
+          apiKey: settings.apiKeys[LlmProviderType.ollama],
+        );
       case LlmProviderType.claude:
         final key = settings.apiKeys[LlmProviderType.claude];
         if (key == null) {
@@ -51,12 +53,6 @@ class LlmService {
           throw Exception('OpenAI API key not configured. Open Settings.');
         }
         return OpenAiProvider(apiKey: key);
-      case LlmProviderType.gemini:
-        final key = settings.apiKeys[LlmProviderType.gemini];
-        if (key == null) {
-          throw Exception('Gemini API key not configured. Open Settings.');
-        }
-        return GeminiProvider(apiKey: key);
     }
   }
 }

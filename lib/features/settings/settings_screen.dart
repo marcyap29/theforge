@@ -28,11 +28,7 @@ class SettingsScreen extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
             children: [
               const _SectionHeader('LLM Providers'),
-              const _ByokCard(
-                providerType: LlmProviderType.gemini,
-                displayName: 'Gemini',
-                isDefault: true,
-              ),
+              const _OllamaCard(),
               const SizedBox(height: 12),
               const _ByokCard(
                 providerType: LlmProviderType.claude,
@@ -43,8 +39,6 @@ class SettingsScreen extends ConsumerWidget {
                 providerType: LlmProviderType.openai,
                 displayName: 'OpenAI',
               ),
-              const SizedBox(height: 12),
-              const _OllamaCard(),
               const SizedBox(height: 24),
               const _SectionHeader('Model Roles'),
               const _RoleCard(
@@ -149,6 +143,7 @@ class _OllamaCard extends ConsumerStatefulWidget {
 
 class _OllamaCardState extends ConsumerState<_OllamaCard> {
   late final TextEditingController _urlController;
+  final _keyController = TextEditingController();
   bool _isChecking = false;
 
   @override
@@ -159,8 +154,9 @@ class _OllamaCardState extends ConsumerState<_OllamaCard> {
             .valueOrNull
             ?.settings
             .ollamaBaseUrl ??
-        'http://localhost:11434';
+        'https://ollama.com';
     _urlController = TextEditingController(text: initial);
+    _keyController.addListener(() => setState(() {}));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _checkConnection();
     });
@@ -169,6 +165,7 @@ class _OllamaCardState extends ConsumerState<_OllamaCard> {
   @override
   void dispose() {
     _urlController.dispose();
+    _keyController.dispose();
     super.dispose();
   }
 
@@ -184,15 +181,27 @@ class _OllamaCardState extends ConsumerState<_OllamaCard> {
         .setOllamaBaseUrl(_urlController.text);
   }
 
+  Future<void> _saveKey() async {
+    final key = _keyController.text.trim();
+    if (key.isEmpty) return;
+    await ref
+        .read(settingsProvider.notifier)
+        .setApiKey(LlmProviderType.ollama, key);
+    _keyController.clear();
+    await _checkConnection();
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(settingsProvider).valueOrNull;
     final ollamaStatus = state?.ollamaStatus ?? OllamaStatus.unknown;
     final ollamaModels = state?.ollamaModels ?? const <ModelInfo>[];
+    final hasKey =
+        (state?.settings.apiKeys[LlmProviderType.ollama])?.isNotEmpty ?? false;
 
     final statusText = switch (ollamaStatus) {
       OllamaStatus.connected => '● Connected',
-      OllamaStatus.notRunning => '○ Not running',
+      OllamaStatus.notRunning => '○ Unreachable',
       OllamaStatus.unknown => '○ Not checked',
     };
     final statusColor = switch (ollamaStatus) {
@@ -202,10 +211,16 @@ class _OllamaCardState extends ConsumerState<_OllamaCard> {
     };
 
     return _ProviderCardShell(
-      title: 'Ollama (local)',
+      title: 'Ollama',
       status: statusText,
       statusColor: statusColor,
       children: [
+        const Text(
+          'Cloud: https://ollama.com + API key. Local: http://localhost:11434 '
+          '(no key needed).',
+          style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+        ),
+        const SizedBox(height: 10),
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
@@ -228,6 +243,35 @@ class _OllamaCardState extends ConsumerState<_OllamaCard> {
             FilledButton.tonal(
               onPressed: _saveUrl,
               child: const Text('Save'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _keyController,
+                obscureText: true,
+                style: const TextStyle(
+                  fontFamily: 'Menlo',
+                  fontSize: 13,
+                  color: Color(0xFFE5E5E7),
+                ),
+                decoration: InputDecoration(
+                  labelText: hasKey
+                      ? 'Cloud API key (saved — enter to replace)'
+                      : 'Cloud API key',
+                  isDense: true,
+                ),
+                onSubmitted: (_) => _saveKey(),
+              ),
+            ),
+            const SizedBox(width: 8),
+            FilledButton.tonal(
+              onPressed: _keyController.text.trim().isEmpty ? null : _saveKey,
+              child: const Text('Save key'),
             ),
           ],
         ),
@@ -292,12 +336,10 @@ class _ByokCard extends ConsumerStatefulWidget {
   const _ByokCard({
     required this.providerType,
     required this.displayName,
-    this.isDefault = false,
   });
 
   final LlmProviderType providerType;
   final String displayName;
-  final bool isDefault;
 
   @override
   ConsumerState<_ByokCard> createState() => _ByokCardState();
@@ -352,9 +394,7 @@ class _ByokCardState extends ConsumerState<_ByokCard> {
     final masked = hasKey ? _maskKey(apiKey) : '';
 
     return _ProviderCardShell(
-      title: widget.isDefault
-          ? '${widget.displayName}  (default)'
-          : widget.displayName,
+      title: widget.displayName,
       status: hasKey ? '● Configured' : '○ Not configured',
       statusColor:
           hasKey ? const Color(0xFF22C55E) : const Color(0xFF9CA3AF),
@@ -488,9 +528,19 @@ class _RoleCard extends ConsumerWidget {
     // Always show all providers; missing keys surface as runtime errors in the chat.
     const availableProviders = LlmProviderType.values;
 
-    final models = assignment.providerType == LlmProviderType.ollama
-        ? state.ollamaModels
-        : modelsFor(assignment.providerType);
+    // For Ollama, offer the curated Cloud models plus any the account/server
+    // reports (deduped by id), so a cloud model is always pickable even when
+    // /api/tags returns nothing.
+    final List<ModelInfo> models;
+    if (assignment.providerType == LlmProviderType.ollama) {
+      final seen = <String>{};
+      models = [
+        ...ollamaCloudModels,
+        ...state.ollamaModels,
+      ].where((m) => seen.add(m.id)).toList(growable: false);
+    } else {
+      models = modelsFor(assignment.providerType);
+    }
 
     final configured = assignment.modelId.isNotEmpty;
 

@@ -1,7 +1,6 @@
 import '../../features/settings/engineer_roster_notifier.dart';
 import 'demo_usage_provider.dart';
 import 'providers/anthropic_usage_provider.dart';
-import 'providers/gemini_usage_provider.dart';
 import 'providers/ollama_usage_provider.dart';
 import 'providers/openai_usage_provider.dart';
 import 'usage_provider.dart';
@@ -64,8 +63,6 @@ class UsageService {
         return const AnthropicUsageProvider();
       case 'openai':
         return const OpenAiUsageProvider();
-      case 'gemini':
-        return const GeminiUsageProvider();
       case 'demo':
         return const DemoUsageProvider();
       default:

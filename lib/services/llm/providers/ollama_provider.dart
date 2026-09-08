@@ -6,8 +6,18 @@ import '../llm_model_config.dart';
 import '../llm_provider.dart';
 
 class OllamaProvider extends LlmProvider {
-  OllamaProvider({required this.baseUrl});
+  OllamaProvider({required this.baseUrl, this.apiKey});
   final String baseUrl;
+
+  /// When set, requests are authenticated as Ollama Cloud (https://ollama.com)
+  /// via `Authorization: Bearer <apiKey>`. Null for a local Ollama server.
+  final String? apiKey;
+
+  Map<String, String> _headers() => {
+        'Content-Type': 'application/json',
+        if (apiKey != null && apiKey!.isNotEmpty)
+          'Authorization': 'Bearer $apiKey',
+      };
 
   @override
   Future<String> complete({
@@ -19,7 +29,7 @@ class OllamaProvider extends LlmProvider {
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/chat'),
-      headers: const {'Content-Type': 'application/json'},
+      headers: _headers(),
       body: jsonEncode({
         'model': modelId,
         'stream': false,
@@ -44,8 +54,15 @@ class OllamaProvider extends LlmProvider {
     return message['content'] as String;
   }
 
-  static Future<List<ModelInfo>> fetchModels(String baseUrl) async {
-    final response = await http.get(Uri.parse('$baseUrl/api/tags'));
+  static Future<List<ModelInfo>> fetchModels(String baseUrl,
+      {String? apiKey}) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/tags'),
+      headers: {
+        if (apiKey != null && apiKey.isNotEmpty)
+          'Authorization': 'Bearer $apiKey',
+      },
+    );
     if (response.statusCode != 200) {
       throw Exception(
         'Ollama error ${response.statusCode}: ${_truncate(response.body)}',
