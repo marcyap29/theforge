@@ -10,6 +10,12 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 
+    // Channel used to deliver dictated text (theforge://paste) to Flutter,
+    // which inserts it into the focused field at the caret.
+    AppDelegate.pasteChannel = FlutterMethodChannel(
+      name: "theforge/paste",
+      binaryMessenger: flutterViewController.engine.binaryMessenger)
+
     super.awakeFromNib()
   }
 }

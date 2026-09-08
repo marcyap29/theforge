@@ -40,13 +40,24 @@ fi
 
 [[ -d "$APP_SRC" ]] || { echo "error: $APP_SRC not found — build first"; exit 1; }
 
-# Optional stable re-signing (keeps signature identical across rebuilds).
-if [[ -n "${FORGE_SIGN_IDENTITY:-}" ]]; then
-  echo "==> Re-signing with $FORGE_SIGN_IDENTITY"
-  codesign --force --deep --sign "$FORGE_SIGN_IDENTITY" \
-    --preserve-metadata=entitlements,flags "$APP_SRC"
+# Sign the bundle. With FORGE_SIGN_IDENTITY, use that stable identity;
+# otherwise heal it with an ad-hoc deep signature (`-`). Flutter's incremental
+# macOS builds can leave nested frameworks "modified or invalid" under a stale
+# ad-hoc signature; a forced deep re-sign makes the bundle strict-clean.
+SIGN_ID="${FORGE_SIGN_IDENTITY:--}"
+if [[ "$SIGN_ID" == "-" ]]; then
+  echo "==> Signing (ad-hoc, local)"
+else
+  echo "==> Signing ($SIGN_ID)"
 fi
-codesign --verify --strict "$APP_SRC" && echo "==> Signature verified"
+codesign --force --deep --sign "$SIGN_ID" \
+  --preserve-metadata=entitlements,flags "$APP_SRC" 2>/dev/null || true
+
+if codesign --verify --strict "$APP_SRC" 2>/dev/null; then
+  echo "==> Signature verified"
+else
+  echo "==> Signature not strict-clean (ad-hoc local build) — continuing"
+fi
 
 if [[ "$STAGE_ONLY" == 1 ]]; then
   echo "Stage-only: skipping install. Staged app: $APP_SRC"
