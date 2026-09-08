@@ -144,4 +144,8 @@ class ForgeDatabase extends _$ForgeDatabase {
 
   Future<void> upsertTracking(ProjectTrackingCompanion entry) =>
       into(projectTracking).insertOnConflictUpdate(entry);
+
+  Future<void> removeTracking(String projectId) =>
+      (delete(projectTracking)..where((t) => t.projectId.equals(projectId)))
+          .go();
 }

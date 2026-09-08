@@ -13,6 +13,11 @@ class ProjectCard extends StatelessWidget {
     required this.entry,
     required this.onOpen,
     required this.onOpenDetail,
+    this.selecting = false,
+    this.selected = false,
+    this.onLongPress,
+    this.onToggleSelect,
+    this.onContextMenu,
   });
 
   final PortfolioEntry entry;
@@ -23,23 +28,58 @@ class ProjectCard extends StatelessWidget {
   /// Open the full Forge project detail (interview/spec pipeline).
   final VoidCallback onOpenDetail;
 
+  /// Multi-select state for bulk delete.
+  final bool selecting;
+  final bool selected;
+  final VoidCallback? onLongPress;
+  final VoidCallback? onToggleSelect;
+
+  /// Right-click (secondary tap) at the given global position.
+  final void Function(Offset globalPosition)? onContextMenu;
+
   @override
   Widget build(BuildContext context) {
     final counts = entry.counts;
     final status = entry.status;
 
-    return InkWell(
-      onTap: onOpen,
-      borderRadius: BorderRadius.circular(6),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(14),
+    return GestureDetector(
+      onSecondaryTapUp: (selecting || onContextMenu == null)
+          ? null
+          : (d) => onContextMenu!(d.globalPosition),
+      child: InkWell(
+        onTap: selecting ? onToggleSelect : onOpen,
+        onLongPress: selecting ? null : onLongPress,
+        borderRadius: BorderRadius.circular(6),
+        child: Card(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(6),
+            side: BorderSide(
+              color: selected
+                  ? const Color(0xFFE8A04C)
+                  : const Color(0xFF2C2C2E),
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
               Row(
                 children: [
+                  if (selecting) ...[
+                    Icon(
+                      selected
+                          ? Icons.check_circle
+                          : Icons.radio_button_unchecked,
+                      size: 16,
+                      color: selected
+                          ? const Color(0xFFE8A04C)
+                          : const Color(0xFF6B7280),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   Expanded(
                     child: Text(
                       entry.project.name,
@@ -112,6 +152,7 @@ class ProjectCard extends StatelessWidget {
                 ],
               ),
             ],
+          ),
           ),
         ),
       ),

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
 import '../../../data/local_db/forge_database.dart';
+import '../project_actions.dart';
 import '../providers/providers.dart';
 import 'new_project_screen.dart';
 import 'project_detail_screen.dart';
@@ -51,40 +52,25 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
         allProjects.where((p) => _selectedIds.contains(p.id)).toList();
     if (toDelete.isEmpty) return;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1C1C1E),
-        title: const Text('Delete Projects',
-            style: TextStyle(color: Color(0xFFE5E5E7))),
-        content: Text(
-          'Permanently delete ${toDelete.length} project${toDelete.length == 1 ? '' : 's'}? '
-          'This cannot be undone.',
-          style: const TextStyle(color: Color(0xFFAEAEB2)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete',
-                style: TextStyle(color: Color(0xFFFF453A))),
-          ),
-        ],
-      ),
+    final n = toDelete.length;
+    final confirmed = await confirmDoubleDelete(
+      context,
+      firstTitle: 'Delete Projects',
+      firstMessage:
+          'Delete $n project${n == 1 ? '' : 's'}? This removes their folders '
+          'and tracked features. This cannot be undone.',
+      secondTitle: 'Are you absolutely sure?',
+      secondMessage:
+          'This permanently deletes $n project${n == 1 ? '' : 's'} and '
+          'everything in their folders.',
+      finalLabel: 'Delete $n permanently',
     );
-
     if (confirmed != true || !mounted) return;
 
     final repo = ref.read(projectFileRepositoryProvider);
     final db = ref.read(forgeDatabaseProvider);
     for (final project in toDelete) {
-      try {
-        await repo.deleteProject(project.path);
-        await db.removeProject(project.id);
-      } catch (_) {}
+      await deleteProjectCascade(repo, db, project);
     }
 
     if (mounted) {
@@ -94,37 +80,23 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
   }
 
   Future<void> _deleteOne(Project project) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1C1C1E),
-        title: const Text('Delete Project',
-            style: TextStyle(color: Color(0xFFE5E5E7))),
-        content: Text(
-          'Permanently delete "${project.name}"? This cannot be undone.',
-          style: const TextStyle(color: Color(0xFFAEAEB2)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete',
-                style: TextStyle(color: Color(0xFFFF453A))),
-          ),
-        ],
-      ),
+    final confirmed = await confirmDoubleDelete(
+      context,
+      firstTitle: 'Delete Project',
+      firstMessage:
+          'Delete "${project.name}"? This removes the project folder and its '
+          'tracked features. This cannot be undone.',
+      secondTitle: 'Are you absolutely sure?',
+      secondMessage:
+          'This permanently deletes "${project.name}" and everything in its '
+          'folder.',
     );
-
     if (confirmed != true || !mounted) return;
 
     final repo = ref.read(projectFileRepositoryProvider);
     final db = ref.read(forgeDatabaseProvider);
     try {
-      await repo.deleteProject(project.path);
-      await db.removeProject(project.id);
+      await deleteProjectCascade(repo, db, project);
       if (mounted) {
         await ref.read(projectListProvider.notifier).refresh();
       }
