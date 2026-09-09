@@ -32,6 +32,11 @@ class ProjectFileRepository {
 
   static const _prefsKeyRootPath = 'forge_root_path';
 
+  /// All Forge-generated deliverables for a project live under this hidden
+  /// subfolder inside the project workspace. README.md and user_notes.md stay
+  /// at the project root as the human-facing entry points.
+  static const forgeDirName = '.forge';
+
   static Future<String?> getSavedRootPath() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_prefsKeyRootPath);
@@ -58,20 +63,21 @@ class ProjectFileRepository {
       throw ProjectAlreadyExistsException(projectDir.path);
     }
 
-    final specsDir = Directory(p.join(projectDir.path, 'specs'));
-    final handoffsDir = Directory(p.join(projectDir.path, 'handoffs'));
-    final worksheetsDir = Directory(p.join(projectDir.path, 'worksheets'));
-    final auditDir = Directory(p.join(projectDir.path, 'audit'));
-    final forgeDir = Directory(p.join(projectDir.path, 'forge'));
-    final ingestedDir = Directory(p.join(projectDir.path, 'ingested'));
+    final base = Directory(p.join(projectDir.path, forgeDirName));
+    final specsDir = Directory(p.join(base.path, 'specs'));
+    final handoffsDir = Directory(p.join(base.path, 'handoffs'));
+    final worksheetsDir = Directory(p.join(base.path, 'worksheets'));
+    final auditDir = Directory(p.join(base.path, 'audit'));
+    final forgeMetaDir = Directory(p.join(base.path, 'forge'));
+    final ingestedDir = Directory(p.join(base.path, 'ingested'));
 
     await projectDir.create(recursive: true);
-    await specsDir.create();
-    await handoffsDir.create();
-    await worksheetsDir.create();
-    await auditDir.create();
-    await forgeDir.create();
-    await ingestedDir.create();
+    await specsDir.create(recursive: true);
+    await handoffsDir.create(recursive: true);
+    await worksheetsDir.create(recursive: true);
+    await auditDir.create(recursive: true);
+    await forgeMetaDir.create(recursive: true);
+    await ingestedDir.create(recursive: true);
 
     final now = DateTime.now();
     final dateStr =
@@ -146,7 +152,7 @@ class ProjectFileRepository {
       String projectName,
       String specVersion,
       String content) async {
-    final versionDir = Directory(p.join(projectPath, 'specs', specVersion));
+    final versionDir = Directory(p.join(projectPath, forgeDirName, 'specs', specVersion));
     await versionDir.create(recursive: true);
     final specPath = p.join(versionDir.path, '${projectName}_LockedSpec_$specVersion.md');
 
@@ -161,7 +167,7 @@ class ProjectFileRepository {
 
   Future<void> appendAuditLog(
       String projectPath, String projectName, String entry) async {
-    final auditDir = Directory(p.join(projectPath, 'audit'));
+    final auditDir = Directory(p.join(projectPath, forgeDirName, 'audit'));
     final logPath = p.join(auditDir.path, '${projectName}_AuditLog.md');
     final logFile = File(logPath);
 
@@ -177,8 +183,8 @@ class ProjectFileRepository {
       String projectPath, String filename, String content) async {
     final version = _extractVersion(filename);
     final dir = version != null
-        ? Directory(p.join(projectPath, 'handoffs', version))
-        : Directory(p.join(projectPath, 'handoffs'));
+        ? Directory(p.join(projectPath, forgeDirName, 'handoffs', version))
+        : Directory(p.join(projectPath, forgeDirName, 'handoffs'));
     await dir.create(recursive: true);
     final handoffFile = File(p.join(dir.path, filename));
     await _archiveIfExists(handoffFile);
@@ -193,7 +199,7 @@ class ProjectFileRepository {
     required String decisionContextContent,
     required String openFlagsContent,
   }) async {
-    final versionDir = Directory(p.join(projectPath, 'forge', specVersion));
+    final versionDir = Directory(p.join(projectPath, forgeDirName, 'forge', specVersion));
     await versionDir.create(recursive: true);
     await File(p.join(versionDir.path, '${projectName}_LockedSpec_$specVersion.md'))
         .writeAsString(lockedSpecContent);
@@ -207,8 +213,8 @@ class ProjectFileRepository {
       String projectPath, String filename, String content) async {
     final version = _extractVersion(filename);
     final dir = version != null
-        ? Directory(p.join(projectPath, 'worksheets', version))
-        : Directory(p.join(projectPath, 'worksheets'));
+        ? Directory(p.join(projectPath, forgeDirName, 'worksheets', version))
+        : Directory(p.join(projectPath, forgeDirName, 'worksheets'));
     await dir.create(recursive: true);
     final worksheetFile = File(p.join(dir.path, filename));
     await _archiveIfExists(worksheetFile);
@@ -217,7 +223,7 @@ class ProjectFileRepository {
 
   Future<void> writeHandoffPackage(
       String projectPath, String projectName, String version, Map<String, dynamic> data) async {
-    final versionDir = Directory(p.join(projectPath, 'handoffs', version));
+    final versionDir = Directory(p.join(projectPath, forgeDirName, 'handoffs', version));
     await versionDir.create(recursive: true);
     final packageFile = File(p.join(versionDir.path, '${projectName}_HandoffPackage_$version.json'));
     await _archiveIfExists(packageFile);
@@ -228,10 +234,10 @@ class ProjectFileRepository {
       String projectPath, String projectName, String specVersion) async {
     // Check versioned subfolder first, fall back to flat for existing projects.
     final versionedPath = p.join(
-        projectPath, 'specs', specVersion, '${projectName}_LockedSpec_$specVersion.md');
+        projectPath, forgeDirName, 'specs', specVersion, '${projectName}_LockedSpec_$specVersion.md');
     if (File(versionedPath).existsSync()) return File(versionedPath).readAsString();
     final flatPath = p.join(
-        projectPath, 'specs', '${projectName}_LockedSpec_$specVersion.md');
+        projectPath, forgeDirName, 'specs', '${projectName}_LockedSpec_$specVersion.md');
     return File(flatPath).readAsString();
   }
 
@@ -246,7 +252,7 @@ class ProjectFileRepository {
   /// inside a version subfolder.
   Future<bool> hasFlatVersionedFiles(String projectPath) async {
     for (final folder in _versionedFolders) {
-      final dir = Directory(p.join(projectPath, folder));
+      final dir = Directory(p.join(projectPath, forgeDirName, folder));
       if (!dir.existsSync()) continue;
       for (final entry in dir.listSync()) {
         if (entry is File && _extractVersion(p.basename(entry.path)) != null) {
@@ -264,7 +270,7 @@ class ProjectFileRepository {
   Future<int> migrateToVersionFolders(String projectPath) async {
     int count = 0;
     for (final folder in _versionedFolders) {
-      final dir = Directory(p.join(projectPath, folder));
+      final dir = Directory(p.join(projectPath, forgeDirName, folder));
       if (!dir.existsSync()) continue;
       for (final entry in dir.listSync()) {
         if (entry is! File) continue;
@@ -272,7 +278,7 @@ class ProjectFileRepository {
         final version = _extractVersion(filename);
         if (version == null) continue;
 
-        final destDir = Directory(p.join(projectPath, folder, version));
+        final destDir = Directory(p.join(projectPath, forgeDirName, folder, version));
         final destFile = File(p.join(destDir.path, filename));
 
         if (destFile.existsSync()) {
@@ -308,7 +314,7 @@ class ProjectFileRepository {
 
   Future<void> writeIngestedSummary(
       String projectPath, String content) async {
-    final ingestedDir = Directory(p.join(projectPath, 'ingested'));
+    final ingestedDir = Directory(p.join(projectPath, forgeDirName, 'ingested'));
     final summaryFile =
         File(p.join(ingestedDir.path, 'reference_context.md'));
     await summaryFile.writeAsString(content);
@@ -316,7 +322,7 @@ class ProjectFileRepository {
 
   Future<String?> readIngestedSummary(String projectPath) async {
     final summaryFile =
-        File(p.join(projectPath, 'ingested', 'reference_context.md'));
+        File(p.join(projectPath, forgeDirName, 'ingested', 'reference_context.md'));
     if (!summaryFile.existsSync()) return null;
     return summaryFile.readAsString();
   }
@@ -338,7 +344,7 @@ class ProjectFileRepository {
   /// Reads project configuration from {projectPath}/forge/project_config.json
   /// Returns empty map if file doesn't exist
   static Future<Map<String, dynamic>> readProjectConfig(String projectPath) async {
-    final configPath = p.join(projectPath, 'forge', 'project_config.json');
+    final configPath = p.join(projectPath, forgeDirName, 'forge', 'project_config.json');
     final config = File(configPath);
     if (!config.existsSync()) {
       return {};
@@ -353,7 +359,7 @@ class ProjectFileRepository {
   /// Writes project configuration to {projectPath}/forge/project_config.json
   /// Merges with existing config if present
   static Future<void> writeProjectConfig(String projectPath, Map<String, dynamic> data) async {
-    final configPath = p.join(projectPath, 'forge', 'project_config.json');
+    final configPath = p.join(projectPath, forgeDirName, 'forge', 'project_config.json');
     final config = File(configPath);
     Map<String, dynamic> existing = {};
     if (config.existsSync()) {
@@ -372,7 +378,7 @@ class ProjectFileRepository {
       String projectPath, String projectName, String version) async {
     // Check versioned subfolder first
     final versionedPath = p.join(
-        projectPath, 'handoffs', version, '${projectName}_HandoffPackage_$version.json');
+        projectPath, forgeDirName, 'handoffs', version, '${projectName}_HandoffPackage_$version.json');
     if (File(versionedPath).existsSync()) {
       try {
         return jsonDecode(await File(versionedPath).readAsString()) as Map<String, dynamic>;
@@ -382,7 +388,7 @@ class ProjectFileRepository {
     }
     // Fall back to flat
     final flatPath = p.join(
-        projectPath, 'handoffs', '${projectName}_HandoffPackage_$version.json');
+        projectPath, forgeDirName, 'handoffs', '${projectName}_HandoffPackage_$version.json');
     if (File(flatPath).existsSync()) {
       try {
         return jsonDecode(await File(flatPath).readAsString()) as Map<String, dynamic>;
@@ -486,7 +492,7 @@ class ProjectFileRepository {
   static Future<void> writeVerificationResult(
       String projectPath, String projectName, String specVersion,
       Map<String, dynamic> data) async {
-    final versionDir = Directory(p.join(projectPath, 'forge', specVersion));
+    final versionDir = Directory(p.join(projectPath, forgeDirName, 'forge', specVersion));
     await versionDir.create(recursive: true);
     final cacheFile = File(p.join(versionDir.path, '${projectName}_Verification_$specVersion.json'));
     await cacheFile.writeAsString(jsonEncode(data));
@@ -496,7 +502,7 @@ class ProjectFileRepository {
   static Future<Map<String, dynamic>?> readVerificationResult(
       String projectPath, String projectName, String specVersion) async {
     final cacheFile = File(p.join(
-        projectPath, 'forge', specVersion, '${projectName}_Verification_$specVersion.json'));
+        projectPath, forgeDirName, 'forge', specVersion, '${projectName}_Verification_$specVersion.json'));
     if (!cacheFile.existsSync()) return null;
     try {
       return jsonDecode(await cacheFile.readAsString()) as Map<String, dynamic>;
@@ -506,7 +512,7 @@ class ProjectFileRepository {
   }
 
   Future<List<File>> listReferenceDocs(String projectPath) async {
-    final ingestedDir = Directory(p.join(projectPath, 'ingested'));
+    final ingestedDir = Directory(p.join(projectPath, forgeDirName, 'ingested'));
     if (!ingestedDir.existsSync()) return [];
     final all = ingestedDir
         .listSync()
@@ -523,14 +529,14 @@ class ProjectFileRepository {
       String projectPath, String sourcePath) async {
     final source = File(sourcePath);
     final filename = p.basename(sourcePath);
-    final ingestedDir = Directory(p.join(projectPath, 'ingested'));
+    final ingestedDir = Directory(p.join(projectPath, forgeDirName, 'ingested'));
     final destPath = p.join(ingestedDir.path, filename);
     return source.copy(destPath);
   }
 
   Future<void> writeIngestedFile(
       String projectPath, String filename, String content) async {
-    final ingestedDir = Directory(p.join(projectPath, 'ingested'));
+    final ingestedDir = Directory(p.join(projectPath, forgeDirName, 'ingested'));
     final file = File(p.join(ingestedDir.path, filename));
     await file.writeAsString(content);
   }
@@ -543,7 +549,7 @@ class ProjectFileRepository {
     required String specVersion,
     required String amendmentText,
   }) async {
-    final ingestedDir = Directory(p.join(projectPath, 'ingested'));
+    final ingestedDir = Directory(p.join(projectPath, forgeDirName, 'ingested'));
     await ingestedDir.create(recursive: true);
     final file = File(p.join(ingestedDir.path,
         '${projectName}_StoryAmendments_$specVersion.md'));
@@ -575,7 +581,7 @@ class ProjectFileRepository {
 
   Future<void> writeInterviewProgress(
       String projectPath, String projectName, Map<String, dynamic> data) async {
-    final auditDir = Directory(p.join(projectPath, 'audit'));
+    final auditDir = Directory(p.join(projectPath, forgeDirName, 'audit'));
     final file = File(p.join(auditDir.path, '${projectName}_InterviewState.json'));
     await file.writeAsString(jsonEncode(data));
   }
@@ -583,7 +589,7 @@ class ProjectFileRepository {
   Future<Map<String, dynamic>?> readInterviewProgress(
       String projectPath, String projectName) async {
     final file = File(
-        p.join(projectPath, 'audit', '${projectName}_InterviewState.json'));
+        p.join(projectPath, forgeDirName, 'audit', '${projectName}_InterviewState.json'));
     if (!file.existsSync()) return null;
     try {
       return jsonDecode(await file.readAsString()) as Map<String, dynamic>;
@@ -595,14 +601,14 @@ class ProjectFileRepository {
   Future<void> clearInterviewProgress(
       String projectPath, String projectName) async {
     final file = File(
-        p.join(projectPath, 'audit', '${projectName}_InterviewState.json'));
+        p.join(projectPath, forgeDirName, 'audit', '${projectName}_InterviewState.json'));
     if (file.existsSync()) await file.delete();
   }
 
   Future<void> updateHandoffPackageField(String projectPath, String projectName,
       String specVersion, Map<String, dynamic> updates) async {
     final file = File(p.join(
-        projectPath, 'handoffs', '${projectName}_HandoffPackage_$specVersion.json'));
+        projectPath, forgeDirName, 'handoffs', '${projectName}_HandoffPackage_$specVersion.json'));
     if (!await file.exists()) return;
     try {
       final data =
@@ -628,9 +634,9 @@ class ProjectFileRepository {
       final version = 'v$i';
       // Versioned subfolder first, flat fallback (mirrors readLockedSpec).
       final versionedPath = p.join(
-          projectPath, 'specs', version, '${projectName}_LockedSpec_$version.md');
+          projectPath, forgeDirName, 'specs', version, '${projectName}_LockedSpec_$version.md');
       final flatPath = p.join(
-          projectPath, 'specs', '${projectName}_LockedSpec_$version.md');
+          projectPath, forgeDirName, 'specs', '${projectName}_LockedSpec_$version.md');
       final specFile = File(versionedPath).existsSync()
           ? File(versionedPath)
           : File(flatPath);
@@ -644,7 +650,7 @@ class ProjectFileRepository {
 
     // Backlog seeds are always from the most recent prior version.
     final seedsFile =
-        File(p.join(projectPath, 'ingested', '${projectName}_V2Seeds.md'));
+        File(p.join(projectPath, forgeDirName, 'ingested', '${projectName}_V2Seeds.md'));
     if (seedsFile.existsSync()) {
       final seedsContent = await seedsFile.readAsString();
       parts.add(
@@ -721,7 +727,7 @@ class ProjectFileRepository {
 
   Future<void> writeIngestionSummary(
       String projectPath, String projectName, IngestionSummary summary) async {
-    final ingestedDir = Directory(p.join(projectPath, 'ingested'));
+    final ingestedDir = Directory(p.join(projectPath, forgeDirName, 'ingested'));
     await ingestedDir.create(recursive: true);
 
     final jsonPath = p.join(ingestedDir.path,
@@ -738,7 +744,7 @@ class ProjectFileRepository {
 
   Future<IngestionSummary?> readIngestionSummary(
       String projectPath, String projectName) async {
-    final ingestedDir = Directory(p.join(projectPath, 'ingested'));
+    final ingestedDir = Directory(p.join(projectPath, forgeDirName, 'ingested'));
     if (!ingestedDir.existsSync()) return null;
 
     final jsonFiles = ingestedDir
@@ -762,7 +768,7 @@ class ProjectFileRepository {
 
   Future<void> writeAsBuiltSpec(
       String projectPath, String projectName, String content) async {
-    final versionDir = Directory(p.join(projectPath, 'specs', 'v1'));
+    final versionDir = Directory(p.join(projectPath, forgeDirName, 'specs', 'v1'));
     await versionDir.create(recursive: true);
     final specPath =
         p.join(versionDir.path, '${projectName}_AsBuiltSpec_v1.md');
@@ -774,7 +780,7 @@ class ProjectFileRepository {
 
   Future<void> writePullInterviewLog(String projectPath, String projectName,
       List<Map<String, dynamic>> turns) async {
-    final auditDir = Directory(p.join(projectPath, 'audit'));
+    final auditDir = Directory(p.join(projectPath, forgeDirName, 'audit'));
     final file =
         File(p.join(auditDir.path, '${projectName}_PullInterview.json'));
     await file.writeAsString(jsonEncode(turns));
@@ -783,7 +789,7 @@ class ProjectFileRepository {
   Future<List<Map<String, dynamic>>> readPullInterviewLog(
       String projectPath, String projectName) async {
     final file = File(
-        p.join(projectPath, 'audit', '${projectName}_PullInterview.json'));
+        p.join(projectPath, forgeDirName, 'audit', '${projectName}_PullInterview.json'));
     if (!file.existsSync()) return [];
     try {
       return (jsonDecode(await file.readAsString()) as List<dynamic>)

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:path/path.dart' as p;
 
+import '../../../data/filesystem/project_file_repository.dart';
 import '../../../data/local_db/forge_database.dart';
 
 /// Persists tracker data (features + per-project tracking state) to the drift
@@ -98,7 +99,8 @@ class TrackerRepository {
     String fileName,
     Map<String, dynamic> data,
   ) async {
-    final dir = Directory(p.join(projectPath, 'tracker'));
+    final dir =
+        Directory(p.join(projectPath, ProjectFileRepository.forgeDirName, 'tracker'));
     if (!dir.existsSync()) {
       await dir.create(recursive: true);
     }

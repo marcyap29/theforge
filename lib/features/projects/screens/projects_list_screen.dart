@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
+import '../../../data/filesystem/project_file_repository.dart';
 import '../../../data/local_db/forge_database.dart';
 import '../project_actions.dart';
 import '../providers/providers.dart';
@@ -352,7 +353,7 @@ class _ProjectRowState extends ConsumerState<_ProjectRow> {
     if (sv == null) return;
     try {
       final file = File(p.join(
-        widget.project.path, 'specs',
+        widget.project.path, ProjectFileRepository.forgeDirName, 'specs',
         '${widget.project.name}_LockedSpec_$sv.md',
       ));
       if (!file.existsSync()) return;

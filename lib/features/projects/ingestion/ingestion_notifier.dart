@@ -143,7 +143,8 @@ class IngestionNotifier extends Notifier<IngestionState> {
 
   Future<void> _rebuildContext(
       ProjectFileRepository repo, String projectPath) async {
-    final ingestedDir = Directory(p.join(projectPath, 'ingested'));
+    final ingestedDir = Directory(
+        p.join(projectPath, ProjectFileRepository.forgeDirName, 'ingested'));
     final factsFiles = ingestedDir
         .listSync()
         .whereType<File>()

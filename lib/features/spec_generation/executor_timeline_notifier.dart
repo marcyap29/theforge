@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
+import '../../data/filesystem/project_file_repository.dart';
 import '../../features/projects/providers/providers.dart';
 import '../../services/llm/llm_provider.dart';
 import '../../services/llm/llm_service_provider.dart';
@@ -21,7 +22,8 @@ class ExecutorTimelineNotifier extends AutoDisposeFamilyAsyncNotifier<ExecutorTi
   @override
   Future<ExecutorTimelineState> build(String arg) async {
     try {
-      final handoffsDir = Directory(p.join(arg, 'handoffs'));
+      final handoffsDir =
+          Directory(p.join(arg, ProjectFileRepository.forgeDirName, 'handoffs'));
       if (!handoffsDir.existsSync()) {
         return const ExecutorTimelineState(status: ExecutorTimelineStatus.notGenerated);
       }

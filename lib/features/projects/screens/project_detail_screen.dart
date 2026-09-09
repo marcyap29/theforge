@@ -31,6 +31,9 @@ import '../providers/providers.dart';
 import 'pull_ingestion_progress_screen.dart';
 import 'pull_ingestion_summary_screen.dart';
 
+/// Hidden per-project folder holding all Forge-generated deliverables.
+const _forgeDir = ProjectFileRepository.forgeDirName;
+
 class ProjectDetailScreen extends ConsumerStatefulWidget {
   const ProjectDetailScreen({super.key, required this.project});
   final Project project;
@@ -534,11 +537,11 @@ class _AppBarTitleState extends State<_AppBarTitle> {
     final sv = widget.specVersion ?? 'v1';
     try {
       // Check versioned subfolder first, fall back to flat for older projects.
-      File file = File(p.join(widget.projectPath, 'specs', sv,
+      File file = File(p.join(widget.projectPath, _forgeDir, 'specs', sv,
           '${widget.projectName}_LockedSpec_$sv.md'));
       if (!file.existsSync()) {
         file = File(p.join(
-            widget.projectPath, 'specs', '${widget.projectName}_LockedSpec_$sv.md'));
+            widget.projectPath, _forgeDir, 'specs', '${widget.projectName}_LockedSpec_$sv.md'));
       }
       if (!file.existsSync()) return;
       final content = await file.readAsString();
@@ -639,10 +642,10 @@ class _VersionHistoryLaneState extends State<_VersionHistoryLane> {
   Future<_SpecSummary> _loadSpec(String version) async {
     try {
       File file = File(p.join(
-          widget.projectPath, 'specs', version,
+          widget.projectPath, _forgeDir, 'specs', version,
           '${widget.projectName}_LockedSpec_$version.md'));
       if (!file.existsSync()) {
-        file = File(p.join(widget.projectPath, 'specs',
+        file = File(p.join(widget.projectPath, _forgeDir, 'specs',
             '${widget.projectName}_LockedSpec_$version.md'));
       }
       if (!file.existsSync()) return (goal: null, components: <String>[]);
@@ -1068,7 +1071,7 @@ String _nextVersion(String current) {
 /// project display name differs from the original folder/file prefix (rename case).
 File? _findSpecFile(String projectPath, String version) {
   final suffix = '_LockedSpec_$version.md';
-  final nestedDir = Directory(p.join(projectPath, 'specs', version));
+  final nestedDir = Directory(p.join(projectPath, _forgeDir, 'specs', version));
   if (nestedDir.existsSync()) {
     final hit = nestedDir
         .listSync()
@@ -1077,7 +1080,7 @@ File? _findSpecFile(String projectPath, String version) {
         .firstOrNull;
     if (hit != null) return hit;
   }
-  final flatDir = Directory(p.join(projectPath, 'specs'));
+  final flatDir = Directory(p.join(projectPath, _forgeDir, 'specs'));
   if (flatDir.existsSync()) {
     final hit = flatDir
         .listSync()
@@ -1102,7 +1105,7 @@ bool _specFileExistsOnDisk(String projectPath, String version) =>
 /// Like _findSpecFile but for setup worksheets (*_SetupWorksheet_{version}.md).
 File? _findWorksheetFile(String projectPath, String version) {
   final suffix = '_SetupWorksheet_$version.md';
-  final nestedDir = Directory(p.join(projectPath, 'worksheets', version));
+  final nestedDir = Directory(p.join(projectPath, _forgeDir, 'worksheets', version));
   if (nestedDir.existsSync()) {
     final hit = nestedDir
         .listSync()
@@ -1111,7 +1114,7 @@ File? _findWorksheetFile(String projectPath, String version) {
         .firstOrNull;
     if (hit != null) return hit;
   }
-  final flatDir = Directory(p.join(projectPath, 'worksheets'));
+  final flatDir = Directory(p.join(projectPath, _forgeDir, 'worksheets'));
   if (flatDir.existsSync()) {
     return flatDir
         .listSync()
@@ -1126,7 +1129,7 @@ bool _worksheetFileExistsOnDisk(String projectPath, String version) =>
     _findWorksheetFile(projectPath, version) != null;
 
 bool _handoffDirHasFiles(String projectPath, String version) {
-  final dir = Directory(p.join(projectPath, 'handoffs', version));
+  final dir = Directory(p.join(projectPath, _forgeDir, 'handoffs', version));
   if (!dir.existsSync()) return false;
   return dir.listSync().whereType<File>().any(
       (f) => f.path.endsWith('.md'));
@@ -1359,12 +1362,12 @@ class _PhaseTimelineState extends State<_PhaseTimeline>
       BuildContext context, String folder, String filename, ArtifactViewMode mode,
       {String? specVersion}) {
     final file = specVersion != null
-        ? File(p.join(widget.project.path, folder, specVersion, filename))
-        : File(p.join(widget.project.path, folder, filename));
+        ? File(p.join(widget.project.path, _forgeDir, folder, specVersion, filename))
+        : File(p.join(widget.project.path, _forgeDir, folder, filename));
     // Fall back to flat path for existing projects.
     final resolvedFile = file.existsSync()
         ? file
-        : File(p.join(widget.project.path, folder, filename));
+        : File(p.join(widget.project.path, _forgeDir, folder, filename));
     if (!resolvedFile.existsSync()) return;
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => ArtifactViewerScreen(
@@ -2084,7 +2087,7 @@ class _FilesSidebarState extends ConsumerState<_FilesSidebar> with RouteAware {
   Future<Map<String, Map<String, List<String>>>> _scan() async {
     final result = <String, Map<String, List<String>>>{};
     for (final f in _folders) {
-      final dir = Directory(p.join(widget.projectPath, f.id));
+      final dir = Directory(p.join(widget.projectPath, _forgeDir, f.id));
       if (!dir.existsSync()) continue;
       final versions = <String, List<String>>{};
       for (final entry in dir.listSync()) {
@@ -2257,8 +2260,8 @@ class _FilesSidebarState extends ConsumerState<_FilesSidebar> with RouteAware {
                                         highlighted: coderFiles.contains('${folder.id}/$version/$filename'),
                                         onTap: () => _open(context, folder.id, version, filename),
                                         filePath: version.isEmpty
-                                            ? p.join(widget.projectPath, folder.id, filename)
-                                            : p.join(widget.projectPath, folder.id, version, filename),
+                                            ? p.join(widget.projectPath, _forgeDir, folder.id, filename)
+                                            : p.join(widget.projectPath, _forgeDir, folder.id, version, filename),
                                       ),
                                   ],
                               ],
@@ -2826,8 +2829,8 @@ class _CopyWorksheetButton extends StatelessWidget {
         onPressed: () async {
           // Check versioned subfolder first, fall back to flat.
           File _resolve(String folder, String filename) {
-            final v = File(p.join(projectPath, folder, specVersion, filename));
-            return v.existsSync() ? v : File(p.join(projectPath, folder, filename));
+            final v = File(p.join(projectPath, _forgeDir, folder, specVersion, filename));
+            return v.existsSync() ? v : File(p.join(projectPath, _forgeDir, folder, filename));
           }
           final goalFile = _resolve('handoffs', '${projectName}_goal_$specVersion.md');
           final worksheetFile = _resolve('worksheets', '${projectName}_SetupWorksheet_$specVersion.md');
@@ -3041,7 +3044,7 @@ class _ContextPanelState extends State<_ContextPanel> {
 
   Future<void> _loadSeeds() async {
     final handoffsDir =
-        Directory(p.join(widget.projectPath, 'handoffs'));
+        Directory(p.join(widget.projectPath, _forgeDir, 'handoffs'));
     if (!handoffsDir.existsSync()) {
       if (mounted) setState(() => _seedsLoaded = true);
       return;
@@ -3520,10 +3523,10 @@ class _CoderPackageSectionState extends State<_CoderPackageSection> {
     if (readme.existsSync()) items.add(_CoderItem('README — Project State', readme));
 
     for (final folder in ['specs', 'handoffs', 'worksheets']) {
-      final vDir = Directory(p.join(widget.projectPath, folder, v));
+      final vDir = Directory(p.join(widget.projectPath, _forgeDir, folder, v));
       final scanDir = vDir.existsSync()
           ? vDir
-          : Directory(p.join(widget.projectPath, folder));
+          : Directory(p.join(widget.projectPath, _forgeDir, folder));
       if (!scanDir.existsSync()) continue;
       for (final f in scanDir.listSync().whereType<File>()) {
         final label = _label(p.basename(f.path));
@@ -3586,7 +3589,7 @@ class _CoderPackageSectionState extends State<_CoderPackageSection> {
         return;
       }
       final text = await _bundle(d.version!, d.items);
-      final exportsDir = Directory(p.join(widget.projectPath, 'exports'));
+      final exportsDir = Directory(p.join(widget.projectPath, _forgeDir, 'exports'));
       await exportsDir.create(recursive: true);
       final out = File(p.join(
         exportsDir.path,
@@ -3624,7 +3627,7 @@ class _CoderPackageSectionState extends State<_CoderPackageSection> {
   }
 
   String? _latestVersionOnDisk() {
-    final specsDir = Directory(p.join(widget.projectPath, 'specs'));
+    final specsDir = Directory(p.join(widget.projectPath, _forgeDir, 'specs'));
     if (!specsDir.existsSync()) return null;
     String? latest;
     for (final entry in specsDir.listSync()) {

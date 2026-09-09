@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:path/path.dart' as p;
 
+import '../../data/filesystem/project_file_repository.dart';
+
 enum ArtifactViewMode { forge, spec, handoff, worksheet, audit }
 
 class ArtifactViewArgs {
@@ -49,9 +51,11 @@ class ArtifactViewerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const base = ProjectFileRepository.forgeDirName;
     final file = args.specVersion != null
-        ? File(p.join(args.projectPath, _folder, args.specVersion!, args.filename))
-        : File(p.join(args.projectPath, _folder, args.filename));
+        ? File(p.join(
+            args.projectPath, base, _folder, args.specVersion!, args.filename))
+        : File(p.join(args.projectPath, base, _folder, args.filename));
 
     return Scaffold(
       appBar: AppBar(
