@@ -9,9 +9,9 @@ import '../../data/filesystem/project_file_repository.dart';
 import 'import_confirm_screen.dart';
 import 'import_service.dart';
 
-/// Import a description / document / transcript (and optionally the linked repo)
-/// and generate the full deliverable set in one shot — an alternative to the
-/// interactive interview.
+/// Import a description / document / transcript, or point at an existing repo,
+/// and generate the full deliverable set — an alternative to the interactive
+/// interview. Repo analysis auto-fills what it can and surfaces the gaps.
 class ImportScreen extends ConsumerStatefulWidget {
   const ImportScreen({
     super.key,
@@ -28,8 +28,8 @@ class ImportScreen extends ConsumerStatefulWidget {
 
 class _ImportScreenState extends ConsumerState<ImportScreen> {
   final _source = TextEditingController();
-  bool _includeRepo = false;
   bool _busy = false;
+  String _status = '';
   String? _repoPath;
 
   @override
@@ -64,7 +64,8 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
     try {
       final content = await File(path).readAsString();
       final header = '\n\n--- ${p.basename(path)} ---\n';
-      _source.text = _source.text.isEmpty ? content : '${_source.text}$header$content';
+      _source.text =
+          _source.text.isEmpty ? content : '${_source.text}$header$content';
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -73,26 +74,54 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
     }
   }
 
-  bool get _canGenerate =>
-      !_busy && (_source.text.trim().isNotEmpty || _includeRepo);
+  /// Pure-repo path: pick a folder, ingest it (docs + structure), and auto-fill.
+  Future<void> _analyzeRepo() async {
+    final picked = await FilePicker.platform
+        .getDirectoryPath(dialogTitle: 'Select the repository to analyze');
+    if (picked == null) return;
+    // Persist as the project's linked repo (also enables future check-ins).
+    await ProjectFileRepository.writeProjectConfig(
+        widget.projectPath, {'repoPath': picked});
+    if (mounted) setState(() => _repoPath = picked);
 
-  Future<void> _generate() async {
+    await _run(
+      status: 'Analyzing repository…',
+      buildSource: () async =>
+          ref.read(importServiceProvider).repoDigest(picked),
+      repoPath: picked,
+    );
+  }
+
+  /// Text path: description / transcript, optionally augmented by the linked repo.
+  Future<void> _generateFromText() async {
+    await _run(
+      status: 'Reading…',
+      buildSource: () async => _source.text.trim(),
+      repoPath: _repoPath,
+    );
+  }
+
+  Future<void> _run({
+    required String status,
+    required Future<String> Function() buildSource,
+    String? repoPath,
+  }) async {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _status = status;
+    });
     try {
-      final service = ref.read(importServiceProvider);
-      var source = _source.text.trim();
-      if (_includeRepo && _repoPath != null) {
-        source = '$source\n\n${await service.repoDigest(_repoPath!)}';
-      }
-      final extracted = await service.extract(source);
+      final source = await buildSource();
+      final result = await ref.read(importServiceProvider).extract(source);
       if (!mounted) return;
       navigator.push(MaterialPageRoute<void>(
         builder: (_) => ImportConfirmScreen(
           projectPath: widget.projectPath,
           projectName: widget.projectName,
-          extracted: extracted,
+          result: result,
+          repoPath: repoPath,
         ),
       ));
     } catch (e) {
@@ -114,13 +143,48 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Paste a description, product brief, or chat transcript — or import '
-              'a .md/.txt file. The Forge will draft a spec you can review, then '
-              'generate the same docs an interview would.',
-              style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
+            // Repo path — the headline for onboarding an existing app.
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0x1AE8A04C),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0x55E8A04C)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Onboard an existing repo',
+                      style: TextStyle(
+                          color: Color(0xFFE5E5E7),
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Point at a repo. The Forge reads its docs + structure, '
+                    'auto-fills the spec, and asks you only for what it can\'t '
+                    'infer — then generates every doc.',
+                    style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
+                  ),
+                  const SizedBox(height: 10),
+                  FilledButton.icon(
+                    onPressed: _busy ? null : _analyzeRepo,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFE8A04C),
+                      foregroundColor: const Color(0xFF0F0F10),
+                    ),
+                    icon: const Icon(Icons.radar, size: 18),
+                    label: Text(_repoPath == null
+                        ? 'Analyze a repo…'
+                        : 'Analyze ${p.basename(_repoPath!)}…'),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 20),
+            const Text('Or describe it / paste a doc or transcript',
+                style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12)),
+            const SizedBox(height: 8),
             Expanded(
               child: TextField(
                 controller: _source,
@@ -151,21 +215,17 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
                   label: const Text('Import file…'),
                 ),
                 const Spacer(),
-                if (_repoPath != null)
-                  Row(
-                    children: [
-                      Checkbox(
-                        value: _includeRepo,
-                        activeColor: const Color(0xFFE8A04C),
-                        onChanged: _busy
-                            ? null
-                            : (v) => setState(() => _includeRepo = v ?? false),
-                      ),
-                      Text('Include repo (${p.basename(_repoPath!)})',
-                          style: const TextStyle(
-                              fontSize: 12, color: Color(0xFF9CA3AF))),
-                    ],
-                  ),
+                if (_busy)
+                  Row(children: [
+                    const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2)),
+                    const SizedBox(width: 8),
+                    Text(_status,
+                        style: const TextStyle(
+                            color: Color(0xFF9CA3AF), fontSize: 12)),
+                  ]),
               ],
             ),
             const SizedBox(height: 12),
@@ -173,18 +233,15 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
               width: double.infinity,
               height: 44,
               child: FilledButton.icon(
-                onPressed: _canGenerate ? _generate : null,
+                onPressed: (_busy || _source.text.trim().isEmpty)
+                    ? null
+                    : _generateFromText,
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFE8A04C),
-                  foregroundColor: const Color(0xFF0F0F10),
+                  backgroundColor: const Color(0xFF1C1C1E),
+                  foregroundColor: const Color(0xFFE5E5E7),
                 ),
-                icon: _busy
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.auto_awesome),
-                label: Text(_busy ? 'Reading…' : 'Draft spec from import'),
+                icon: const Icon(Icons.auto_awesome, size: 18),
+                label: const Text('Draft spec from text'),
               ),
             ),
           ],
