@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../features/projects/models/pull_ingestion_summary.dart';
 
 enum ProjectMode { build, audit, pull }
@@ -30,27 +29,17 @@ class ProjectFileRepository {
   ProjectFileRepository({Future<Directory> Function()? rootDirProvider})
       : _rootDirProvider = rootDirProvider ?? _defaultRootDir;
 
-  static const _prefsKeyRootPath = 'forge_root_path';
-
   /// All Forge-generated deliverables for a project live under this hidden
   /// subfolder inside the project workspace. README.md and user_notes.md stay
   /// at the project root as the human-facing entry points.
   static const forgeDirName = '.forge';
 
-  static Future<String?> getSavedRootPath() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_prefsKeyRootPath);
-  }
-
-  static Future<void> saveRootPath(String path) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_prefsKeyRootPath, path);
-  }
-
+  /// The canonical, fixed home for all Forge project workspaces. It is
+  /// deliberately NOT user-configurable and is never a code repo, so the Forge
+  /// can always find a project's documentation even as code repos move or are
+  /// deleted. Link a code repo per-project via the Repo Path row instead, and
+  /// use "Export docs…" to copy deliverables into a repo when wanted.
   static Future<Directory> _defaultRootDir() async {
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString(_prefsKeyRootPath);
-    if (saved != null) return Directory(saved);
     final docs = await getApplicationDocumentsDirectory();
     return Directory(p.join(docs.path, 'The Forge Projects'));
   }

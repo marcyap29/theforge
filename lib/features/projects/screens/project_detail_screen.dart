@@ -23,6 +23,7 @@ import '../../spec_generation/compliance/spec_compliance_screen.dart';
 import '../../spec_generation/executor_timeline_notifier.dart';
 import '../../spec_generation/worksheet_generation_screen.dart';
 import '../../tracker/screens/project_tracker_screen.dart';
+import '../doc_export.dart';
 import '../ingestion/ingestion_notifier.dart';
 import '../ingestion/pull_ingestion_notifier.dart';
 import '../ingestion/reference_docs_screen.dart';
@@ -113,6 +114,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           specVersion: live.specVersion,
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.ios_share),
+            tooltip: 'Export docs…',
+            onPressed: () => _exportDocs(live),
+          ),
           IconButton(
             icon: const Icon(Icons.checklist_rtl),
             tooltip: 'Feature Tracker',
@@ -244,6 +250,45 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         ],
       ),
     );
+  }
+
+  /// Copies this project's deliverables to a chosen folder (defaults to the
+  /// linked repo) under a visible `forge-docs/`. The canonical workspace stays
+  /// the source of truth.
+  Future<void> _exportDocs(Project live) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final config = await ProjectFileRepository.readProjectConfig(live.path);
+    final repoPath = config['repoPath'] as String?;
+    final dest = await FilePicker.platform.getDirectoryPath(
+      dialogTitle: 'Export "${live.name}" docs to…',
+      initialDirectory:
+          (repoPath != null && repoPath.isNotEmpty) ? repoPath : null,
+    );
+    if (dest == null) return;
+    try {
+      final n = await exportProjectDocs(
+        projectPath: live.path,
+        projectName: live.name,
+        destDir: dest,
+      );
+      final outPath = p.join(dest, 'forge-docs');
+      messenger.showSnackBar(SnackBar(
+        content: Text('Exported $n file${n == 1 ? '' : 's'} → $outPath',
+            style: const TextStyle(fontFamily: 'Menlo', fontSize: 11)),
+        backgroundColor: const Color(0xFF1C1C1E),
+        duration: const Duration(seconds: 6),
+        action: SnackBarAction(
+          label: 'Show in Finder',
+          textColor: const Color(0xFFE8A04C),
+          onPressed: () => Process.run('open', ['-R', outPath]),
+        ),
+      ));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(
+        content: Text('Export failed: $e'),
+        backgroundColor: const Color(0xFF3F0A0A),
+      ));
+    }
   }
 
   String _ctaSectionLabel(String phase) => switch (_stageOf(phase)) {
