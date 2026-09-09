@@ -5,7 +5,13 @@ import '../../../data/filesystem/project_file_repository.dart';
 import '../../../data/local_db/forge_database.dart';
 import '../../../features/settings/settings_providers.dart';
 import '../../../services/llm/llm_provider.dart';
+import '../../import/import_screen.dart';
 import '../providers/providers.dart';
+
+/// How a new project is seeded. The three interview flows map 1:1 to
+/// [ProjectMode]; `importDoc` reuses Build mode but routes to the one-shot
+/// Import → Spec flow instead of the interview.
+enum _Flow { build, audit, pull, importDoc }
 
 class NewProjectScreen extends ConsumerStatefulWidget {
   const NewProjectScreen({super.key});
@@ -17,8 +23,15 @@ class NewProjectScreen extends ConsumerStatefulWidget {
 class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
   final _nameController = TextEditingController();
   String _name = '';
-  ProjectMode _mode = ProjectMode.build;
+  _Flow _flow = _Flow.build;
   bool _creating = false;
+
+  ProjectMode _modeFor(_Flow f) => switch (f) {
+        _Flow.build => ProjectMode.build,
+        _Flow.importDoc => ProjectMode.build,
+        _Flow.audit => ProjectMode.audit,
+        _Flow.pull => ProjectMode.pull,
+      };
 
   @override
   void initState() {
@@ -51,20 +64,28 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
     final now = DateTime.now().millisecondsSinceEpoch;
 
     try {
-      final projectPath = await repo.createProject(name, _mode);
+      final mode = _modeFor(_flow);
+      final projectPath = await repo.createProject(name, mode);
       await db.upsertProject(
         ProjectsCompanion.insert(
           id: name,
           name: name,
           path: projectPath,
-          mode: _mode.name,
+          mode: mode.name,
           phase: 'v1_interview',
           createdAt: now,
         ),
       );
       await ref.read(projectListProvider.notifier).refresh();
       if (mounted) {
-        navigator.pop();
+        if (_flow == _Flow.importDoc) {
+          navigator.pushReplacement(MaterialPageRoute<void>(
+            builder: (_) => ImportScreen(
+                projectPath: projectPath, projectName: name),
+          ));
+        } else {
+          navigator.pop();
+        }
       }
     } on ProjectAlreadyExistsException {
       if (!mounted) return;
@@ -189,9 +210,31 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            const _SectionHeader('Interview Mode'),
+            const _SectionHeader('How to start'),
             _ModeCard(
-              mode: ProjectMode.build,
+              icon: Icons.auto_awesome,
+              accentColor: const Color(0xFFE8A04C),
+              title: 'IMPORT → SPEC',
+              tagline: 'Generate docs from an import.',
+              description:
+                  'Paste a description, doc, or transcript (and optionally a '
+                  'linked repo). The LLM drafts the spec set in one shot — you '
+                  'review, then it generates.',
+              dimensions: const [
+                'Description',
+                'Document',
+                'Transcript',
+                'Repo',
+              ],
+              selected: _flow == _Flow.importDoc,
+              onTap: _creating
+                  ? null
+                  : () => setState(() => _flow = _Flow.importDoc),
+            ),
+            const SizedBox(height: 12),
+            _ModeCard(
+              icon: Icons.build_outlined,
+              accentColor: const Color(0xFFE8A04C),
               title: 'BUILD INTERVIEW',
               tagline: 'Define what gets built.',
               description:
@@ -203,14 +246,15 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
                 'Platform',
                 'Scope boundary',
               ],
-              selected: _mode == ProjectMode.build,
+              selected: _flow == _Flow.build,
               onTap: _creating
                   ? null
-                  : () => setState(() => _mode = ProjectMode.build),
+                  : () => setState(() => _flow = _Flow.build),
             ),
             const SizedBox(height: 12),
             _ModeCard(
-              mode: ProjectMode.audit,
+              icon: Icons.fact_check_outlined,
+              accentColor: const Color(0xFF94A3B8),
               title: 'AUDIT INTERVIEW',
               tagline: 'Establish current state.',
               description:
@@ -223,13 +267,14 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
                 'Decision debt',
                 'AI & token usage',
               ],
-              selected: _mode == ProjectMode.audit,
+              selected: _flow == _Flow.audit,
               onTap: _creating
                   ? null
-                  : () => setState(() => _mode = ProjectMode.audit),
+                  : () => setState(() => _flow = _Flow.audit),
             ),
             _ModeCard(
-              mode: ProjectMode.pull,
+              icon: Icons.search_outlined,
+              accentColor: const Color(0xFFA78BFA),
               title: 'PROJECT ONBOARDING',
               tagline: 'Map an existing codebase.',
               description:
@@ -241,10 +286,10 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
                 'API surface',
                 'Dependencies',
               ],
-              selected: _mode == ProjectMode.pull,
+              selected: _flow == _Flow.pull,
               onTap: _creating
                   ? null
-                  : () => setState(() => _mode = ProjectMode.pull),
+                  : () => setState(() => _flow = _Flow.pull),
             ),
             const SizedBox(height: 32),
             SizedBox(
@@ -304,7 +349,8 @@ class _SectionHeader extends StatelessWidget {
 
 class _ModeCard extends StatelessWidget {
   const _ModeCard({
-    required this.mode,
+    required this.icon,
+    required this.accentColor,
     required this.title,
     required this.tagline,
     required this.description,
@@ -313,7 +359,8 @@ class _ModeCard extends StatelessWidget {
     required this.onTap,
   });
 
-  final ProjectMode mode;
+  final IconData icon;
+  final Color accentColor;
   final String title;
   final String tagline;
   final String description;
@@ -330,16 +377,6 @@ class _ModeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final borderColor = selected ? _amberBorder : _slateBorder;
     final backgroundColor = selected ? _amberBackground : _cardBackground;
-    final icon = switch (mode) {
-      ProjectMode.build => Icons.build_outlined,
-      ProjectMode.audit => Icons.fact_check_outlined,
-      ProjectMode.pull => Icons.search_outlined,
-    };
-    final accentColor = switch (mode) {
-      ProjectMode.build => _amberBorder,
-      ProjectMode.audit => const Color(0xFF94A3B8),
-      ProjectMode.pull => const Color(0xFFA78BFA),
-    };
 
     return Material(
       color: Colors.transparent,
