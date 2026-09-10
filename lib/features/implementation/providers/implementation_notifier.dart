@@ -137,13 +137,8 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
   /// Kicks off the run: streams the agent's plan, then waits for approval.
   Future<void> start(ImplBrief brief) async {
     if (state.phase != RunPhase.idle) return;
-    final gen = ++_gen;
     _brief = brief;
-    _partial = '';
-    _streamStarted = false;
-    _partialKind = ConsoleLineKind.thinking;
     state = state.copyWith(startedAt: DateTime.now(), error: null);
-    _phase(RunPhase.planning);
     _log(ConsoleLineKind.narration, 'Planning: "${brief.featureTitle}"');
     _log(ConsoleLineKind.info, 'Repo: ${brief.repoPath}');
     final resolved = ref.read(llmServiceProvider).resolve(LlmRole.executor);
@@ -151,6 +146,28 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
       _log(ConsoleLineKind.info,
           'Model: ${resolved.provider.name} · ${resolved.modelId}');
     }
+    await _plan();
+  }
+
+  /// Re-plans from the current plan plus the user's steering instruction — the
+  /// "tell the AI what to change" path.
+  Future<void> revise(String feedback) async {
+    if (_brief == null || state.plan == null) return;
+    if (state.phase != RunPhase.awaitingApproval) return;
+    if (feedback.trim().isEmpty) return;
+    _log(ConsoleLineKind.command, '↻ Revise: ${feedback.trim()}');
+    await _plan(previousPlan: state.plan, feedback: feedback.trim());
+  }
+
+  /// Shared planning body used by both [start] and [revise].
+  Future<void> _plan({AgentPlan? previousPlan, String? feedback}) async {
+    final brief = _brief;
+    if (brief == null) return;
+    final gen = ++_gen;
+    _partial = '';
+    _streamStarted = false;
+    _partialKind = ConsoleLineKind.thinking;
+    _phase(RunPhase.planning);
     _log(ConsoleLineKind.info, 'Waiting for the model to respond…');
 
     // Reassure the user while we wait for the first streamed token — a large
@@ -176,6 +193,8 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
         lockedSpec: brief.lockedSpec,
         goalStatement: brief.goalStatement,
         components: brief.components,
+        previousPlan: previousPlan,
+        feedback: feedback,
         onDelta: (t, thinking) => _onDelta(t, thinking, gen),
         onStatus: (s) {
           if (gen == _gen) _log(ConsoleLineKind.narration, s);
@@ -189,11 +208,17 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
       }
       _log(
         ConsoleLineKind.info,
-        'Proposed ${plan.edits.length} file change'
+        '${previousPlan == null ? 'Proposed' : 'Revised —'} '
+        '${plan.edits.length} file change'
         '${plan.edits.length == 1 ? '' : 's'} and ${plan.commands.length} '
         'command${plan.commands.length == 1 ? '' : 's'}.',
       );
-      state = state.copyWith(plan: plan);
+      // A fresh plan clears prior skip decisions.
+      state = state.copyWith(
+        plan: plan,
+        skippedEdits: {},
+        skippedCommands: {},
+      );
       _phase(RunPhase.awaitingApproval);
     } catch (e) {
       if (gen != _gen || state.phase == RunPhase.stopped) return;
@@ -203,6 +228,28 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     } finally {
       if (gen == _gen) _waitTimer?.cancel();
     }
+  }
+
+  /// Hand-edit: replace the proposed content of one edit with the user's own.
+  void editProposedContent(int index, String newContent) {
+    final plan = state.plan;
+    if (plan == null || index < 0 || index >= plan.edits.length) return;
+    final old = plan.edits[index];
+    final edits = [...plan.edits];
+    edits[index] = ProposedEdit(
+      path: old.path,
+      rationale: old.rationale.isEmpty ? 'Edited by you' : old.rationale,
+      oldContent: old.oldContent,
+      newContent: newContent,
+    );
+    state = state.copyWith(
+      plan: AgentPlan(
+        summary: plan.summary,
+        rationale: plan.rationale,
+        edits: edits,
+        commands: plan.commands,
+      ),
+    );
   }
 
   void toggleEdit(int index) {

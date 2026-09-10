@@ -30,12 +30,14 @@ class ImplAgent {
     String? lockedSpec,
     String? goalStatement,
     List<String> components = const [],
+    AgentPlan? previousPlan,
+    String? feedback,
     void Function(String text, bool thinking)? onDelta,
     void Function(String status)? onStatus,
   }) async {
     final files = await ImplWorkspace.gatherRepoFiles(repoPath);
     final keyDocs = await ImplWorkspace.gatherKeyDocs(repoPath);
-    final context = _userPrompt(
+    var context = _userPrompt(
       featureTitle: featureTitle,
       featureDescription: featureDescription,
       targetVersion: targetVersion,
@@ -45,6 +47,11 @@ class ImplAgent {
       files: files,
       keyDocs: keyDocs,
     );
+    // Revision: fold the previous plan + the user's steering into the context
+    // so both passes take it into account.
+    if (feedback != null && feedback.trim().isNotEmpty) {
+      context += _revisionBlock(previousPlan, feedback.trim());
+    }
 
     // --- Pass 1 — Scout: which existing files does it need to read? ---
     onStatus?.call('Choosing which files to read…');
@@ -120,6 +127,29 @@ class ImplAgent {
       onDelta?.call(delta.text, delta.thinking);
     }
     return buffer.toString();
+  }
+
+  String _revisionBlock(AgentPlan? prev, String feedback) {
+    final b = StringBuffer()
+      ..writeln()
+      ..writeln('## Revise the previous plan');
+    if (prev != null) {
+      b.writeln('Your previous plan was:');
+      if (prev.summary.isNotEmpty) b.writeln('- summary: ${prev.summary}');
+      for (final e in prev.edits) {
+        b.writeln('- edit: ${e.path}');
+      }
+      for (final c in prev.commands) {
+        b.writeln('- command: ${c.raw}');
+      }
+    }
+    b
+      ..writeln()
+      ..writeln('The user wants you to change it. Their instruction:')
+      ..writeln('"$feedback"')
+      ..writeln('Produce a NEW complete plan that follows this instruction. '
+          'Keep the parts that were fine; change what they asked.');
+    return b.toString();
   }
 
   List<String> _parseFileList(String raw) {

@@ -174,6 +174,8 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
                     onToggleEdit: notifier.toggleEdit,
                     onToggleCommand: notifier.toggleCommand,
                     onApply: notifier.applyAndRun,
+                    onRevise: notifier.revise,
+                    onEditContent: notifier.editProposedContent,
                   ),
                 if (state.phase == RunPhase.done)
                   _DoneBar(
@@ -454,24 +456,126 @@ class _ThinkingBlock extends StatelessWidget {
   }
 }
 
-class _ApprovalPanel extends StatelessWidget {
+class _ApprovalPanel extends StatefulWidget {
   const _ApprovalPanel({
     required this.state,
     required this.onToggleEdit,
     required this.onToggleCommand,
     required this.onApply,
+    required this.onRevise,
+    required this.onEditContent,
   });
 
   final ImplRunState state;
   final ValueChanged<int> onToggleEdit;
   final ValueChanged<int> onToggleCommand;
   final VoidCallback onApply;
+  final ValueChanged<String> onRevise;
+  final void Function(int index, String content) onEditContent;
+
+  @override
+  State<_ApprovalPanel> createState() => _ApprovalPanelState();
+}
+
+class _ApprovalPanelState extends State<_ApprovalPanel> {
+  final _revise = TextEditingController();
+
+  @override
+  void dispose() {
+    _revise.dispose();
+    super.dispose();
+  }
+
+  void _submitRevise() {
+    final text = _revise.text.trim();
+    if (text.isEmpty) return;
+    widget.onRevise(text);
+    _revise.clear();
+  }
+
+  /// Opens a full editor on a proposed file so the user can hand-tweak the
+  /// content before applying.
+  Future<void> _editContent(int index) async {
+    final edit = widget.state.plan!.edits[index];
+    final controller = TextEditingController(text: edit.newContent);
+    final saved = await showDialog<String>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: const Color(0xFF0F0F10),
+        insetPadding: const EdgeInsets.all(40),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 900, maxHeight: 640),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 12, 10),
+                child: Row(children: [
+                  const Icon(Icons.edit_outlined,
+                      size: 16, color: Color(0xFFE8A04C)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text('Edit ${edit.path}',
+                        style: const TextStyle(
+                            fontFamily: 'Menlo',
+                            fontSize: 13,
+                            color: Color(0xFFE5E5E7))),
+                  ),
+                ]),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: TextField(
+                    controller: controller,
+                    expands: true,
+                    maxLines: null,
+                    textAlignVertical: TextAlignVertical.top,
+                    style: const TextStyle(
+                        fontFamily: 'Menlo',
+                        fontSize: 12.5,
+                        height: 1.4,
+                        color: Color(0xFFE5E5E7)),
+                    decoration: const InputDecoration(
+                      filled: true,
+                      fillColor: Color(0xFF0A0A0B),
+                      border: OutlineInputBorder(
+                        borderSide: BorderSide(color: Color(0xFF2C2C2E)),
+                      ),
+                      contentPadding: EdgeInsets.all(12),
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(children: [
+                  const Spacer(),
+                  TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text('Cancel')),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: () => Navigator.of(ctx).pop(controller.text),
+                    child: const Text('Save changes'),
+                  ),
+                ]),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (saved != null) widget.onEditContent(index, saved);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final state = widget.state;
     final plan = state.plan!;
     return Container(
-      constraints: const BoxConstraints(maxHeight: 380),
+      constraints: const BoxConstraints(maxHeight: 420),
       decoration: const BoxDecoration(
         color: Color(0xFF0F0F10),
         border: Border(top: BorderSide(color: Color(0xFF1C1C1E))),
@@ -483,7 +587,8 @@ class _ApprovalPanel extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
             child: Text(
-              'Review the plan — approve or skip each step, then apply.',
+              'Review the plan — approve, skip, or edit each step, or tell the '
+              'AI what to change.',
               style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
             ),
           ),
@@ -496,16 +601,48 @@ class _ApprovalPanel extends StatelessWidget {
                   _EditCard(
                     edit: plan.edits[i],
                     skipped: state.skippedEdits.contains(i),
-                    onToggle: () => onToggleEdit(i),
+                    onToggle: () => widget.onToggleEdit(i),
+                    onEdit: () => _editContent(i),
                   ),
                 for (var i = 0; i < plan.commands.length; i++)
                   _CommandCard(
                     command: plan.commands[i],
                     skipped: state.skippedCommands.contains(i),
-                    onToggle: () => onToggleCommand(i),
+                    onToggle: () => widget.onToggleCommand(i),
                   ),
               ],
             ),
+          ),
+          // Steer the AI: type an instruction and it re-plans.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+            child: Row(children: [
+              Expanded(
+                child: TextField(
+                  controller: _revise,
+                  onSubmitted: (_) => _submitRevise(),
+                  style: const TextStyle(fontSize: 12.5, color: Color(0xFFE5E5E7)),
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    hintText: 'Tell the AI what to change…',
+                    hintStyle: TextStyle(color: Color(0xFF6B7280), fontSize: 12.5),
+                    filled: true,
+                    fillColor: Color(0xFF0A0A0B),
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFF2C2C2E)),
+                    ),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: _submitRevise,
+                icon: const Icon(Icons.autorenew, size: 16),
+                label: const Text('Revise'),
+              ),
+            ]),
           ),
           Padding(
             padding: const EdgeInsets.all(12),
@@ -521,7 +658,7 @@ class _ApprovalPanel extends StatelessWidget {
                 ),
                 const Spacer(),
                 FilledButton.icon(
-                  onPressed: onApply,
+                  onPressed: widget.onApply,
                   icon: const Icon(Icons.play_arrow, size: 18),
                   label: const Text('Apply & Run'),
                 ),
@@ -539,10 +676,12 @@ class _EditCard extends StatelessWidget {
     required this.edit,
     required this.skipped,
     required this.onToggle,
+    this.onEdit,
   });
   final ProposedEdit edit;
   final bool skipped;
   final VoidCallback onToggle;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -575,6 +714,21 @@ class _EditCard extends StatelessWidget {
         trailing: _SkipToggle(skipped: skipped, onToggle: onToggle),
         childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
         children: [
+          if (onEdit != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_note, size: 16),
+                label: const Text('Edit content'),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFFE8A04C),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ),
           DiffView(oldText: edit.oldContent, newText: edit.newContent),
         ],
       ),
