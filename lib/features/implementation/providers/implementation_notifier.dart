@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../services/llm/llm_provider.dart';
+import '../../../services/llm/llm_service_provider.dart';
 import '../data/command_runner.dart';
 import '../data/impl_workspace.dart';
 import '../models/run_session.dart';
@@ -55,10 +57,14 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
   final _streamBuf = StringBuffer();
   bool _streamLineStarted = false;
   bool _jsonSeen = false;
+  Timer? _waitTimer;
 
   @override
   ImplRunState build(String featureId) {
-    ref.onDispose(_runner.cancel);
+    ref.onDispose(() {
+      _runner.cancel();
+      _waitTimer?.cancel();
+    });
     final runId = '${featureId.substring(0, featureId.length.clamp(0, 8))}'
         '-${DateTime.now().millisecondsSinceEpoch}';
     return ImplRunState.initial(runId);
@@ -94,6 +100,7 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
   /// Handles one streamed token: shows the plain-English preamble live, then
   /// hides the raw JSON (which the parser consumes) behind a steady indicator.
   void _onDelta(String delta) {
+    _waitTimer?.cancel(); // first token arrived — stop the "still waiting" pings
     _streamBuf.write(delta);
     if (_jsonSeen) return;
     final text = _streamBuf.toString();
@@ -118,6 +125,26 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     _phase(RunPhase.planning);
     _log(ConsoleLineKind.narration, 'Planning: "${brief.featureTitle}"');
     _log(ConsoleLineKind.info, 'Repo: ${brief.repoPath}');
+    final resolved = ref.read(llmServiceProvider).resolve(LlmRole.executor);
+    if (resolved != null) {
+      _log(ConsoleLineKind.info,
+          'Model: ${resolved.provider.name} · ${resolved.modelId}');
+    }
+    _log(ConsoleLineKind.info, 'Waiting for the model to respond…');
+
+    // Reassure the user while we wait for the first streamed token — a large
+    // cloud model can take a while to start, and a static console looks stuck.
+    _waitTimer = Timer.periodic(const Duration(seconds: 8), (t) {
+      if (_streamLineStarted || state.phase != RunPhase.planning) {
+        t.cancel();
+        return;
+      }
+      final secs = state.startedAt == null
+          ? 0
+          : DateTime.now().difference(state.startedAt!).inSeconds;
+      _log(ConsoleLineKind.info, 'Still working… (${secs}s)');
+    });
+
     try {
       final agent = ref.read(implAgentProvider);
       final plan = await agent.proposePlan(
@@ -145,6 +172,8 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
       _log(ConsoleLineKind.error, 'Planning failed: $e');
       state = state.copyWith(error: e.toString());
       _phase(RunPhase.failed);
+    } finally {
+      _waitTimer?.cancel();
     }
   }
 

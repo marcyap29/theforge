@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../tracker/widgets/active_model_chip.dart';
 import '../models/run_session.dart';
 import '../providers/implementation_notifier.dart';
 import '../widgets/diff_view.dart';
@@ -77,6 +78,10 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
         title: Text('Build: ${widget.brief.featureTitle}',
             style: const TextStyle(fontSize: 15)),
         actions: [
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+            child: ActiveModelChip(),
+          ),
           if (state.startedAt != null)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 4),
