@@ -4,6 +4,63 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-10 — Claude Code [Build with AI (§BWAI)]
+
+**Branch:** main · **Commit:** `71d7de4`
+
+### Done
+
+**§BWAI — Feature-driven in-app implementation agent (Pro):** From a tracked
+feature, The Forge calls the LLM to implement it — propose-&-approve loop
+(diffs + commands), applies approved edits with per-step Undo, runs commands
+with live streamed output in an in-app console, verifies against the Handoff
+checklist. New module `lib/features/implementation/`:
+- `models/run_session.dart` (phases, console lines, plan, verify results)
+- `data/command_runner.dart` (**first `Process.start`** streaming in the app)
+- `data/impl_workspace.dart` (repo gather, edit apply + `.forge/impl_backups/` Undo, checklist verify)
+- `data/impl_agent.dart` (executor-role LLM → JSON plan; full-file content, not diffs)
+- `providers/` (run notifier state machine + `entitlementProvider` stub)
+- `screens/implementation_screen.dart` + `widgets/diff_view.dart` (LCS diff)
+
+**§BWAI-REL — Feature + release tracking:** New `Releases` drift table
+(schemaVersion **2→3**, create-only migration) + CRUD; `tracker_repository`
+release ensure/save + `.forge/tracker/releases.json` mirror; `releases/
+release_providers.dart` (group by version, cut release → notes → CHANGELOG,
+optional git tag; deterministic notes); `screens/releases_screen.dart`;
+`project_tracker_screen` gains "Build with AI" tile action + Releases app-bar
+entry (build → `in_progress`; ship → `shipped` + ensure release row);
+`project_file_repository` `gitCommitAll` + `gitTag`.
+
+### Key Technical Findings
+- Providers are all blocking (`stream: false`): model reasoning is chunked;
+  the live feel is streamed **command** output only. Token-streaming the model
+  is a Phase-2 provider change.
+- Agent returns **full file content** (not diffs) → reliable apply; diff is
+  computed locally for display.
+- Verification reuses the existing Handoff checklist as a **deterministic**
+  oracle (files exist + keywords present) — no extra LLM call.
+- drift codegen still needs the `objective_c` hook workaround (move aside → run
+  build_runner → restore).
+
+### Modified / New
+NEW: `lib/features/implementation/**` (8), `lib/features/tracker/releases/release_providers.dart`,
+`lib/features/tracker/screens/releases_screen.dart`, `test/release_logic_test.dart`,
+`DOCS/forge/build_with_ai_plan_v1.md`, `DOCS/Coding Lessons/FOR_MARC_build-with-ai-agent.md`.
+MODIFIED: `lib/data/local_db/forge_database.dart` (+ `.g.dart`),
+`lib/data/filesystem/project_file_repository.dart`,
+`lib/features/tracker/data/tracker_repository.dart`,
+`lib/features/tracker/screens/project_tracker_screen.dart`.
+
+### Verification
+`dart analyze lib/` clean · `flutter test` 11/11.
+
+### Next
+Deploy (`tool/deploy_macos.sh`) and exercise Build with AI on a linked repo.
+Phase-2 ideas: token-streaming providers; agent commit-per-feature; LLM-polished
+release notes; wire `entitlementProvider` to the managed backend.
+
+---
+
 ## Session: 2026-09-10 — Claude Code [Portfolio Tracker era (§PT)]
 
 **Branch:** main

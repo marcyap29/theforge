@@ -42,8 +42,9 @@ Long-term feature pool. Active sprint work lives in `planner.md`.
   → §DIST Direct-distribution deploy (unsandboxed + Developer ID + notarize) ✅ (2026-09-10)
   → §FORGEDIR `.forge/` per-project deliverables folder + fixed canonical root ✅ (2026-09-10)
   → §IMPORT Import-a-repo → gap form → spec (LLM extraction feeds the interview) ✅ (2026-09-10)
+  → §BWAI Build with AI — feature-driven in-app implementation agent + release tracking ✅ (2026-09-10)
        ↓
-  → §MB Managed metered AI backend (gateway over Ollama Cloud) — freemium paid tier (not started)
+  → §MB Managed metered AI backend (gateway over Ollama Cloud) — freemium paid tier (not started; §BWAI is the hook)
   → Configuration C pilot (Qualcomm) — Watch + Reverse on existing codebase
 ```
 
@@ -74,6 +75,17 @@ Every §N that brings The Forge closer to a working interview-to-spec run unbloc
 ---
 
 ## High Priority
+
+### §BWAI — Build with AI (Feature-Driven Implementation Agent)
+**What it is:** From a tracked feature (status `planned`), "Build with AI" has The Forge itself call the LLM to implement it — a propose-&-approve loop of file diffs + shell commands, applied edits with per-step Undo, commands run with live streamed output in an in-app console, and verification against the Handoff checklist. Plus release tracking: a new `Releases` table, a per-version Releases view, and "Cut release" (deterministic notes → CHANGELOG, optional git tag). Pro-gated (entitlement stub).
+
+**Why it matters:** Turns The Forge from "writes the spec, hands off" into "builds the feature" without the user leaving the app or opening a terminal — the subscription hook for the vibecoder pivot.
+
+**Architecture:** New `lib/features/implementation/` module (models/run_session, data/command_runner [first `Process.start`], data/impl_workspace, data/impl_agent, providers, screens). `Releases` drift table (schemaVersion 2→3). Reuses `LlmService` (executor role, blocking), the Handoff verification checklist as a deterministic oracle, and `repoPath` linking.
+
+**Status:** ✅ MVP complete 2026-09-10 — `dart analyze` clean, 11/11 tests. Plan: `DOCS/forge/build_with_ai_plan_v1.md`. Phase-2: token-streaming providers, agent commit-per-feature, LLM-polished notes, managed-backend entitlement.
+
+---
 
 ### §PT — Portfolio Tracker (Virtual Project Manager)
 **What it is:** A portfolio dashboard (now the app home `/`) that tracks every project — its features and their status (idea/planned/inProgress/blocked/shipped/archived) — plus per-project tracker screens, an LLM feature scanner ("Scan Repo and Documents") that derives a feature list from a project's own `.forge` docs and/or a linked code repo, and a check-in service that reviews staleness and proposes updates.
