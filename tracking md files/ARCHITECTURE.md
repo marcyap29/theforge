@@ -1,7 +1,7 @@
 # The Forge — Architecture
 
-**Version:** 2.0.0
-**Last Updated:** 2026-06-20
+**Version:** 3.0.0
+**Last Updated:** 2026-09-10
 
 ---
 
@@ -353,6 +353,75 @@ Once V1 is complete, a "Start V2 Interview →" button appears. The feature inte
 
 ---
 
+## Portfolio Tracker
+
+Lightweight project + feature tracking layered over the existing spec pipeline.
+
+- Drift schema bumped to `schemaVersion` 2 (was 1); tables `Features` + `ProjectTracking` added alongside `projects`
+- Migration is create-only (`MigrationStrategy` creates new tables on upgrade 1→2; existing data untouched, never destructive)
+- DB rows are mirrored to per-project JSON under `.forge/tracker/*.json` so tracking data travels with the project folder and survives an index rebuild
+- **Portfolio dashboard is the home route `/`** — the old project list moved to `/projects`
+- Per-project **feature board** groups features by status: `idea` / `planned` / `in_progress` / `blocked` / `shipped` / `archived`
+- Providers live in `lib/features/tracker/**`
+- Project delete is an index + folder cascade, guarded to only operate under the canonical projects root (refuses paths outside it)
+
+---
+
+## Auto-scan & Virtual-PM Check-ins
+
+- `FeatureScanner` (`lib/features/tracker/scan/feature_scan.dart`) — proposes features from a project's own `.forge` docs AND/OR a linked repo
+- `CheckinService` (`lib/features/tracker/checkin/`) — diffs git since the last review → proposes status changes, new features, and flags
+- On open, a **staleness banner** surfaces per-project review cadence and prompts a check-in when overdue
+
+---
+
+## Import → Spec & Repo Onboarding
+
+`lib/features/import/**` — routes existing material into the normal spec pipeline without a new mode.
+
+- Four inputs: paste a description / import a doc / paste a transcript / analyze a repo
+- `ImportService` distills the input into the interview's `extracted` state → a compressed CONFIRM/gap screen → the **existing** `SpecGenerationScreen` generates an identical Locked Spec / Worksheet / Handoff / goal
+- Repo analyze runs **Quick** (docs + structure) or **Deep** (also reads code via `scanProjectCodebase` + `analyzeFileBatch`)
+- Unknowns become `openQuestions`, shown as gaps on the confirm screen
+- Entry point: a New Project "Import → Spec" card (no new `ProjectMode`)
+
+---
+
+## Deliverable Layout (.forge)
+
+- Every generated artifact for a project lives under a hidden `.forge/` folder (subfolders: `specs` / `worksheets` / `handoffs` / `audit` / `forge` / `ingested` / `exports` / `tracker`)
+- `README.md` and `user_notes.md` stay at the project root
+- Central constant `ProjectFileRepository.forgeDirName`
+- Canonical projects root is a FIXED home (`~/Documents/The Forge Projects`) — NOT user-configurable, and never a code repo
+- "Export docs…" (`lib/features/projects/doc_export.dart`) copies deliverables out to `<chosen>/forge-docs/`
+
+---
+
+## Provider Layer (update)
+
+- **Gemini removed entirely** — no `GeminiProvider`, no Gemini usage provider
+- Providers are now Ollama, Claude, OpenAI
+- Ollama runs against **Cloud** (`https://ollama.com`) with a Bearer key; default model `gpt-oss:120b-cloud`
+- A role configured with a provider but an empty model falls back to that provider's first model
+
+---
+
+## Deploy & Distribution
+
+- Deploy scripts: `tool/deploy_{macos,ios,android}.sh` (+ `install_macos.sh`)
+- macOS build is **UNSANDBOXED** (git features require filesystem/exec access), distributed directly via Developer ID + notarization — not the App Store
+- Full deploy docs in `DOCS/deploy/`
+- Dictation input arrives via the `theforge://paste` URL scheme (`macos/Runner/*` → `lib/services/paste_receiver.dart`)
+
+---
+
+## Monetization (planned, not built)
+
+- Vibecoder freemium: free manual board; paid AI (scan / check-in / import) via an Orbital-run metered gateway fronting Ollama Cloud
+- Full design lives in the two Desktop docs (Monetization Plan + Managed Backend Architecture)
+
+---
+
 ## Key Invariants
 
 - **No Firebase.** `grep -ri firebase lib/` must return zero matches.
@@ -365,4 +434,4 @@ Once V1 is complete, a "Start V2 Interview →" button appears. The feature inte
 
 ---
 
-_The Forge · Orbital AI — Architecture v2.0.0 · June 2026_
+_The Forge · Orbital AI — Architecture v3.0.0 · September 2026_

@@ -4,6 +4,78 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-10 — Claude Code [Portfolio Tracker era (§PT)]
+
+**Branch:** main
+
+### Done
+
+**§PT1 — Portfolio Tracker data + UI:**
+- drift tables `Features` + `ProjectTracking` (schemaVersion 1→2, create-only migration, mirrored to `tracker/*.json`); dashboard is the new home (`/`), old list moved to `/projects`; per-project feature board grouped by status; real tracker tests replaced the stale starter test. Files: `lib/features/tracker/**`, `lib/data/local_db/forge_database.dart`, `test/widget_test.dart`.
+
+**§PT2 — Auto-scan + check-ins:**
+- `lib/features/tracker/scan/feature_scan.dart`, `lib/features/tracker/checkin/**`; on-open staleness + review cadence; git-diff check-in with accept/edit.
+
+**§PT3 — Deploy + unsandbox:**
+- `tool/deploy_{macos,ios,android}.sh`, `install_macos.sh`; macOS entitlements unsandboxed; `DOCS/deploy/*`.
+
+**§PT4 — Ollama Cloud + Gemini removal:**
+- `lib/services/llm/**` (`OllamaProvider` Bearer auth, default `gpt-oss:120b-cloud`), `lib/features/settings/**`; `gemini_provider.dart` + `gemini_usage_provider.dart` deleted.
+
+**§PT5 — Deletion:**
+- `lib/features/projects/project_actions.dart` (double-confirm + cascade) + dashboard/list screens.
+
+**§PT6 — Dictation:**
+- `macos/Runner/*` + `lib/services/paste_receiver.dart` + `lib/main.dart` (`theforge://paste` → `PasteTextIntent`).
+
+**§PT7 — App icon** across all platforms.
+
+**§PT8 — `.forge` layout:**
+- `ProjectFileRepository.forgeDirName`; ~40 path sites + tracker + external readers under `.forge/`; migrated stranded sandbox projects (AR Mechanic, Forkit) into the canonical root; deleted stale `net.orbitalai.dataflow` container.
+
+**§PT9 — Fixed canonical root + Export:**
+- removed the settable-root picker; `lib/features/projects/doc_export.dart` ("Export docs…" → `forge-docs/`).
+
+**§PT10 — Import → Spec:**
+- `lib/features/import/**` (`import_service`, `import_screen`, `import_confirm_screen`); New Project "Import → Spec" card; reuses `SpecGenerationScreen`.
+
+**§PT11 — Repo onboarding:**
+- `import_service` `repoDigest`/`deepAnalysis`/`repoSource`; Quick vs Deep scan; gap form + `openQuestions`; Deep reuses `scanProjectCodebase` + `analyzeFileBatch`.
+
+**§PT12 — Doc-based feature scan:**
+- `feature_scan.dart` now reads a project's own `.forge` docs (+ linked repo); button "Scan Repo and Documents".
+
+**Bug fixes:**
+- BUG-SETTINGS-002 (role provider but empty model broke every LLM call — Settings auto-picks first model + `LlmService` fallback)
+- BUG-UI-003 (macOS folder picker silent — `lockParentWindow`)
+- BUG-DATA-001 CRITICAL (deleting a mis-indexed project could `rm -rf` a real code repo — now guarded to the canonical root + index pruning + path shown in dialog)
+
+**Repo:** consolidated to a single `main` (PR #1 merged, #2 closed).
+
+### Key Technical Findings
+- Flutter macOS text fields don't reliably receive synthetic ⌘V (CGEvent) — use a URL-scheme + `PasteTextIntent` instead.
+- drift codegen (`build_runner`) fails on Dart 3.10 because transitive `objective_c` ships a native build hook that blocks the AOT step; workaround: temporarily move the hook aside during codegen.
+- Un-sandboxing was required because the git-based features can't run under the App Sandbox.
+- The projects root must be a FIXED canonical home; letting it be set to a code repo caused the index to list real source folders as deletable "projects".
+- Import reuses the interview's `InterviewState`/`extracted` contract, so one extractor feeds the existing `SpecGenerationScreen` — no second generator.
+
+### Modified
+- `lib/features/tracker/**` (NEW)
+- `lib/features/import/**` (NEW)
+- `lib/features/projects/project_actions.dart` (NEW), `doc_export.dart` (NEW)
+- `lib/data/local_db/forge_database.dart` (schemaVersion 1→2)
+- `lib/services/llm/**`, `lib/features/settings/**`; `gemini_provider.dart` + `gemini_usage_provider.dart` (DELETED)
+- `lib/services/paste_receiver.dart` (NEW), `lib/main.dart`, `macos/Runner/*`
+- `tool/deploy_{macos,ios,android}.sh` (NEW), `install_macos.sh` (NEW), `DOCS/deploy/*` (NEW)
+- `test/widget_test.dart` (real tracker tests)
+
+### Next
+- Managed-backend metered-gateway spike (freemium Pro tier over Ollama Cloud).
+- Optional batch mode for Deep scan (fewer LLM calls on big repos).
+- Consider the App-Store sandbox rework (in-process git + security-scoped bookmarks) per `DOCS/deploy/APP_STORE_SANDBOX_PLAN.md`.
+
+---
+
 ## Session: 2026-07-02 — Claude Code [Module Discovery + Ingestion Pipeline (§MD)]
 
 **Branch:** main

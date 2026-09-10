@@ -63,8 +63,9 @@
 - **`CODE_SIGN_STYLE = Manual` without a provisioning profile breaks the build.** Use `Automatic` for development unless you have a provisioning profile configured.
 - **`NSUserDefaults` can be cleared by container resets during development.** Dual-write sensitive settings to a config file in `getApplicationSupportDirectory()` as the authoritative source on next launch.
 - **`file_picker` requires `com.apple.security.files.user-selected.read-only` in both `.entitlements` files.** Without it, `NSOpenPanel` is silently blocked by the macOS sandbox — no error, no dialog, nothing. Add to both `DebugProfile.entitlements` and `Release.entitlements`.
+- **macOS directory pickers must use `lockParentWindow: true`, and picker calls must surface errors — never swallow them.** `file_picker`'s `getDirectoryPath` opens an app-modal `NSOpenPanel` via `runModal()` that can fail to present depending on window/activation state, showing nothing. Passing `lockParentWindow: true` attaches it to the window (sheet). Always wrap the call in try/catch and show any error as a snackbar so a failure can never look like "nothing happened." See BUG-UI-003.
 
-**Past bugs:** June 2026 — `keychain-access-groups` broke macOS build; `flutter_secure_storage` broke API key storage after entitlement removal. Fixed by removing entitlement and switching to SharedPreferences + `forge_config.json`. June 2026 — `file_picker` NSOpenPanel silently blocked until `user-selected.read-only` entitlement added.
+**Past bugs:** June 2026 — `keychain-access-groups` broke macOS build; `flutter_secure_storage` broke API key storage after entitlement removal. Fixed by removing entitlement and switching to SharedPreferences + `forge_config.json`. June 2026 — `file_picker` NSOpenPanel silently blocked until `user-selected.read-only` entitlement added. Sep 2026 — BUG-UI-003: `getDirectoryPath` app-modal panel failed to present; fixed with `lockParentWindow: true` + error snackbars.
 
 ---
 
@@ -73,9 +74,10 @@
 **Rules:**
 - **`TextEditingController` changes do not trigger `setState` automatically.** If a button's enabled state depends on `controller.text`, add `_controller.addListener(() => setState(() {}))` in `initState`. Evaluating `controller.text` in `build()` without a listener gives a stale value.
 - **Validate stored model IDs against the current catalog on settings load.** SharedPreferences persists across app versions. If the model catalog changes (retired models, new names), old IDs silently remain and cause API 404 errors on the next LLM call. In `SettingsNotifier.build()`, check `modelsFor(providerType).map((m) => m.id).contains(savedModelId)` and fall back to the first valid model if the check fails. See BUG-SETTINGS-001.
-- **Never list retired model IDs in the catalog.** `gpt-4-turbo`, `gemini-3.5-flash`, `gemini-1.5-pro-preview` are retired. Current catalog as of 2026-06: Claude (`claude-opus-4-7`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`), OpenAI (`gpt-4.1`, `gpt-4o`, `gpt-4o-mini`), Gemini (`gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-2.0-flash`).
+- **Never list retired model IDs in the catalog.** `gpt-4-turbo`, `gemini-3.5-flash`, `gemini-1.5-pro-preview` are retired. Gemini was removed entirely as of 2026-09. Current catalog: Claude (`claude-opus-4-7`, `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`), OpenAI (`gpt-4.1`, `gpt-4o`, `gpt-4o-mini`), Ollama Cloud (default `gpt-oss:120b-cloud`).
+- **A role provider selection must always carry a valid model; never persist a role with an empty `modelId`.** When the provider dropdown changes, immediately auto-select `modelsFor(p).firstOrNull?.id` — a provider with a blank model makes `LlmService.complete` throw "No model selected" and breaks every LLM feature. Defensively, `complete` also falls back to the provider's first model when `modelId` is empty. See BUG-SETTINGS-002.
 
-**Past bugs:** June 2026 — Settings Save button permanently disabled because text was evaluated at build time without a controller listener. June 2026 — BUG-SETTINGS-001: `gemini-3.5-flash` persisted in SharedPreferences from old code, caused Gemini API 404 on every LLM call; fixed by adding validation + fallback on load.
+**Past bugs:** June 2026 — Settings Save button permanently disabled because text was evaluated at build time without a controller listener. June 2026 — BUG-SETTINGS-001: `gemini-3.5-flash` persisted in SharedPreferences from old code, caused Gemini API 404 on every LLM call; fixed by adding validation + fallback on load. Sep 2026 — BUG-SETTINGS-002: changing a role's provider left `modelId` empty → every LLM call threw; fixed by auto-selecting the first model on provider change + `complete` fallback.
 
 ---
 
@@ -88,6 +90,18 @@
 - **`InkWell` on macOS Flutter desktop requires an immediate `Material` ancestor.** A `Scaffold` or any other `Material` widget higher in the tree is NOT sufficient — Flutter's ink system requires a local `Material` in the subtree. Wrap with `Material(color: Colors.transparent)` around the `InkWell`. Match the `_FileRow` pattern in `project_detail_screen.dart`.
 
 **Past bugs:** June 2026 — HandoffPackage named `_vv1` due to `v$version` where `version = 'v1'`. June 2026 — `_ReferenceDocsRow` Manage button unresponsive on macOS until wrapped with `Material(color: Colors.transparent)`.
+
+---
+
+## Filesystem / Destructive Operations Rules
+
+**Rules:**
+- **Destructive filesystem operations must be fenced to a known-owned root; never delete a path the app did not create.** Before any recursive delete of a project folder, assert `p.isWithin(await ProjectFileRepository.canonicalRootPath(), targetPath)`. If the path is outside the canonical root, remove the index row only — never touch disk. See BUG-DATA-001.
+- **The Forge Projects root is fixed to the canonical location and must never be settable to a code repo.** Pointing the root at a source tree causes the scanner to index `lib/`, `macos/`, `.git/` as "projects," which a delete would then rm-rf. The root path is hardcoded to `canonicalRootPath()`; there is no user-facing setter.
+- **Prune index rows that no longer exist under the root on launch.** `ProjectListNotifier` rebuilds from the filesystem — drop rows whose path isn't found so stale/foreign entries can't linger and be acted on destructively.
+- **Show the exact absolute path in any destructive confirmation dialog** (selectable), and require a double confirm. The user must be able to see precisely what will be deleted before confirming.
+
+**Past bugs:** Sep 2026 — BUG-DATA-001: the index held rows pointing at Sabihin's real source folders; "Delete project" would have rm-rf'd the actual repo. Fixed by fencing deletion to the canonical root, fixing the root, pruning stale rows, and showing the path in the confirm dialog.
 
 ---
 

@@ -1,6 +1,6 @@
 # Configuration Management — The Forge
 
-**Last Updated:** 2026-07-02
+**Last Updated:** 2026-09-10
 **Status:** ✅ Synced
 
 ---
@@ -118,12 +118,56 @@
 | pull_ingestion_progress_screen.dart | lib/features/projects/screens/ | 2026-07-02 | ✅ Synced |
 | pull_ingestion_summary_screen.dart | lib/features/projects/screens/ | 2026-07-01 | ✅ Synced |
 | pull_interview_notifier.dart | lib/features/pull_interview/state/ | 2026-07-01 | ✅ Synced |
+| forge_database.dart | lib/data/local_db/ | 2026-09-10 | ✅ Synced (schemaVersion 2 — Features + ProjectTracking) |
+| tracker_enums.dart | lib/features/tracker/models/ | 2026-09-10 | ✅ Synced |
+| tracker_repository.dart | lib/features/tracker/data/ | 2026-09-10 | ✅ Synced |
+| tracker_providers.dart | lib/features/tracker/providers/ | 2026-09-10 | ✅ Synced |
+| portfolio_dashboard_screen.dart | lib/features/tracker/screens/ | 2026-09-10 | ✅ Synced (app home `/`) |
+| project_tracker_screen.dart | lib/features/tracker/screens/ | 2026-09-10 | ✅ Synced |
+| feature_scan.dart | lib/features/tracker/scan/ | 2026-09-10 | ✅ Synced |
+| checkin_service.dart | lib/features/tracker/checkin/ | 2026-09-10 | ✅ Synced |
+| checkin_review_dialog.dart | lib/features/tracker/checkin/ | 2026-09-10 | ✅ Synced |
+| import_service.dart | lib/features/import/ | 2026-09-10 | ✅ Synced |
+| import_screen.dart | lib/features/import/ | 2026-09-10 | ✅ Synced |
+| import_confirm_screen.dart | lib/features/import/ | 2026-09-10 | ✅ Synced |
+| project_actions.dart | lib/features/projects/ | 2026-09-10 | ✅ Synced (delete guard — BUG-DATA-001) |
+| doc_export.dart | lib/features/projects/ | 2026-09-10 | ✅ Synced |
+| project_file_repository.dart | lib/data/filesystem/ | 2026-09-10 | ✅ Synced (`.forge/` dir + fixed canonical root) |
+| paste_receiver.dart | lib/services/ | 2026-09-10 | ✅ Synced (`theforge://paste`) |
+| settings_screen.dart | lib/features/settings/ | 2026-09-10 | ✅ Synced (provider auto-selects model — BUG-SETTINGS-002) |
+| llm_service.dart | lib/services/llm/ | 2026-09-10 | ✅ Synced (empty-modelId fallback) |
+| deploy_macos.sh | tool/ | 2026-09-10 | ✅ Synced |
+| deploy_ios.sh | tool/ | 2026-09-10 | ✅ Synced |
+| deploy_android.sh | tool/ | 2026-09-10 | ✅ Synced |
+| install_macos.sh | tool/ | 2026-09-10 | ✅ Synced |
 
 
 ---
 
 
 ## Change Log
+
+### 2026-09-10 — §PT Portfolio Tracker + §DIST Deploy + §FORGEDIR + §IMPORT
+
+**Action:** Major release (v0.3.0). The Forge becomes a virtual project manager: a portfolio tracker across all projects, an LLM feature scanner over docs and/or code, a check-in service, direct-distribution deploy, a `.forge/` per-project deliverables folder with a fixed canonical root, and an import-a-repo → gap-form → spec flow. Gemini removed; Ollama Cloud default. 3 bugs fixed.
+
+**Key changes:**
+- `lib/data/local_db/forge_database.dart` — `Features` + `ProjectTracking` tables; `schemaVersion` 1→2 with create-only migration; `removeTracking()`.
+- `lib/features/tracker/**` — enums, repository, providers, portfolio dashboard (app home `/`), per-project tracker screen, LLM feature scanner (`scan/feature_scan.dart` — reads a project's own `.forge` docs and/or a linked repo), check-in service + review dialog.
+- `lib/features/import/**` — import service (extract → gap form → `SpecGenerationScreen`), import screen (Quick/Deep chooser), import confirm screen (gap form + Dig deeper).
+- `lib/data/filesystem/project_file_repository.dart` — `.forge/` deliverables dir (~40 sites); fixed canonical root (no longer settable to a code repo).
+- `lib/features/projects/project_actions.dart` — delete fenced to canonical root (BUG-DATA-001); `project_list_notifier.dart` prunes stale index rows.
+- `lib/features/projects/doc_export.dart` — `exportProjectDocs` → `<destDir>/forge-docs/`.
+- `lib/services/llm/llm_service.dart` + `settings_screen.dart` — empty-`modelId` fallback + provider auto-selects first model (BUG-SETTINGS-002).
+- `lib/services/paste_receiver.dart`, `main.dart`, `macos/Runner/*` — `theforge://paste` receiver for dictation.
+- `tool/deploy_{macos,ios,android}.sh` + `install_macos.sh`; `DOCS/deploy/`.
+- Gemini provider removed entirely; Ollama Cloud default (`gpt-oss:120b-cloud`).
+
+**Bugs fixed:** BUG-SETTINGS-002 (`6f677c0`), BUG-UI-003 (`a11c2a8`), BUG-DATA-001 (`5ee6aee`, `a11c2a8`).
+
+**Docs:** `DOCS/Portfolio-Tracker_Development-Story.md` (new); ARCHITECTURE.md v3.0.0; FEATURES.md; CHANGELOG.md v0.3.0; context.md + planner.md + backlog.md updated; 3 new bugtracker records + master index + BUG_PREVENTION.
+
+---
 
 ### 2026-07-01 — §CCI: Cross-Cutting Invariant Extraction
 

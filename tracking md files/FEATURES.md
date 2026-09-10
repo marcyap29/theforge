@@ -1,6 +1,6 @@
 # The Forge — Feature Catalog
 
-**Last Updated:** 2026-05-31
+**Last Updated:** 2026-09-10
 
 ---
 
@@ -21,6 +21,22 @@
 | Workspace + billing ($150/workspace/month) | Planned | §8 in backlog |
 | Audit trail export (versioned, client deliverable) | Future | §11 in backlog |
 | Open source executor path (tool-agnostic JSON spec) | Future | §10 in backlog |
+
+---
+
+## Portfolio Tracker
+
+| Feature | Status | Notes |
+|---|---|---|
+| Portfolio dashboard | Shipped | Home route `/`; old project list moved to `/projects` |
+| Feature board (status tracking) | Shipped | Grouped by idea/planned/in_progress/blocked/shipped/archived; providers in `lib/features/tracker/**` |
+| Auto-scan features (docs + repo) | Shipped | `FeatureScanner` proposes features from `.forge` docs and/or a linked repo |
+| Virtual-PM check-ins | Shipped | `CheckinService` diffs git since last review → status changes/new features/flags + staleness banner |
+| Import → Spec | Shipped | Paste description/doc/transcript → `ImportService` → existing `SpecGenerationScreen` |
+| Repo onboarding (Quick/Deep) | Shipped | Quick = docs+structure; Deep also reads code via `scanProjectCodebase`+`analyzeFileBatch`; unknowns → gaps |
+| Export docs | Shipped | `doc_export.dart` copies `.forge` deliverables to `<chosen>/forge-docs/` |
+| Project deletion (safe) | Shipped | Index + folder cascade, guarded to the canonical projects root |
+| Dictation (`theforge://paste`) | Shipped | URL scheme → `lib/services/paste_receiver.dart` |
 
 ---
 

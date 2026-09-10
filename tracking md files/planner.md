@@ -4,6 +4,26 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 
 ---
 
+## §PT — Portfolio Tracker era — COMPLETE ✅
+
+**Completed:** 2026-09-10
+
+- [x] §PT1 Portfolio Tracker data + UI — drift `Features` + `ProjectTracking` (schemaVersion 1→2, create-only, mirrored to `tracker/*.json`); dashboard is new home, board grouped by status; `lib/features/tracker/**`
+- [x] §PT2 Auto-scan + check-ins — on-open staleness + review cadence; git-diff check-in accept/edit; `lib/features/tracker/scan/feature_scan.dart`, `lib/features/tracker/checkin/**`
+- [x] §PT3 Deploy + unsandbox — `tool/deploy_{macos,ios,android}.sh`, `install_macos.sh`; macOS entitlements unsandboxed; `DOCS/deploy/*`
+- [x] §PT4 Ollama Cloud + Gemini removal — `lib/services/llm/**` (Bearer auth, default `gpt-oss:120b-cloud`); `gemini_provider.dart` + `gemini_usage_provider.dart` deleted
+- [x] §PT5 Deletion — double-confirm + cascade; `lib/features/projects/project_actions.dart`
+- [x] §PT6 Dictation — `theforge://paste` → `PasteTextIntent`; `macos/Runner/*`, `lib/services/paste_receiver.dart`, `lib/main.dart`
+- [x] §PT7 App icon across all platforms
+- [x] §PT8 `.forge` layout — `ProjectFileRepository.forgeDirName`; ~40 path sites migrated under `.forge/`; stranded sandbox projects consolidated to canonical root
+- [x] §PT9 Fixed canonical root + Export — removed settable-root picker; `lib/features/projects/doc_export.dart` (→ `forge-docs/`)
+- [x] §PT10 Import → Spec — `lib/features/import/**`; New Project "Import → Spec" card; reuses `SpecGenerationScreen`
+- [x] §PT11 Repo onboarding — `import_service` `repoDigest`/`deepAnalysis`/`repoSource`; Quick vs Deep scan; gap form + `openQuestions`
+- [x] §PT12 Doc-based feature scan — `feature_scan.dart` reads a project's own `.forge` docs (+ linked repo); "Scan Repo and Documents"
+- [x] Bug fixes: BUG-SETTINGS-002, BUG-UI-003, BUG-DATA-001 (see bugtracker)
+
+---
+
 ## §MD — Module-Aware Codebase Ingestion — COMPLETE ✅
 
 **Completed:** 2026-07-02

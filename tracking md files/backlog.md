@@ -1,6 +1,6 @@
 # The Forge — Feature Backlog
 
-**Last Updated:** 2026-06-09
+**Last Updated:** 2026-09-10
 
 Long-term feature pool. Active sprint work lives in `planner.md`.
 
@@ -38,6 +38,12 @@ Long-term feature pool. Active sprint work lives in `planner.md`.
   → §CCI Cross-Cutting Invariant Extraction ✅ (2026-07-01)
   → §MD Module-Aware Codebase Ingestion (discovery + multi-module pipeline + confirmation UI) ✅ (2026-07-02)
        ↓
+  → §PT Portfolio Tracker — virtual project manager across all projects ✅ (2026-09-10)
+  → §DIST Direct-distribution deploy (unsandboxed + Developer ID + notarize) ✅ (2026-09-10)
+  → §FORGEDIR `.forge/` per-project deliverables folder + fixed canonical root ✅ (2026-09-10)
+  → §IMPORT Import-a-repo → gap form → spec (LLM extraction feeds the interview) ✅ (2026-09-10)
+       ↓
+  → §MB Managed metered AI backend (gateway over Ollama Cloud) — freemium paid tier (not started)
   → Configuration C pilot (Qualcomm) — Watch + Reverse on existing codebase
 ```
 
@@ -68,6 +74,28 @@ Every §N that brings The Forge closer to a working interview-to-spec run unbloc
 ---
 
 ## High Priority
+
+### §PT — Portfolio Tracker (Virtual Project Manager)
+**What it is:** A portfolio dashboard (now the app home `/`) that tracks every project — its features and their status (idea/planned/inProgress/blocked/shipped/archived) — plus per-project tracker screens, an LLM feature scanner ("Scan Repo and Documents") that derives a feature list from a project's own `.forge` docs and/or a linked code repo, and a check-in service that reviews staleness and proposes updates.
+
+**Why it matters:** Turns The Forge from a one-shot spec generator into a continuous instrument for managing a real portfolio of apps and future projects — the "vibecoder" direction.
+
+**Architecture:** `Features` + `ProjectTracking` drift tables (schemaVersion 1→2, create-only migration); `lib/features/tracker/**` (models/tracker_enums.dart, data/tracker_repository.dart, providers, portfolio_dashboard_screen.dart, project_tracker_screen.dart, scan/feature_scan.dart, checkin/checkin_service.dart + review dialog). Scanner reuses the `LlmService` architect role; check-in reuses the same one-shot synthesis pattern.
+
+**Status:** ✅ Complete 2026-09-10 — see `DOCS/Portfolio-Tracker_Development-Story.md`, ARCHITECTURE.md v3.0.0.
+
+---
+
+### §MB — Managed Metered AI Backend (Freemium Paid Tier)
+**What it is:** A managed backend gateway (metered over Ollama Cloud) so non-technical users get AI features without bringing their own key. Free tier = manual board + BYOK; paid tier = managed metered AI. This is the monetization path for the vibecoder pivot.
+
+**Why it matters:** BYOK is a hard wall for non-technical builders. A managed metered backend is what makes a paid tier viable.
+
+**Reference:** `~/Desktop/CLAUDE OUTPUTS/The Forge/The-Forge_Monetization-Plan_v1.md`, `The-Forge_Managed-Backend-Architecture_v1.md` (strategy — open business decision, not built).
+
+**Status:** Not started — open business decision.
+
+---
 
 ### §EX1 — Executor Timeline (Project-Specific Build Sequence)
 ✅ Complete 2026-06-11 — `buildExecutorTimelinePrompt()` in spec_generator; `executor_timeline_notifier.dart` (AutoDisposeFamilyAsyncNotifier, disk-backed); `_BuildSequenceSection` widget in ProjectDetailScreen behind phase gate; `dart analyze lib/` zero issues
