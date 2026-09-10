@@ -99,8 +99,8 @@ class _ImportConfirmScreenState extends ConsumerState<ImportConfirmScreen> {
     setState(() => _digging = true);
     try {
       final svc = ref.read(importServiceProvider);
-      final digest = await svc.repoDigest(widget.repoPath!, deep: true);
-      final res = await svc.extract(digest);
+      final source = await svc.repoSource(widget.repoPath!, deep: true);
+      final res = await svc.extract(source);
       // Fill only currently-empty fields; never overwrite the user's edits.
       for (final (key, _) in _singleLine) {
         if (_c[key]!.text.trim().isEmpty) {

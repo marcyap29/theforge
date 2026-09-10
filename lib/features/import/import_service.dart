@@ -4,9 +4,11 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
+import '../../data/filesystem/project_file_repository.dart';
 import '../../services/llm/llm_provider.dart';
 import '../../services/llm/llm_service.dart';
 import '../../services/llm/llm_service_provider.dart';
+import '../projects/ingestion/pull_codebase_ingestion_engine.dart';
 
 /// Result of an import: the interview's structured `extracted` state, plus any
 /// open questions the LLM couldn't answer from the material (the gaps).
@@ -129,6 +131,34 @@ class ImportService {
     } catch (_) {
       return '(unreadable)';
     }
+  }
+
+  /// Deep pass: reads the actual source files and runs the structured
+  /// component analyzer (the same engine Pull mode uses) to produce a
+  /// components overview. One LLM call per file, so it is bounded and opt-in.
+  Future<String> deepAnalysis(String repoPath) async {
+    final files = await ProjectFileRepository()
+        .scanProjectCodebase(repoPath, _codeExts.toList());
+    if (files.isEmpty) return '';
+    final bounded = files.take(30).toList();
+    final components = await analyzeFileBatch(_llm, bounded);
+    if (components.isEmpty) return '';
+    final buf = StringBuffer()
+      ..writeln('## Deep code analysis '
+          '(${components.length} components from ${bounded.length} files)');
+    for (final c in components) {
+      buf.writeln('- ${c.name}: ${c.responsibilities}');
+    }
+    return buf.toString();
+  }
+
+  /// Full repo source for a run: docs + structure, plus (when [deep]) the
+  /// component analysis appended.
+  Future<String> repoSource(String repoPath, {required bool deep}) async {
+    final digest = await repoDigest(repoPath, deep: deep);
+    if (!deep) return digest;
+    final analysis = await deepAnalysis(repoPath);
+    return analysis.isEmpty ? digest : '$digest\n\n$analysis';
   }
 
   Future<ImportResult> extract(String source) async {

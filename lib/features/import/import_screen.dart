@@ -94,16 +94,56 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
     }
     if (picked == null) return;
     final repoPath = picked; // non-null; safe to capture in closures
+    if (!mounted) return;
+    final deep = await _chooseDepth();
+    if (deep == null) return; // cancelled
     // Persist as the project's linked repo (also enables future check-ins).
     await ProjectFileRepository.writeProjectConfig(
         widget.projectPath, {'repoPath': repoPath});
     if (mounted) setState(() => _repoPath = repoPath);
 
     await _run(
-      status: 'Analyzing repository…',
+      status: deep ? 'Deep scan — reading code…' : 'Analyzing repository…',
       buildSource: () async =>
-          ref.read(importServiceProvider).repoDigest(repoPath),
+          ref.read(importServiceProvider).repoSource(repoPath, deep: deep),
       repoPath: repoPath,
+    );
+  }
+
+  /// Lets the user pick how thorough the repo scan is. Returns true for a deep
+  /// scan, false for quick, null if cancelled.
+  Future<bool?> _chooseDepth() {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1C1C1E),
+        title: const Text('How thorough?',
+            style: TextStyle(color: Color(0xFFE5E5E7), fontSize: 16)),
+        content: const Text(
+          'Quick reads the README, docs, and file structure — fast.\n\n'
+          'Deep also reads and analyzes the source code for higher fidelity '
+          '(slower, more LLM calls). You can also "Dig deeper" later.',
+          style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Quick scan'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFE8A04C),
+              foregroundColor: const Color(0xFF0F0F10),
+            ),
+            child: const Text('Deep scan'),
+          ),
+        ],
+      ),
     );
   }
 
