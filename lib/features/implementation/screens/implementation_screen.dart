@@ -47,9 +47,8 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
     super.dispose();
   }
 
-  String _elapsed(DateTime? from) {
-    if (from == null) return '';
-    final s = DateTime.now().difference(from).inSeconds;
+  String _fmt(Duration d) {
+    final s = d.inSeconds;
     final m = s ~/ 60;
     final r = s % 60;
     return '${m.toString().padLeft(2, '0')}:${r.toString().padLeft(2, '0')}';
@@ -85,7 +84,7 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
           if (state.startedAt != null)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 4),
-              child: Text(_elapsed(state.startedAt),
+              child: Text(_fmt(state.elapsed(DateTime.now())),
                   style: const TextStyle(
                       fontFamily: 'Menlo', fontSize: 12, color: Color(0xFF8A8A8E))),
             ),

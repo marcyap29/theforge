@@ -55,7 +55,7 @@ class OllamaProvider extends LlmProvider {
   }
 
   @override
-  Stream<String> completeStream({
+  Stream<LlmDelta> completeStream({
     required String systemPrompt,
     required String userPrompt,
     required double temperature,
@@ -80,8 +80,10 @@ class OllamaProvider extends LlmProvider {
         final body = await response.stream.bytesToString();
         throw Exception('Ollama error ${response.statusCode}: ${_truncate(body)}');
       }
-      // Ollama streams newline-delimited JSON objects, each with a partial
-      // `message.content` and a `done` flag on the last.
+      // Ollama streams newline-delimited JSON objects. Reasoning models put
+      // their chain-of-thought in `message.thinking` (with empty `content`)
+      // until the reasoning finishes, then stream the real answer in
+      // `message.content`. Surface both — thinking as a thinking delta.
       await for (final line in response.stream
           .transform(utf8.decoder)
           .transform(const LineSplitter())) {
@@ -89,8 +91,12 @@ class OllamaProvider extends LlmProvider {
         try {
           final obj = jsonDecode(line) as Map<String, dynamic>;
           final msg = obj['message'] as Map<String, dynamic>?;
+          final thinking = msg?['thinking'] as String?;
+          if (thinking != null && thinking.isNotEmpty) {
+            yield LlmDelta(thinking, thinking: true);
+          }
           final chunk = msg?['content'] as String?;
-          if (chunk != null && chunk.isNotEmpty) yield chunk;
+          if (chunk != null && chunk.isNotEmpty) yield LlmDelta(chunk);
           if (obj['done'] == true) break;
         } catch (_) {
           // Ignore any non-JSON keep-alive line.

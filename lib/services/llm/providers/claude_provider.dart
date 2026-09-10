@@ -49,7 +49,7 @@ class ClaudeProvider extends LlmProvider {
   }
 
   @override
-  Stream<String> completeStream({
+  Stream<LlmDelta> completeStream({
     required String systemPrompt,
     required String userPrompt,
     required double temperature,
@@ -92,8 +92,14 @@ class ClaudeProvider extends LlmProvider {
           final obj = jsonDecode(payload) as Map<String, dynamic>;
           if (obj['type'] == 'content_block_delta') {
             final delta = obj['delta'] as Map<String, dynamic>?;
-            final text = delta?['text'] as String?;
-            if (text != null && text.isNotEmpty) yield text;
+            final type = delta?['type'] as String?;
+            if (type == 'thinking_delta') {
+              final t = delta?['thinking'] as String?;
+              if (t != null && t.isNotEmpty) yield LlmDelta(t, thinking: true);
+            } else {
+              final text = delta?['text'] as String?;
+              if (text != null && text.isNotEmpty) yield LlmDelta(text);
+            }
           }
         } catch (_) {
           // Ignore ping / non-JSON lines.

@@ -151,6 +151,7 @@ class ImplRunState {
     this.error,
     this.featureShipped = false,
     this.startedAt,
+    this.endedAt,
   });
 
   factory ImplRunState.initial(String runId) => ImplRunState(
@@ -164,8 +165,16 @@ class ImplRunState {
   final List<ConsoleLine> console;
   final AgentPlan? plan;
 
-  /// When the run began — powers the elapsed-time display in the header.
+  /// When the run began, and when it reached a terminal phase — together they
+  /// drive the elapsed-time display (which freezes once [endedAt] is set).
   final DateTime? startedAt;
+  final DateTime? endedAt;
+
+  /// Seconds elapsed, frozen once the run finishes.
+  Duration elapsed(DateTime now) {
+    if (startedAt == null) return Duration.zero;
+    return (endedAt ?? now).difference(startedAt!);
+  }
 
   /// Indices of proposed edits/commands the user chose to skip.
   final Set<int> skippedEdits;
@@ -193,6 +202,7 @@ class ImplRunState {
     String? error,
     bool? featureShipped,
     DateTime? startedAt,
+    DateTime? endedAt,
   }) {
     return ImplRunState(
       runId: runId,
@@ -206,6 +216,7 @@ class ImplRunState {
       error: error,
       featureShipped: featureShipped ?? this.featureShipped,
       startedAt: startedAt ?? this.startedAt,
+      endedAt: endedAt ?? this.endedAt,
     );
   }
 }

@@ -30,7 +30,7 @@ class ImplAgent {
     String? lockedSpec,
     String? goalStatement,
     List<String> components = const [],
-    void Function(String delta)? onDelta,
+    void Function(String text, bool thinking)? onDelta,
   }) async {
     final files = await ImplWorkspace.gatherRepoFiles(repoPath);
 
@@ -44,8 +44,9 @@ class ImplAgent {
       files: files,
     );
 
-    // Stream the response so the UI can show the model "thinking" live, while
-    // we accumulate the full text to parse the JSON plan once it completes.
+    // Stream the response so the UI can show the model reason live. Reasoning
+    // models emit `thinking` deltas (shown, not parsed) before the real answer;
+    // we only accumulate CONTENT deltas to parse the JSON plan.
     final buffer = StringBuffer();
     await for (final delta in _llm.completeStream(
       role: LlmRole.executor,
@@ -54,8 +55,8 @@ class ImplAgent {
       systemPrompt: _systemPrompt,
       userPrompt: userPrompt,
     )) {
-      buffer.write(delta);
-      onDelta?.call(delta);
+      if (!delta.thinking) buffer.write(delta.text);
+      onDelta?.call(delta.text, delta.thinking);
     }
 
     return _parse(buffer.toString(), repoPath);

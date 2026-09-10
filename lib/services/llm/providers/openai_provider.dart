@@ -51,7 +51,7 @@ class OpenAiProvider extends LlmProvider {
   }
 
   @override
-  Stream<String> completeStream({
+  Stream<LlmDelta> completeStream({
     required String systemPrompt,
     required String userPrompt,
     required double temperature,
@@ -96,7 +96,7 @@ class OpenAiProvider extends LlmProvider {
           final delta =
               (choices.first as Map<String, dynamic>)['delta'] as Map<String, dynamic>?;
           final text = delta?['content'] as String?;
-          if (text != null && text.isNotEmpty) yield text;
+          if (text != null && text.isNotEmpty) yield LlmDelta(text);
         } catch (_) {
           // Ignore non-JSON lines.
         }

@@ -40,9 +40,9 @@ class LlmService {
     );
   }
 
-  /// Streaming variant of [complete]: yields text deltas as they arrive. Same
+  /// Streaming variant of [complete]: yields deltas as they arrive. Same
   /// role → provider → model resolution.
-  Stream<String> completeStream({
+  Stream<LlmDelta> completeStream({
     required String systemPrompt,
     required String userPrompt,
     required double temperature,
