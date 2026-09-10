@@ -169,6 +169,7 @@ class ImplRunState {
     this.featureShipped = false,
     this.startedAt,
     this.endedAt,
+    this.canFix = false,
   });
 
   factory ImplRunState.initial(String runId) => ImplRunState(
@@ -186,6 +187,10 @@ class ImplRunState {
   /// drive the elapsed-time display (which freezes once [endedAt] is set).
   final DateTime? startedAt;
   final DateTime? endedAt;
+
+  /// True when the last run had failures (a command exited non-zero or a
+  /// verification did not pass) — enables the "Fix it" action.
+  final bool canFix;
 
   /// Seconds elapsed, frozen once the run finishes.
   Duration elapsed(DateTime now) {
@@ -220,6 +225,7 @@ class ImplRunState {
     bool? featureShipped,
     DateTime? startedAt,
     DateTime? endedAt,
+    bool? canFix,
   }) {
     return ImplRunState(
       runId: runId,
@@ -234,6 +240,7 @@ class ImplRunState {
       featureShipped: featureShipped ?? this.featureShipped,
       startedAt: startedAt ?? this.startedAt,
       endedAt: endedAt ?? this.endedAt,
+      canFix: canFix ?? this.canFix,
     );
   }
 }

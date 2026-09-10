@@ -176,14 +176,17 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
                     onApply: notifier.applyAndRun,
                     onRevise: notifier.revise,
                     onEditContent: notifier.editProposedContent,
+                    onEditCommand: notifier.editProposedCommand,
                   ),
                 if (state.phase == RunPhase.done)
                   _DoneBar(
                     alreadyShipped: state.featureShipped,
+                    canFix: state.canFix,
                     onShip: () {
                       notifier.markFeatureShipped();
                       Navigator.of(context).pop(true);
                     },
+                    onFix: notifier.fix,
                     onClose: () =>
                         Navigator.of(context).pop(state.featureShipped),
                   ),
@@ -464,6 +467,7 @@ class _ApprovalPanel extends StatefulWidget {
     required this.onApply,
     required this.onRevise,
     required this.onEditContent,
+    required this.onEditCommand,
   });
 
   final ImplRunState state;
@@ -472,6 +476,7 @@ class _ApprovalPanel extends StatefulWidget {
   final VoidCallback onApply;
   final ValueChanged<String> onRevise;
   final void Function(int index, String content) onEditContent;
+  final void Function(int index, String raw, String human) onEditCommand;
 
   @override
   State<_ApprovalPanel> createState() => _ApprovalPanelState();
@@ -570,6 +575,55 @@ class _ApprovalPanelState extends State<_ApprovalPanel> {
     if (saved != null) widget.onEditContent(index, saved);
   }
 
+  /// Hand-edit a proposed command's text before it runs.
+  Future<void> _editCommand(int index) async {
+    final cmd = widget.state.plan!.commands[index];
+    final rawC = TextEditingController(text: cmd.raw);
+    final humanC = TextEditingController(text: cmd.human);
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF141416),
+        title: const Text('Edit command'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: rawC,
+              autofocus: true,
+              style: const TextStyle(
+                  fontFamily: 'Menlo', fontSize: 12.5, color: Color(0xFFE5E5E7)),
+              decoration: const InputDecoration(
+                labelText: 'Command',
+                hintText: 'e.g. flutter test test/foo_test.dart',
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: humanC,
+              style: const TextStyle(fontSize: 12.5, color: Color(0xFFE5E5E7)),
+              decoration: const InputDecoration(
+                labelText: 'Description (optional)',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Save')),
+        ],
+      ),
+    );
+    if (saved == true) {
+      widget.onEditCommand(index, rawC.text, humanC.text);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = widget.state;
@@ -609,6 +663,7 @@ class _ApprovalPanelState extends State<_ApprovalPanel> {
                     command: plan.commands[i],
                     skipped: state.skippedCommands.contains(i),
                     onToggle: () => widget.onToggleCommand(i),
+                    onEdit: () => _editCommand(i),
                   ),
               ],
             ),
@@ -741,10 +796,12 @@ class _CommandCard extends StatelessWidget {
     required this.command,
     required this.skipped,
     required this.onToggle,
+    this.onEdit,
   });
   final ProposedCommand command;
   final bool skipped;
   final VoidCallback onToggle;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -774,7 +831,20 @@ class _CommandCard extends StatelessWidget {
             color: Color(0xFF9CA3AF),
           ),
         ),
-        trailing: _SkipToggle(skipped: skipped, onToggle: onToggle),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (onEdit != null)
+              IconButton(
+                icon: const Icon(Icons.edit_note, size: 16),
+                color: const Color(0xFFE8A04C),
+                tooltip: 'Edit command',
+                visualDensity: VisualDensity.compact,
+                onPressed: onEdit,
+              ),
+            _SkipToggle(skipped: skipped, onToggle: onToggle),
+          ],
+        ),
       ),
     );
   }
@@ -957,42 +1027,64 @@ class _Timeline extends StatelessWidget {
 class _DoneBar extends StatelessWidget {
   const _DoneBar({
     required this.alreadyShipped,
+    required this.canFix,
     required this.onShip,
+    required this.onFix,
     required this.onClose,
   });
   final bool alreadyShipped;
+  final bool canFix;
   final VoidCallback onShip;
+  final VoidCallback onFix;
   final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
+    final trouble = canFix;
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: const BoxDecoration(
-        color: Color(0x2281C784),
-        border: Border(top: BorderSide(color: Color(0xFF1C1C1E))),
+      decoration: BoxDecoration(
+        color: trouble ? const Color(0x22FF453A) : const Color(0x2281C784),
+        border: const Border(top: BorderSide(color: Color(0xFF1C1C1E))),
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.check_circle_outline,
+          Icon(
+            trouble ? Icons.error_outline : Icons.check_circle_outline,
             size: 18,
-            color: Color(0xFF81C784),
+            color: trouble ? const Color(0xFFFF453A) : const Color(0xFF81C784),
           ),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Text(
-              'Run complete. Mark this feature as shipped?',
-              style: TextStyle(fontSize: 13, color: Color(0xFFE5E5E7)),
+              trouble
+                  ? 'Run finished with issues. Let the AI fix them?'
+                  : 'Run complete. Mark this feature as shipped?',
+              style: const TextStyle(fontSize: 13, color: Color(0xFFE5E5E7)),
             ),
           ),
+          if (trouble) ...[
+            FilledButton.icon(
+              onPressed: onFix,
+              icon: const Icon(Icons.healing_outlined, size: 16),
+              label: const Text('Fix it'),
+            ),
+            const SizedBox(width: 8),
+          ],
           TextButton(onPressed: onClose, child: const Text('Close')),
           const SizedBox(width: 8),
-          FilledButton.icon(
-            onPressed: onShip,
-            icon: const Icon(Icons.local_shipping_outlined, size: 16),
-            label: const Text('Mark shipped'),
-          ),
+          if (trouble)
+            OutlinedButton.icon(
+              onPressed: onShip,
+              icon: const Icon(Icons.local_shipping_outlined, size: 16),
+              label: const Text('Ship anyway'),
+            )
+          else
+            FilledButton.icon(
+              onPressed: onShip,
+              icon: const Icon(Icons.local_shipping_outlined, size: 16),
+              label: const Text('Mark shipped'),
+            ),
         ],
       ),
     );

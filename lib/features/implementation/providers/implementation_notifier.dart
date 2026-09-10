@@ -59,6 +59,9 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
   bool _streamStarted = false;
   Timer? _waitTimer;
 
+  /// The last run's failure report, fed back to the agent by [fix].
+  String? _fixContext;
+
   // Incremented on every start/stop/reset so a stale in-flight stream (which
   // we can't hard-cancel) can't mutate the state of a newer run.
   int _gen = 0;
@@ -213,11 +216,13 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
         '${plan.edits.length == 1 ? '' : 's'} and ${plan.commands.length} '
         'command${plan.commands.length == 1 ? '' : 's'}.',
       );
-      // A fresh plan clears prior skip decisions.
+      // A fresh plan clears prior skip decisions and the fixable state.
+      _fixContext = null;
       state = state.copyWith(
         plan: plan,
         skippedEdits: {},
         skippedCommands: {},
+        canFix: false,
       );
       _phase(RunPhase.awaitingApproval);
     } catch (e) {
@@ -304,25 +309,36 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     }
     state = state.copyWith(appliedEditPaths: applied);
 
+    // Accumulate a failure report so "Fix it" can feed it back to the agent.
+    final failures = StringBuffer();
+
     // --- Run commands (streamed) ---
     _phase(RunPhase.running);
     for (var i = 0; i < plan.commands.length; i++) {
       if (state.skippedCommands.contains(i)) continue;
       final cmd = plan.commands[i];
       _log(ConsoleLineKind.command, '\$ ${cmd.raw}');
+      final captured = <String>[];
       final result = await _runner.run(
         cmd.raw,
         workingDirectory: brief.repoPath,
-        onOutput: (o) => _log(
-          o.isError ? ConsoleLineKind.stderr : ConsoleLineKind.stdout,
-          o.text,
-        ),
+        onOutput: (o) {
+          captured.add(o.text);
+          _log(
+            o.isError ? ConsoleLineKind.stderr : ConsoleLineKind.stdout,
+            o.text,
+          );
+        },
       );
       if (result.ok) {
         _log(ConsoleLineKind.success, '✓ command succeeded');
       } else {
         _log(ConsoleLineKind.error,
             '✗ command exited with code ${result.exitCode}');
+        failures
+          ..writeln('Command failed (exit ${result.exitCode}): ${cmd.raw}')
+          ..writeln(_tail(captured, 40))
+          ..writeln();
       }
     }
 
@@ -337,12 +353,57 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
       for (final r in results) {
         _log(r.passed ? ConsoleLineKind.success : ConsoleLineKind.stderr,
             '${r.passed ? '✓' : '•'} ${r.requirement} — ${r.note}');
+        if (!r.passed) {
+          failures.writeln('Check not passing: ${r.requirement} — ${r.note}');
+        }
       }
       state = state.copyWith(verifications: results);
     }
 
-    _log(ConsoleLineKind.narration, 'Run complete.');
+    final report = failures.toString().trim();
+    _fixContext = report.isEmpty ? null : report;
+    _log(
+        report.isEmpty ? ConsoleLineKind.narration : ConsoleLineKind.error,
+        report.isEmpty
+            ? 'Run complete.'
+            : 'Run finished with issues — you can ask the AI to fix them.');
+    state = state.copyWith(canFix: report.isNotEmpty);
     _phase(RunPhase.done);
+  }
+
+  static String _tail(List<String> lines, int n) {
+    final t = lines.length > n ? lines.sublist(lines.length - n) : lines;
+    return t.map((l) => '  $l').join('\n');
+  }
+
+  /// Feeds the last run's failures back to the agent for a corrective plan.
+  Future<void> fix() async {
+    final ctx = _fixContext;
+    if (ctx == null || _brief == null) return;
+    _log(ConsoleLineKind.command, '⛑ Fix the failures from the last run');
+    await _plan(
+      previousPlan: state.plan,
+      feedback: 'The previous attempt applied but had problems. Fix them:\n$ctx',
+    );
+  }
+
+  /// Hand-edit a proposed command's text before it runs.
+  void editProposedCommand(int index, String raw, String human) {
+    final plan = state.plan;
+    if (plan == null || index < 0 || index >= plan.commands.length) return;
+    final commands = [...plan.commands];
+    commands[index] = ProposedCommand(
+      human: human.trim().isEmpty ? raw.trim() : human.trim(),
+      raw: raw.trim(),
+    );
+    state = state.copyWith(
+      plan: AgentPlan(
+        summary: plan.summary,
+        rationale: plan.rationale,
+        edits: plan.edits,
+        commands: commands,
+      ),
+    );
   }
 
   /// Reverses one applied edit from its backup.
@@ -382,6 +443,7 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     _brief = null;
     _partial = '';
     _streamStarted = false;
+    _fixContext = null;
     ref.read(implActiveRunsProvider.notifier).set(arg, RunPhase.idle);
     state = ImplRunState.initial(state.runId);
   }
