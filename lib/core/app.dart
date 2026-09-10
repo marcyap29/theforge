@@ -44,21 +44,21 @@ class TheForgeApp extends ConsumerWidget {
         );
       },
       shortcuts: {
-        SingleActivator(LogicalKeyboardKey.equal, meta: true):
+        const SingleActivator(LogicalKeyboardKey.equal, meta: true):
             const IncreaseTextScaleIntent(),
-        SingleActivator(LogicalKeyboardKey.equal, meta: true, shift: true):
+        const SingleActivator(LogicalKeyboardKey.equal, meta: true, shift: true):
             const IncreaseTextScaleIntent(),
-        SingleActivator(LogicalKeyboardKey.equal, control: true):
+        const SingleActivator(LogicalKeyboardKey.equal, control: true):
             const IncreaseTextScaleIntent(),
-        SingleActivator(LogicalKeyboardKey.equal, control: true, shift: true):
+        const SingleActivator(LogicalKeyboardKey.equal, control: true, shift: true):
             const IncreaseTextScaleIntent(),
-        SingleActivator(LogicalKeyboardKey.minus, meta: true):
+        const SingleActivator(LogicalKeyboardKey.minus, meta: true):
             const DecreaseTextScaleIntent(),
-        SingleActivator(LogicalKeyboardKey.minus, control: true):
+        const SingleActivator(LogicalKeyboardKey.minus, control: true):
             const DecreaseTextScaleIntent(),
-        SingleActivator(LogicalKeyboardKey.digit0, meta: true):
+        const SingleActivator(LogicalKeyboardKey.digit0, meta: true):
             const ResetTextScaleIntent(),
-        SingleActivator(LogicalKeyboardKey.digit0, control: true):
+        const SingleActivator(LogicalKeyboardKey.digit0, control: true):
             const ResetTextScaleIntent(),
       },
       actions: {
