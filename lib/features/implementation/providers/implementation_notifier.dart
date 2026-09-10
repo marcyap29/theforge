@@ -74,9 +74,16 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     return ImplRunState.initial(runId);
   }
 
+  /// Hard cap on retained console lines so a flood of command output can never
+  /// grow memory unbounded (and take the app down).
+  static const _maxConsole = 5000;
+  List<ConsoleLine> _cap(List<ConsoleLine> lines) => lines.length > _maxConsole
+      ? lines.sublist(lines.length - _maxConsole)
+      : lines;
+
   void _log(ConsoleLineKind kind, String text) {
     state = state.copyWith(
-      console: [...state.console, ConsoleLine(kind, text, DateTime.now())],
+      console: _cap([...state.console, ConsoleLine(kind, text, DateTime.now())]),
     );
     _streamStarted = false; // a discrete line closes any open streamed line
   }
@@ -113,7 +120,7 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     _partial = segs.last;
     _partialKind = kind;
     _streamStarted = true;
-    state = state.copyWith(console: console);
+    state = state.copyWith(console: _cap(console));
   }
 
   /// Handles one streamed delta. Reasoning models stream their chain-of-thought
@@ -218,7 +225,16 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     final plan = state.plan;
     if (brief == null || plan == null) return;
     if (state.phase != RunPhase.awaitingApproval) return;
+    try {
+      await _applyAndRun(brief, plan);
+    } catch (e) {
+      _log(ConsoleLineKind.error, 'Run failed: $e');
+      state = state.copyWith(error: e.toString());
+      _phase(RunPhase.failed);
+    }
+  }
 
+  Future<void> _applyAndRun(ImplBrief brief, AgentPlan plan) async {
     // --- Apply edits ---
     _phase(RunPhase.applying);
     final applied = {...state.appliedEditPaths};

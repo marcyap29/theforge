@@ -29,17 +29,38 @@ class CommandRunner {
 
   bool get isRunning => _current != null;
 
+  /// Patterns we refuse to run even if approved — destructive or self-harming
+  /// commands that a non-technical user shouldn't be able to unleash by tapping.
+  static final _dangerous = RegExp(
+    r'(^|\s|;|&|\|)('
+    r'sudo|rm\s+-[rf]|rmdir|mkfs|dd\s|shutdown|reboot|halt|'
+    r'kill|killall|pkill|:\(\)\s*\{|chmod\s+-R\s+777|'
+    r'>\s*/dev/|git\s+push\s+.*--force|git\s+reset\s+--hard'
+    r')(\s|$)',
+    caseSensitive: false,
+  );
+
+  static bool isDangerous(String raw) => _dangerous.hasMatch(raw);
+
   /// Runs [raw] in [workingDirectory], invoking [onOutput] for each streamed
-  /// line. Completes with the exit code. Never throws — a spawn failure is
-  /// surfaced as a non-zero result with the error streamed to [onOutput].
+  /// line. Completes with the exit code. Never throws — a spawn failure, a
+  /// blocked command, or a timeout is surfaced as a non-zero result with a
+  /// message streamed to [onOutput]. A per-command [timeout] prevents an
+  /// interactive/long-running command from hanging the run forever.
   Future<CommandResult> run(
     String raw, {
     required String workingDirectory,
     required void Function(CommandOutput) onOutput,
+    Duration timeout = const Duration(minutes: 3),
   }) async {
     final parts = _tokenize(raw);
     if (parts.isEmpty) {
       return CommandResult(exitCode: 0);
+    }
+    if (isDangerous(raw)) {
+      onOutput(CommandOutput(
+          'Blocked: this command is disallowed for safety.', isError: true));
+      return CommandResult(exitCode: -2);
     }
     try {
       final process = await Process.start(
@@ -61,9 +82,18 @@ class CommandRunner {
           .listen((line) => onOutput(CommandOutput(line, isError: true)))
           .asFuture<void>();
 
-      final code = await process.exitCode;
-      await Future.wait([stdoutDone, stderrDone]);
+      var timedOut = false;
+      final code = await process.exitCode.timeout(timeout, onTimeout: () {
+        timedOut = true;
+        process.kill();
+        return -1;
+      });
+      await Future.wait([stdoutDone, stderrDone]).catchError((_) => <void>[]);
       _current = null;
+      if (timedOut) {
+        onOutput(CommandOutput(
+            'Timed out after ${timeout.inSeconds}s — stopped.', isError: true));
+      }
       return CommandResult(exitCode: code);
     } catch (e) {
       _current = null;

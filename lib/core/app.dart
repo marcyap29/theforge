@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../features/interview/providers/interview_providers.dart';
 import '../features/interview/ui/interview_screen.dart';
@@ -14,15 +16,18 @@ import '../features/watch/briefing_screen.dart';
 import '../features/watch/decision_screen.dart';
 import '../features/watch/spec_drift_screen.dart';
 import '../features/watch/watch_dashboard_screen.dart';
+import 'text_scale_notifier.dart';
 import 'theme/app_theme.dart';
 
 final routeObserver = RouteObserver<ModalRoute<dynamic>>();
 
-class TheForgeApp extends StatelessWidget {
+class TheForgeApp extends ConsumerWidget {
   const TheForgeApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final textScale = ref.watch(textScaleProvider).valueOrNull ?? 1.0;
+
     return MaterialApp(
       title: 'The Forge',
       debugShowCheckedModeBanner: false,
@@ -30,6 +35,52 @@ class TheForgeApp extends StatelessWidget {
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.dark,
       navigatorObservers: [routeObserver],
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(textScale),
+          ),
+          child: child!,
+        );
+      },
+      shortcuts: {
+        SingleActivator(LogicalKeyboardKey.equal, meta: true):
+            const IncreaseTextScaleIntent(),
+        SingleActivator(LogicalKeyboardKey.equal, meta: true, shift: true):
+            const IncreaseTextScaleIntent(),
+        SingleActivator(LogicalKeyboardKey.equal, control: true):
+            const IncreaseTextScaleIntent(),
+        SingleActivator(LogicalKeyboardKey.equal, control: true, shift: true):
+            const IncreaseTextScaleIntent(),
+        SingleActivator(LogicalKeyboardKey.minus, meta: true):
+            const DecreaseTextScaleIntent(),
+        SingleActivator(LogicalKeyboardKey.minus, control: true):
+            const DecreaseTextScaleIntent(),
+        SingleActivator(LogicalKeyboardKey.digit0, meta: true):
+            const ResetTextScaleIntent(),
+        SingleActivator(LogicalKeyboardKey.digit0, control: true):
+            const ResetTextScaleIntent(),
+      },
+      actions: {
+        IncreaseTextScaleIntent: CallbackAction<IncreaseTextScaleIntent>(
+          onInvoke: (_) {
+            ref.read(textScaleProvider.notifier).increase();
+            return null;
+          },
+        ),
+        DecreaseTextScaleIntent: CallbackAction<DecreaseTextScaleIntent>(
+          onInvoke: (_) {
+            ref.read(textScaleProvider.notifier).decrease();
+            return null;
+          },
+        ),
+        ResetTextScaleIntent: CallbackAction<ResetTextScaleIntent>(
+          onInvoke: (_) {
+            ref.read(textScaleProvider.notifier).reset();
+            return null;
+          },
+        ),
+      },
       initialRoute: '/',
       routes: {
         '/': (context) => const PortfolioDashboardScreen(),
@@ -91,6 +142,18 @@ class TheForgeApp extends StatelessWidget {
       },
     );
   }
+}
+
+class IncreaseTextScaleIntent extends Intent {
+  const IncreaseTextScaleIntent();
+}
+
+class DecreaseTextScaleIntent extends Intent {
+  const DecreaseTextScaleIntent();
+}
+
+class ResetTextScaleIntent extends Intent {
+  const ResetTextScaleIntent();
 }
 
 class _MissingInterviewArgs extends StatelessWidget {
