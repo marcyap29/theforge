@@ -480,6 +480,39 @@ class ProjectFileRepository {
     }
   }
 
+  /// Stages all changes and commits them in the linked repo. Returns true on
+  /// success. Never throws — a non-repo or a failed commit returns false.
+  static Future<bool> gitCommitAll(String repoPath, String message) async {
+    try {
+      final add =
+          await Process.run('git', ['add', '-A'], workingDirectory: repoPath);
+      if (add.exitCode != 0) return false;
+      final commit = await Process.run(
+        'git',
+        ['commit', '-m', message],
+        workingDirectory: repoPath,
+      );
+      return commit.exitCode == 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Creates an annotated git tag in the linked repo. Returns true on success.
+  static Future<bool> gitTag(String repoPath, String tag,
+      {String? message}) async {
+    try {
+      final res = await Process.run(
+        'git',
+        ['tag', '-a', tag, '-m', message ?? tag],
+        workingDirectory: repoPath,
+      );
+      return res.exitCode == 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Writes verification result cache to forge/{version}/Name_Verification_{version}.json
   static Future<void> writeVerificationResult(
       String projectPath, String projectName, String specVersion,

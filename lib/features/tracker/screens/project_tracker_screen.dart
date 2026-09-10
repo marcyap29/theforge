@@ -1,17 +1,25 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/filesystem/project_file_repository.dart';
 import '../../../data/local_db/forge_database.dart';
+import '../../implementation/providers/implementation_notifier.dart';
+import '../../implementation/providers/implementation_providers.dart';
+import '../../implementation/screens/implementation_screen.dart';
+import '../../projects/providers/providers.dart';
 import '../checkin/checkin_review_dialog.dart';
 import '../checkin/checkin_service.dart';
 import '../models/tracker_enums.dart';
 import '../providers/tracker_providers.dart';
+import '../releases/release_providers.dart';
 import '../scan/feature_scan.dart';
 import '../widgets/feature_edit_dialog.dart';
 import '../widgets/scan_review_sheet.dart';
 import '../widgets/status_chip.dart';
+import 'releases_screen.dart';
 
 /// The per-project feature board: features grouped by status with add/edit/
 /// delete + quick status changes, plus project-level status, review cadence,
@@ -91,6 +99,11 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             onPressed: _scanRepo,
           ),
           IconButton(
+            icon: const Icon(Icons.rocket_launch_outlined),
+            tooltip: 'Releases',
+            onPressed: _openReleases,
+          ),
+          IconButton(
             icon: const Icon(Icons.schedule),
             tooltip: 'Review cadence',
             onPressed: () => _editCadence(trackingAsync.valueOrNull),
@@ -161,6 +174,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             onDelete: () => ref
                 .read(featureListProvider(project.id).notifier)
                 .deleteFeature(f),
+            onBuild: () => _buildFeature(f),
           )),
     ];
   }
@@ -190,6 +204,93 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
           targetVersion: result.targetVersion,
         );
     ref.invalidate(portfolioProvider);
+  }
+
+  void _openReleases() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => ReleasesScreen(project: project),
+    ));
+  }
+
+  /// "Build with AI" (Pro): assemble the brief (feature + spec/handoff as
+  /// context), open the implementation window, and update tracking on ship.
+  Future<void> _buildFeature(Feature feature) async {
+    final messenger = ScaffoldMessenger.of(context);
+    if (!ref.read(entitlementProvider)) {
+      messenger.showSnackBar(const SnackBar(
+          content: Text('Build with AI is a Pro feature.')));
+      return;
+    }
+    final config = await ProjectFileRepository.readProjectConfig(project.path);
+    final repoPath = config['repoPath'] as String?;
+    if (repoPath == null || !Directory(repoPath).existsSync()) {
+      messenger.showSnackBar(const SnackBar(
+          content: Text('Link a code repo first (Repo Path) to build.')));
+      return;
+    }
+
+    // Load spec/handoff context if a spec has been generated.
+    String? lockedSpec;
+    String? goalStatement;
+    var components = <String>[];
+    var checklist = <Map<String, dynamic>>[];
+    final version = project.specVersion;
+    if (version != null && version.isNotEmpty) {
+      final fileRepo = ref.read(projectFileRepositoryProvider);
+      try {
+        lockedSpec =
+            await fileRepo.readLockedSpec(project.path, project.name, version);
+      } catch (_) {}
+      final handoff = await ProjectFileRepository.readHandoffPackage(
+          project.path, project.name, version);
+      if (handoff != null) {
+        goalStatement = handoff['goalStatement'] as String?;
+        components =
+            ((handoff['components'] as List?) ?? const []).cast<String>();
+        checklist = ((handoff['verificationChecklist'] as List?) ?? const [])
+            .whereType<Map>()
+            .map((e) => e.cast<String, dynamic>())
+            .toList();
+      }
+    }
+
+    final brief = ImplBrief(
+      projectPath: project.path,
+      projectName: project.name,
+      repoPath: repoPath,
+      featureId: feature.id,
+      featureTitle: feature.title,
+      featureDescription: feature.description,
+      targetVersion: feature.targetVersion,
+      lockedSpec: lockedSpec,
+      goalStatement: goalStatement,
+      components: components,
+      checklist: checklist,
+    );
+
+    // Mark in-progress while the build runs.
+    await ref
+        .read(featureListProvider(project.id).notifier)
+        .setStatus(feature, FeatureStatus.inProgress);
+    ref.invalidate(portfolioProvider);
+
+    if (!mounted) return;
+    final shipped = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => ImplementationScreen(brief: brief)),
+    );
+
+    if (shipped == true) {
+      await ref
+          .read(featureListProvider(project.id).notifier)
+          .setStatus(feature, FeatureStatus.shipped);
+      final v = feature.targetVersion?.trim();
+      if (v != null && v.isNotEmpty) {
+        await ref
+            .read(releaseListProvider(project.id).notifier)
+            .ensureForVersion(v, projectPath: project.path);
+      }
+      ref.invalidate(portfolioProvider);
+    }
   }
 
   Future<void> _scanRepo() async {
@@ -443,12 +544,14 @@ class _FeatureTile extends StatelessWidget {
     required this.onSetStatus,
     required this.onEdit,
     required this.onDelete,
+    required this.onBuild,
   });
 
   final Feature feature;
   final ValueChanged<FeatureStatus> onSetStatus;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onBuild;
 
   @override
   Widget build(BuildContext context) {
@@ -465,6 +568,8 @@ class _FeatureTile extends StatelessWidget {
           switch (a.kind) {
             case _ActionKind.setStatus:
               onSetStatus(a.status!);
+            case _ActionKind.build:
+              onBuild();
             case _ActionKind.edit:
               onEdit();
             case _ActionKind.delete:
@@ -472,6 +577,17 @@ class _FeatureTile extends StatelessWidget {
           }
         },
         itemBuilder: (_) => [
+          if (status.isActive) ...[
+            const PopupMenuItem(
+              value: _TileAction.build_,
+              child: Row(children: [
+                Icon(Icons.auto_awesome, size: 16, color: Color(0xFFE8A04C)),
+                SizedBox(width: 8),
+                Text('Build with AI'),
+              ]),
+            ),
+            const PopupMenuDivider(),
+          ],
           const PopupMenuItem(
             enabled: false,
             height: 28,
@@ -537,7 +653,7 @@ class _FeatureTile extends StatelessWidget {
   }
 }
 
-enum _ActionKind { setStatus, edit, delete }
+enum _ActionKind { setStatus, build, edit, delete }
 
 class _TileAction {
   const _TileAction(this.kind, [this.status]);
@@ -546,6 +662,7 @@ class _TileAction {
 
   static _TileAction move(FeatureStatus s) =>
       _TileAction(_ActionKind.setStatus, s);
+  static const _TileAction build_ = _TileAction(_ActionKind.build);
   static const _TileAction edit_ = _TileAction(_ActionKind.edit);
   static const _TileAction delete_ = _TileAction(_ActionKind.delete);
 }

@@ -1584,6 +1584,572 @@ class ProjectTrackingCompanion extends UpdateCompanion<ProjectTrackingData> {
   }
 }
 
+class $ReleasesTable extends Releases with TableInfo<$ReleasesTable, Release> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ReleasesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _projectIdMeta = const VerificationMeta(
+    'projectId',
+  );
+  @override
+  late final GeneratedColumn<String> projectId = GeneratedColumn<String>(
+    'project_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _versionMeta = const VerificationMeta(
+    'version',
+  );
+  @override
+  late final GeneratedColumn<String> version = GeneratedColumn<String>(
+    'version',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('planned'),
+  );
+  static const VerificationMeta _releasedAtMeta = const VerificationMeta(
+    'releasedAt',
+  );
+  @override
+  late final GeneratedColumn<int> releasedAt = GeneratedColumn<int>(
+    'released_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _gitTagMeta = const VerificationMeta('gitTag');
+  @override
+  late final GeneratedColumn<String> gitTag = GeneratedColumn<String>(
+    'git_tag',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    projectId,
+    version,
+    status,
+    releasedAt,
+    notes,
+    gitTag,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'releases';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Release> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('project_id')) {
+      context.handle(
+        _projectIdMeta,
+        projectId.isAcceptableOrUnknown(data['project_id']!, _projectIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_projectIdMeta);
+    }
+    if (data.containsKey('version')) {
+      context.handle(
+        _versionMeta,
+        version.isAcceptableOrUnknown(data['version']!, _versionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_versionMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('released_at')) {
+      context.handle(
+        _releasedAtMeta,
+        releasedAt.isAcceptableOrUnknown(data['released_at']!, _releasedAtMeta),
+      );
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    if (data.containsKey('git_tag')) {
+      context.handle(
+        _gitTagMeta,
+        gitTag.isAcceptableOrUnknown(data['git_tag']!, _gitTagMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Release map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Release(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      projectId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}project_id'],
+      )!,
+      version: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}version'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      releasedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}released_at'],
+      ),
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+      gitTag: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}git_tag'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $ReleasesTable createAlias(String alias) {
+    return $ReleasesTable(attachedDatabase, alias);
+  }
+}
+
+class Release extends DataClass implements Insertable<Release> {
+  final String id;
+  final String projectId;
+
+  /// The version label features are grouped under (e.g. "v1", "1.2.0").
+  final String version;
+
+  /// One of: planned | released
+  final String status;
+
+  /// Epoch ms when the release was cut. Null while still planned.
+  final int? releasedAt;
+
+  /// Generated release notes (markdown). Null until cut.
+  final String? notes;
+
+  /// Git tag applied to the linked repo when cut, if any.
+  final String? gitTag;
+  final int createdAt;
+  final int updatedAt;
+  const Release({
+    required this.id,
+    required this.projectId,
+    required this.version,
+    required this.status,
+    this.releasedAt,
+    this.notes,
+    this.gitTag,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['project_id'] = Variable<String>(projectId);
+    map['version'] = Variable<String>(version);
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || releasedAt != null) {
+      map['released_at'] = Variable<int>(releasedAt);
+    }
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    if (!nullToAbsent || gitTag != null) {
+      map['git_tag'] = Variable<String>(gitTag);
+    }
+    map['created_at'] = Variable<int>(createdAt);
+    map['updated_at'] = Variable<int>(updatedAt);
+    return map;
+  }
+
+  ReleasesCompanion toCompanion(bool nullToAbsent) {
+    return ReleasesCompanion(
+      id: Value(id),
+      projectId: Value(projectId),
+      version: Value(version),
+      status: Value(status),
+      releasedAt: releasedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(releasedAt),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+      gitTag: gitTag == null && nullToAbsent
+          ? const Value.absent()
+          : Value(gitTag),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory Release.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Release(
+      id: serializer.fromJson<String>(json['id']),
+      projectId: serializer.fromJson<String>(json['projectId']),
+      version: serializer.fromJson<String>(json['version']),
+      status: serializer.fromJson<String>(json['status']),
+      releasedAt: serializer.fromJson<int?>(json['releasedAt']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      gitTag: serializer.fromJson<String?>(json['gitTag']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'projectId': serializer.toJson<String>(projectId),
+      'version': serializer.toJson<String>(version),
+      'status': serializer.toJson<String>(status),
+      'releasedAt': serializer.toJson<int?>(releasedAt),
+      'notes': serializer.toJson<String?>(notes),
+      'gitTag': serializer.toJson<String?>(gitTag),
+      'createdAt': serializer.toJson<int>(createdAt),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+    };
+  }
+
+  Release copyWith({
+    String? id,
+    String? projectId,
+    String? version,
+    String? status,
+    Value<int?> releasedAt = const Value.absent(),
+    Value<String?> notes = const Value.absent(),
+    Value<String?> gitTag = const Value.absent(),
+    int? createdAt,
+    int? updatedAt,
+  }) => Release(
+    id: id ?? this.id,
+    projectId: projectId ?? this.projectId,
+    version: version ?? this.version,
+    status: status ?? this.status,
+    releasedAt: releasedAt.present ? releasedAt.value : this.releasedAt,
+    notes: notes.present ? notes.value : this.notes,
+    gitTag: gitTag.present ? gitTag.value : this.gitTag,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  Release copyWithCompanion(ReleasesCompanion data) {
+    return Release(
+      id: data.id.present ? data.id.value : this.id,
+      projectId: data.projectId.present ? data.projectId.value : this.projectId,
+      version: data.version.present ? data.version.value : this.version,
+      status: data.status.present ? data.status.value : this.status,
+      releasedAt: data.releasedAt.present
+          ? data.releasedAt.value
+          : this.releasedAt,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      gitTag: data.gitTag.present ? data.gitTag.value : this.gitTag,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Release(')
+          ..write('id: $id, ')
+          ..write('projectId: $projectId, ')
+          ..write('version: $version, ')
+          ..write('status: $status, ')
+          ..write('releasedAt: $releasedAt, ')
+          ..write('notes: $notes, ')
+          ..write('gitTag: $gitTag, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    projectId,
+    version,
+    status,
+    releasedAt,
+    notes,
+    gitTag,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Release &&
+          other.id == this.id &&
+          other.projectId == this.projectId &&
+          other.version == this.version &&
+          other.status == this.status &&
+          other.releasedAt == this.releasedAt &&
+          other.notes == this.notes &&
+          other.gitTag == this.gitTag &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class ReleasesCompanion extends UpdateCompanion<Release> {
+  final Value<String> id;
+  final Value<String> projectId;
+  final Value<String> version;
+  final Value<String> status;
+  final Value<int?> releasedAt;
+  final Value<String?> notes;
+  final Value<String?> gitTag;
+  final Value<int> createdAt;
+  final Value<int> updatedAt;
+  final Value<int> rowid;
+  const ReleasesCompanion({
+    this.id = const Value.absent(),
+    this.projectId = const Value.absent(),
+    this.version = const Value.absent(),
+    this.status = const Value.absent(),
+    this.releasedAt = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.gitTag = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ReleasesCompanion.insert({
+    required String id,
+    required String projectId,
+    required String version,
+    this.status = const Value.absent(),
+    this.releasedAt = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.gitTag = const Value.absent(),
+    required int createdAt,
+    required int updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       projectId = Value(projectId),
+       version = Value(version),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<Release> custom({
+    Expression<String>? id,
+    Expression<String>? projectId,
+    Expression<String>? version,
+    Expression<String>? status,
+    Expression<int>? releasedAt,
+    Expression<String>? notes,
+    Expression<String>? gitTag,
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (projectId != null) 'project_id': projectId,
+      if (version != null) 'version': version,
+      if (status != null) 'status': status,
+      if (releasedAt != null) 'released_at': releasedAt,
+      if (notes != null) 'notes': notes,
+      if (gitTag != null) 'git_tag': gitTag,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ReleasesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? projectId,
+    Value<String>? version,
+    Value<String>? status,
+    Value<int?>? releasedAt,
+    Value<String?>? notes,
+    Value<String?>? gitTag,
+    Value<int>? createdAt,
+    Value<int>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return ReleasesCompanion(
+      id: id ?? this.id,
+      projectId: projectId ?? this.projectId,
+      version: version ?? this.version,
+      status: status ?? this.status,
+      releasedAt: releasedAt ?? this.releasedAt,
+      notes: notes ?? this.notes,
+      gitTag: gitTag ?? this.gitTag,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (projectId.present) {
+      map['project_id'] = Variable<String>(projectId.value);
+    }
+    if (version.present) {
+      map['version'] = Variable<String>(version.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (releasedAt.present) {
+      map['released_at'] = Variable<int>(releasedAt.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (gitTag.present) {
+      map['git_tag'] = Variable<String>(gitTag.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReleasesCompanion(')
+          ..write('id: $id, ')
+          ..write('projectId: $projectId, ')
+          ..write('version: $version, ')
+          ..write('status: $status, ')
+          ..write('releasedAt: $releasedAt, ')
+          ..write('notes: $notes, ')
+          ..write('gitTag: $gitTag, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$ForgeDatabase extends GeneratedDatabase {
   _$ForgeDatabase(QueryExecutor e) : super(e);
   $ForgeDatabaseManager get managers => $ForgeDatabaseManager(this);
@@ -1592,6 +2158,7 @@ abstract class _$ForgeDatabase extends GeneratedDatabase {
   late final $ProjectTrackingTable projectTracking = $ProjectTrackingTable(
     this,
   );
+  late final $ReleasesTable releases = $ReleasesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1600,6 +2167,7 @@ abstract class _$ForgeDatabase extends GeneratedDatabase {
     projects,
     features,
     projectTracking,
+    releases,
   ];
 }
 
@@ -2386,6 +2954,278 @@ typedef $$ProjectTrackingTableProcessedTableManager =
       ProjectTrackingData,
       PrefetchHooks Function()
     >;
+typedef $$ReleasesTableCreateCompanionBuilder =
+    ReleasesCompanion Function({
+      required String id,
+      required String projectId,
+      required String version,
+      Value<String> status,
+      Value<int?> releasedAt,
+      Value<String?> notes,
+      Value<String?> gitTag,
+      required int createdAt,
+      required int updatedAt,
+      Value<int> rowid,
+    });
+typedef $$ReleasesTableUpdateCompanionBuilder =
+    ReleasesCompanion Function({
+      Value<String> id,
+      Value<String> projectId,
+      Value<String> version,
+      Value<String> status,
+      Value<int?> releasedAt,
+      Value<String?> notes,
+      Value<String?> gitTag,
+      Value<int> createdAt,
+      Value<int> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$ReleasesTableFilterComposer
+    extends Composer<_$ForgeDatabase, $ReleasesTable> {
+  $$ReleasesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get releasedAt => $composableBuilder(
+    column: $table.releasedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get gitTag => $composableBuilder(
+    column: $table.gitTag,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ReleasesTableOrderingComposer
+    extends Composer<_$ForgeDatabase, $ReleasesTable> {
+  $$ReleasesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get releasedAt => $composableBuilder(
+    column: $table.releasedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get gitTag => $composableBuilder(
+    column: $table.gitTag,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ReleasesTableAnnotationComposer
+    extends Composer<_$ForgeDatabase, $ReleasesTable> {
+  $$ReleasesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get projectId =>
+      $composableBuilder(column: $table.projectId, builder: (column) => column);
+
+  GeneratedColumn<String> get version =>
+      $composableBuilder(column: $table.version, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<int> get releasedAt => $composableBuilder(
+    column: $table.releasedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<String> get gitTag =>
+      $composableBuilder(column: $table.gitTag, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$ReleasesTableTableManager
+    extends
+        RootTableManager<
+          _$ForgeDatabase,
+          $ReleasesTable,
+          Release,
+          $$ReleasesTableFilterComposer,
+          $$ReleasesTableOrderingComposer,
+          $$ReleasesTableAnnotationComposer,
+          $$ReleasesTableCreateCompanionBuilder,
+          $$ReleasesTableUpdateCompanionBuilder,
+          (Release, BaseReferences<_$ForgeDatabase, $ReleasesTable, Release>),
+          Release,
+          PrefetchHooks Function()
+        > {
+  $$ReleasesTableTableManager(_$ForgeDatabase db, $ReleasesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ReleasesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ReleasesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ReleasesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> projectId = const Value.absent(),
+                Value<String> version = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<int?> releasedAt = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<String?> gitTag = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<int> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ReleasesCompanion(
+                id: id,
+                projectId: projectId,
+                version: version,
+                status: status,
+                releasedAt: releasedAt,
+                notes: notes,
+                gitTag: gitTag,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String projectId,
+                required String version,
+                Value<String> status = const Value.absent(),
+                Value<int?> releasedAt = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<String?> gitTag = const Value.absent(),
+                required int createdAt,
+                required int updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => ReleasesCompanion.insert(
+                id: id,
+                projectId: projectId,
+                version: version,
+                status: status,
+                releasedAt: releasedAt,
+                notes: notes,
+                gitTag: gitTag,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ReleasesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$ForgeDatabase,
+      $ReleasesTable,
+      Release,
+      $$ReleasesTableFilterComposer,
+      $$ReleasesTableOrderingComposer,
+      $$ReleasesTableAnnotationComposer,
+      $$ReleasesTableCreateCompanionBuilder,
+      $$ReleasesTableUpdateCompanionBuilder,
+      (Release, BaseReferences<_$ForgeDatabase, $ReleasesTable, Release>),
+      Release,
+      PrefetchHooks Function()
+    >;
 
 class $ForgeDatabaseManager {
   final _$ForgeDatabase _db;
@@ -2396,4 +3236,6 @@ class $ForgeDatabaseManager {
       $$FeaturesTableTableManager(_db, _db.features);
   $$ProjectTrackingTableTableManager get projectTracking =>
       $$ProjectTrackingTableTableManager(_db, _db.projectTracking);
+  $$ReleasesTableTableManager get releases =>
+      $$ReleasesTableTableManager(_db, _db.releases);
 }

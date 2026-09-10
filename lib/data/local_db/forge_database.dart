@@ -42,6 +42,35 @@ class Features extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// A release groups shipped features under a version label. Created when the
+/// user "cuts a release" from the tracker; carries the generated release notes
+/// and (optionally) the git tag applied to the linked repo. Mirrored to
+/// `{projectPath}/.forge/tracker/releases.json`.
+class Releases extends Table {
+  TextColumn get id => text()();
+  TextColumn get projectId => text()();
+
+  /// The version label features are grouped under (e.g. "v1", "1.2.0").
+  TextColumn get version => text()();
+
+  /// One of: planned | released
+  TextColumn get status => text().withDefault(const Constant('planned'))();
+
+  /// Epoch ms when the release was cut. Null while still planned.
+  IntColumn get releasedAt => integer().nullable()();
+
+  /// Generated release notes (markdown). Null until cut.
+  TextColumn get notes => text().nullable()();
+
+  /// Git tag applied to the linked repo when cut, if any.
+  TextColumn get gitTag => text().nullable()();
+  IntColumn get createdAt => integer()();
+  IntColumn get updatedAt => integer()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Portfolio-level tracking state for a project, kept separate from the
 /// discovery-indexed [Projects] table so project rediscovery never clobbers it.
 class ProjectTracking extends Table {
@@ -62,12 +91,12 @@ class ProjectTracking extends Table {
   Set<Column> get primaryKey => {projectId};
 }
 
-@DriftDatabase(tables: [Projects, Features, ProjectTracking])
+@DriftDatabase(tables: [Projects, Features, ProjectTracking, Releases])
 class ForgeDatabase extends _$ForgeDatabase {
   ForgeDatabase() : super(driftDatabase(name: 'forge_index'));
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -78,6 +107,10 @@ class ForgeDatabase extends _$ForgeDatabase {
           if (from < 2) {
             await m.createTable(features);
             await m.createTable(projectTracking);
+          }
+          // v2 -> v3: introduce the releases table. Existing rows untouched.
+          if (from < 3) {
+            await m.createTable(releases);
           }
         },
       );
@@ -148,4 +181,21 @@ class ForgeDatabase extends _$ForgeDatabase {
   Future<void> removeTracking(String projectId) =>
       (delete(projectTracking)..where((t) => t.projectId.equals(projectId)))
           .go();
+
+  // --- Releases ---
+
+  Future<List<Release>> getReleasesForProject(String projectId) =>
+      (select(releases)..where((t) => t.projectId.equals(projectId))).get();
+
+  Future<Release?> getReleaseForVersion(String projectId, String version) =>
+      (select(releases)
+            ..where((t) =>
+                t.projectId.equals(projectId) & t.version.equals(version)))
+          .getSingleOrNull();
+
+  Future<void> upsertRelease(ReleasesCompanion entry) =>
+      into(releases).insertOnConflictUpdate(entry);
+
+  Future<void> deleteRelease(String id) =>
+      (delete(releases)..where((t) => t.id.equals(id))).go();
 }

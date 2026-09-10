@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:path/path.dart' as p;
+import 'package:uuid/uuid.dart';
 
 import '../../../data/filesystem/project_file_repository.dart';
 import '../../../data/local_db/forge_database.dart';
@@ -69,6 +70,61 @@ class TrackerRepository {
         'lastReviewHead': data.lastReviewHead,
       });
     }
+  }
+
+  // --- Releases ---
+
+  Future<List<Release>> releasesForProject(String projectId) =>
+      _db.getReleasesForProject(projectId);
+
+  /// Returns the release for [version], creating a `planned` one if none exists.
+  Future<Release> ensureRelease(
+    String projectId,
+    String version, {
+    String? projectPath,
+  }) async {
+    final existing = await _db.getReleaseForVersion(projectId, version);
+    if (existing != null) return existing;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final release = Release(
+      id: const Uuid().v4(),
+      projectId: projectId,
+      version: version,
+      status: 'planned',
+      releasedAt: null,
+      notes: null,
+      gitTag: null,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await _db.upsertRelease(release.toCompanion(false));
+    await _mirrorReleases(projectId, projectPath);
+    return release;
+  }
+
+  Future<void> saveRelease(Release release, {String? projectPath}) async {
+    await _db.upsertRelease(release.toCompanion(false));
+    await _mirrorReleases(release.projectId, projectPath);
+  }
+
+  Future<void> _mirrorReleases(String projectId, String? projectPath) async {
+    if (projectPath == null) return;
+    final releases = await _db.getReleasesForProject(projectId);
+    await _writeJson(projectPath, 'releases.json', {
+      'projectId': projectId,
+      'releases': releases
+          .map((r) => {
+                'id': r.id,
+                'version': r.version,
+                'status': r.status,
+                'releasedAt': r.releasedAt,
+                'notes': r.notes,
+                'gitTag': r.gitTag,
+                'createdAt': r.createdAt,
+                'updatedAt': r.updatedAt,
+              })
+          .toList(),
+    });
   }
 
   // --- JSON mirror ---
