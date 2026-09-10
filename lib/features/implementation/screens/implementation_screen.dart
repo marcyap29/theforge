@@ -62,13 +62,23 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
     });
   }
 
+  /// True when the view is already at (or very near) the bottom — used so we
+  /// only "stick" to new output when the user hasn't scrolled up to read.
+  bool get _isAtBottom {
+    if (!_scroll.hasClients) return true;
+    return _scroll.position.pixels >= _scroll.position.maxScrollExtent - 120;
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(implRunProvider(_featureId));
     final notifier = ref.read(implRunProvider(_featureId).notifier);
 
+    // Follow new output (including live in-place reasoning updates) only when
+    // the user is already at the bottom — so scrolling up to read the thought
+    // process isn't interrupted.
     ref.listen(implRunProvider(_featureId), (prev, next) {
-      if ((prev?.console.length ?? 0) != next.console.length) _autoScroll();
+      if (!identical(prev?.console, next.console) && _isAtBottom) _autoScroll();
     });
 
     return Scaffold(
@@ -189,11 +199,16 @@ class _Console extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
+    return Scrollbar(
       controller: controller,
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      itemCount: lines.length,
-      itemBuilder: (_, i) {
+      thumbVisibility: true,
+      interactive: true,
+      child: ListView.builder(
+        controller: controller,
+        primary: false,
+        padding: const EdgeInsets.fromLTRB(14, 12, 22, 12),
+        itemCount: lines.length,
+        itemBuilder: (_, i) {
         final l = lines[i];
         return Padding(
           padding: const EdgeInsets.only(bottom: 2),
@@ -215,7 +230,8 @@ class _Console extends StatelessWidget {
             ]),
           ),
         );
-      },
+        },
+      ),
     );
   }
 }
