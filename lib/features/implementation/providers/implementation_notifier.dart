@@ -54,11 +54,9 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
   final _runner = CommandRunner();
 
   // Streaming-display state for the planning phase.
-  final _contentBuf = StringBuffer(); // the answer text (used to find the JSON)
   String _partial = ''; // current unfinished streamed line
   ConsoleLineKind _partialKind = ConsoleLineKind.thinking;
   bool _streamStarted = false;
-  bool _jsonSeen = false;
   Timer? _waitTimer;
 
   // Incremented on every start/stop/reset so a stale in-flight stream (which
@@ -80,6 +78,7 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     state = state.copyWith(
       console: [...state.console, ConsoleLine(kind, text, DateTime.now())],
     );
+    _streamStarted = false; // a discrete line closes any open streamed line
   }
 
   /// Sets the run phase AND mirrors it to the app-level registry so the tracker
@@ -118,32 +117,14 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
   }
 
   /// Handles one streamed delta. Reasoning models stream their chain-of-thought
-  /// as [thinking] deltas — the model's INTERNAL thoughts (dim, collapsible) —
-  /// while the real answer arrives as content deltas: the plain-English
-  /// preamble it wants to SHARE (green) followed by the JSON plan (hidden and
-  /// parsed).
+  /// as [thinking] deltas — the model's INTERNAL thoughts (dim, collapsible),
+  /// shown live so you watch it reason. Content deltas are the JSON answer,
+  /// which the agent parses; they are not displayed raw (the green "Summary"
+  /// and the plan cards convey the outcome).
   void _onDelta(String text, bool thinking, int gen) {
     if (gen != _gen) return; // stale stream from a stopped/reset run
     _waitTimer?.cancel();
-    if (thinking) {
-      _appendStream(text, ConsoleLineKind.thinking);
-      return;
-    }
-    if (_jsonSeen) return;
-    final before = _contentBuf.length;
-    _contentBuf.write(text);
-    final brace = _contentBuf.toString().indexOf('{');
-    if (brace >= 0) {
-      _jsonSeen = true;
-      // Show only the presentation that arrived before the JSON began.
-      final visible = (brace - before).clamp(0, text.length);
-      if (visible > 0) {
-        _appendStream(text.substring(0, visible), ConsoleLineKind.presentation);
-      }
-      _log(ConsoleLineKind.info, 'Writing the plan…');
-    } else {
-      _appendStream(text, ConsoleLineKind.presentation);
-    }
+    if (thinking) _appendStream(text, ConsoleLineKind.thinking);
   }
 
   /// Kicks off the run: streams the agent's plan, then waits for approval.
@@ -151,11 +132,9 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     if (state.phase != RunPhase.idle) return;
     final gen = ++_gen;
     _brief = brief;
-    _contentBuf.clear();
     _partial = '';
     _streamStarted = false;
     _partialKind = ConsoleLineKind.thinking;
-    _jsonSeen = false;
     state = state.copyWith(startedAt: DateTime.now(), error: null);
     _phase(RunPhase.planning);
     _log(ConsoleLineKind.narration, 'Planning: "${brief.featureTitle}"');
@@ -191,6 +170,9 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
         goalStatement: brief.goalStatement,
         components: brief.components,
         onDelta: (t, thinking) => _onDelta(t, thinking, gen),
+        onStatus: (s) {
+          if (gen == _gen) _log(ConsoleLineKind.narration, s);
+        },
       );
       // Ignore a stream that finished after the user stopped or restarted.
       if (gen != _gen || state.phase == RunPhase.stopped) return;
@@ -335,10 +317,8 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     _gen++; // invalidate any stale stream before a fresh start
     _waitTimer?.cancel();
     _brief = null;
-    _contentBuf.clear();
     _partial = '';
     _streamStarted = false;
-    _jsonSeen = false;
     ref.read(implActiveRunsProvider.notifier).set(arg, RunPhase.idle);
     state = ImplRunState.initial(state.runId);
   }
