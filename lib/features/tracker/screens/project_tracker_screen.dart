@@ -87,7 +87,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.radar),
-            tooltip: 'Scan repo → features',
+            tooltip: 'Suggest features (from docs + repo)',
             onPressed: _scanRepo,
           ),
           IconButton(
@@ -194,13 +194,19 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
 
   Future<void> _scanRepo() async {
     final messenger = ScaffoldMessenger.of(context);
-    final repoPath = await _resolveRepoPath();
-    if (repoPath == null) return;
+    // Derive features from the project's own documents, plus the linked repo if
+    // one exists — no folder prompt (a doc-only project still works).
+    final config = await ProjectFileRepository.readProjectConfig(project.path);
+    final rp = config['repoPath'] as String?;
+    final repoPath = (rp != null && rp.isNotEmpty) ? rp : null;
 
-    _showBlockingSpinner('Scanning repository…');
+    _showBlockingSpinner(
+        repoPath != null ? 'Reading docs + repo…' : 'Reading project documents…');
     List<ProposedFeature> proposals;
     try {
-      proposals = await ref.read(featureScannerProvider).scan(repoPath);
+      proposals = await ref
+          .read(featureScannerProvider)
+          .scan(projectPath: project.path, repoPath: repoPath);
     } catch (e) {
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
       messenger.showSnackBar(SnackBar(
@@ -608,7 +614,8 @@ class _EmptyState extends StatelessWidget {
               style: TextStyle(color: Color(0xFF9CA3AF))),
           const SizedBox(height: 4),
           const Text(
-            'Scan the repo to auto-propose a feature list, or add manually.',
+            'Suggest a feature list from this project\'s documents (and repo, if '
+            'linked), or add manually.',
             style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
           ),
           const SizedBox(height: 16),
@@ -618,7 +625,7 @@ class _EmptyState extends StatelessWidget {
               FilledButton.icon(
                 onPressed: onScan,
                 icon: const Icon(Icons.radar, size: 18),
-                label: const Text('Scan repo'),
+                label: const Text('Suggest features'),
               ),
               const SizedBox(width: 12),
               OutlinedButton.icon(

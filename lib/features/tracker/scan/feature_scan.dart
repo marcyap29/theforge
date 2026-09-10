@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
+import '../../../data/filesystem/project_file_repository.dart';
 import '../../../services/llm/llm_provider.dart';
 import '../../../services/llm/llm_service.dart';
 import '../../../services/llm/llm_service_provider.dart';
@@ -42,17 +43,26 @@ class FeatureScanner {
 
   final LlmService _llm;
 
-  Future<List<ProposedFeature>> scan(String repoPath) async {
-    final dir = Directory(repoPath);
-    if (!dir.existsSync()) {
-      throw FeatureScanException('Repository path does not exist: $repoPath');
+  /// Derives features from a project's own Forge documents (spec, handoff,
+  /// goal, seeds…) AND/OR a linked code repo. Either source alone is enough —
+  /// a doc-only project (no code) still yields a feature list.
+  Future<List<ProposedFeature>> scan({
+    required String projectPath,
+    String? repoPath,
+  }) async {
+    final docs = await _readProjectDocs(projectPath);
+
+    String? readme;
+    List<String> fileList = const [];
+    if (repoPath != null && Directory(repoPath).existsSync()) {
+      readme = await _readReadme(repoPath);
+      fileList = await _listFiles(repoPath);
     }
 
-    final readme = await _readReadme(repoPath);
-    final fileList = await _listFiles(repoPath);
-    if (fileList.isEmpty && readme == null) {
+    if (docs == null && readme == null && fileList.isEmpty) {
       throw FeatureScanException(
-          'No files or README found to scan in $repoPath');
+          'No documents or repo found to derive features from. Generate a spec '
+          'first, or link a repo.');
     }
 
     final raw = await _llm.complete(
@@ -60,10 +70,64 @@ class FeatureScanner {
       temperature: 0.3,
       maxTokens: 2000,
       systemPrompt: _systemPrompt,
-      userPrompt: _userPrompt(repoPath, readme, fileList),
+      userPrompt: _userPrompt(projectPath, docs, readme, fileList, repoPath),
     );
 
     return _parse(raw);
+  }
+
+  /// Concatenates the project's README + `.forge` deliverables (spec/handoff/
+  /// goal/seeds/worksheet…), spec-first, within a size budget.
+  Future<String?> _readProjectDocs(String projectPath) async {
+    final buffer = StringBuffer();
+    var budget = 12000;
+
+    Future<void> add(File f, String label) async {
+      if (budget <= 0 || !f.existsSync()) return;
+      try {
+        var c = await f.readAsString();
+        if (c.length > 3000) c = '${c.substring(0, 3000)}\n…(truncated)';
+        if (c.length > budget) c = c.substring(0, budget);
+        buffer..writeln('### $label')..writeln(c)..writeln();
+        budget -= c.length;
+      } catch (_) {}
+    }
+
+    await add(File(p.join(projectPath, 'README.md')), 'README.md');
+
+    final forge =
+        Directory(p.join(projectPath, ProjectFileRepository.forgeDirName));
+    if (forge.existsSync()) {
+      final files = forge
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((f) {
+            final n = p.basename(f.path).toLowerCase();
+            return n.endsWith('.md') || n.endsWith('.txt') || n.endsWith('.json');
+          })
+          .toList();
+      int rank(File f) {
+        final n = p.basename(f.path).toLowerCase();
+        if (n.contains('lockedspec')) return 0;
+        if (n.contains('handoff') || n.contains('goal')) return 1;
+        if (n.contains('seed')) return 2;
+        if (n.contains('worksheet') || n.contains('decision')) return 3;
+        return 4;
+      }
+      files.sort((a, b) => rank(a).compareTo(rank(b)));
+      final seenSpec = <bool>{}; // include only the first LockedSpec (dedup copy)
+      for (final f in files) {
+        final name = p.basename(f.path);
+        if (name.toLowerCase().contains('lockedspec')) {
+          if (seenSpec.isNotEmpty) continue;
+          seenSpec.add(true);
+        }
+        await add(f, name);
+      }
+    }
+
+    final s = buffer.toString().trim();
+    return s.isEmpty ? null : s;
   }
 
   Future<String?> _readReadme(String repoPath) async {
@@ -116,14 +180,18 @@ class FeatureScanner {
       list.length > 400 ? list.sublist(0, 400) : list;
 
   static const _systemPrompt = '''
-You are a senior product analyst. Given a codebase's README and file listing,
-infer the discrete product FEATURES the project has or plans. A "feature" is a
-user-facing capability or a significant subsystem — not a single file.
+You are a senior product analyst. Given a project's DOCUMENTS (its locked spec,
+handoff, goal, seeds) and/or its CODEBASE (README + file listing), infer the
+discrete product FEATURES. A "feature" is a user-facing capability or a
+significant subsystem — not a single file.
 
 Rules:
-- Infer status from evidence: if code implementing it clearly exists → "shipped".
-  If the README/TODOs mention it as planned/future → "planned". If it looks
-  partially built → "in_progress". Use "idea" only for vague aspirations.
+- Infer status from evidence:
+  • Code clearly implements it → "shipped".
+  • Specified in the docs but no code evidence it's built → "planned".
+  • Partially built → "in_progress".
+  • Deferred / V2 seeds → "idea" (set targetVersion "v2" where stated).
+  • Only vague aspirations → "idea".
 - Prefer 8–18 features. Be specific and concise in titles (max ~6 words).
 - Description: one sentence on what the feature does.
 
@@ -131,19 +199,26 @@ Respond with ONLY a JSON array, no prose, no code fences. Each element:
 {"title": string, "description": string, "status": "idea|planned|in_progress|blocked|shipped", "targetVersion": string|null}
 ''';
 
-  String _userPrompt(String repoPath, String? readme, List<String> files) {
+  String _userPrompt(String projectPath, String? docs, String? readme,
+      List<String> files, String? repoPath) {
     final buffer = StringBuffer()
-      ..writeln('# Repository: ${p.basename(repoPath)}')
+      ..writeln('# Project: ${p.basename(projectPath)}')
       ..writeln();
-    if (readme != null) {
+    if (docs != null) {
       buffer
-        ..writeln('## README')
-        ..writeln(readme)
+        ..writeln('## Project documents')
+        ..writeln(docs)
         ..writeln();
     }
-    buffer
-      ..writeln('## Files (${files.length})')
-      ..writeln(files.join('\n'));
+    if (repoPath != null && (readme != null || files.isNotEmpty)) {
+      buffer.writeln('## Linked codebase: ${p.basename(repoPath)}');
+      if (readme != null) {
+        buffer..writeln('### README')..writeln(readme)..writeln();
+      }
+      buffer
+        ..writeln('### Files (${files.length})')
+        ..writeln(files.join('\n'));
+    }
     return buffer.toString();
   }
 
