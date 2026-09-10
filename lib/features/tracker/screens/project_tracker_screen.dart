@@ -298,8 +298,10 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     final existing = config['repoPath'] as String?;
     if (existing != null && existing.isNotEmpty) return existing;
 
-    final picked = await FilePicker.platform
-        .getDirectoryPath(dialogTitle: 'Select repository to scan');
+    final picked = await FilePicker.platform.getDirectoryPath(
+      dialogTitle: 'Select repository to scan',
+      lockParentWindow: true,
+    );
     if (picked == null) return null;
     await ProjectFileRepository.writeProjectConfig(
         project.path, {'repoPath': picked});

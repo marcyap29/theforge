@@ -76,19 +76,34 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
 
   /// Pure-repo path: pick a folder, ingest it (docs + structure), and auto-fill.
   Future<void> _analyzeRepo() async {
-    final picked = await FilePicker.platform
-        .getDirectoryPath(dialogTitle: 'Select the repository to analyze');
+    final messenger = ScaffoldMessenger.of(context);
+    String? picked;
+    try {
+      picked = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: 'Select the repository to analyze',
+        // Attach the panel to the window; an app-modal panel can fail to
+        // present on macOS otherwise (looks like "nothing happened").
+        lockParentWindow: true,
+      );
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(
+        content: Text('Could not open the folder picker: $e'),
+        backgroundColor: const Color(0xFF3F0A0A),
+      ));
+      return;
+    }
     if (picked == null) return;
+    final repoPath = picked; // non-null; safe to capture in closures
     // Persist as the project's linked repo (also enables future check-ins).
     await ProjectFileRepository.writeProjectConfig(
-        widget.projectPath, {'repoPath': picked});
-    if (mounted) setState(() => _repoPath = picked);
+        widget.projectPath, {'repoPath': repoPath});
+    if (mounted) setState(() => _repoPath = repoPath);
 
     await _run(
       status: 'Analyzing repository…',
       buildSource: () async =>
-          ref.read(importServiceProvider).repoDigest(picked),
-      repoPath: picked,
+          ref.read(importServiceProvider).repoDigest(repoPath),
+      repoPath: repoPath,
     );
   }
 

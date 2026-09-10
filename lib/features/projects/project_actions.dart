@@ -71,7 +71,13 @@ Future<bool?> _confirm(
     builder: (ctx) => AlertDialog(
       backgroundColor: const Color(0xFF1C1C1E),
       title: Text(title, style: const TextStyle(color: Color(0xFFE5E5E7))),
-      content: Text(message, style: const TextStyle(color: Color(0xFFAEAEB2))),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: SelectableText(message,
+              style: const TextStyle(color: Color(0xFFAEAEB2), fontSize: 13)),
+        ),
+      ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx, false),

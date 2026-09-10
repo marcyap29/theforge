@@ -54,16 +54,17 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
     if (toDelete.isEmpty) return;
 
     final n = toDelete.length;
+    final paths = toDelete.map((p) => p.path).join('\n');
     final confirmed = await confirmDoubleDelete(
       context,
       firstTitle: 'Delete Projects',
       firstMessage:
-          'Delete $n project${n == 1 ? '' : 's'}? This removes their folders '
-          'and tracked features. This cannot be undone.',
+          'Delete $n project${n == 1 ? '' : 's'}?\n\nFolders to be deleted:\n'
+          '$paths\n\nThis removes their Forge folders and tracked features. '
+          'Linked code repos are NOT touched. This cannot be undone.',
       secondTitle: 'Are you absolutely sure?',
       secondMessage:
-          'This permanently deletes $n project${n == 1 ? '' : 's'} and '
-          'everything in their folders.',
+          'Permanently delete these $n folder${n == 1 ? '' : 's'}?\n\n$paths',
       finalLabel: 'Delete $n permanently',
     );
     if (confirmed != true || !mounted) return;
@@ -85,12 +86,13 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
       context,
       firstTitle: 'Delete Project',
       firstMessage:
-          'Delete "${project.name}"? This removes the project folder and its '
-          'tracked features. This cannot be undone.',
+          'Delete "${project.name}"?\n\nFolder to be deleted:\n${project.path}'
+          '\n\nThis removes the Forge project folder and its tracked features. '
+          'Your linked code repo is NOT touched. This cannot be undone.',
       secondTitle: 'Are you absolutely sure?',
       secondMessage:
-          'This permanently deletes "${project.name}" and everything in its '
-          'folder.',
+          'Permanently delete "${project.name}" and everything in\n'
+          '${project.path}?',
     );
     if (confirmed != true || !mounted) return;
 
