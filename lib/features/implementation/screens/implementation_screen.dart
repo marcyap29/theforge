@@ -24,7 +24,9 @@ class ImplementationScreen extends ConsumerStatefulWidget {
 class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
   final _scroll = ScrollController();
   Timer? _ticker;
-  bool _hideThinking = false;
+
+  /// Start-line indices of internal-thinking blocks the user has collapsed.
+  final Set<int> _collapsedThinking = {};
 
   String get _featureId => widget.brief.featureId;
 
@@ -34,7 +36,8 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
     // start() is idempotent (guards on idle), so re-entering an in-flight or
     // finished run re-attaches rather than restarting.
     Future.microtask(
-        () => ref.read(implRunProvider(_featureId).notifier).start(widget.brief));
+      () => ref.read(implRunProvider(_featureId).notifier).start(widget.brief),
+    );
     // Tick once a second so the header's elapsed time advances.
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
@@ -85,22 +88,11 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0B),
       appBar: AppBar(
-        title: Text('Build: ${widget.brief.featureTitle}',
-            style: const TextStyle(fontSize: 15)),
+        title: Text(
+          'Build: ${widget.brief.featureTitle}',
+          style: const TextStyle(fontSize: 15),
+        ),
         actions: [
-          if (state.console.any((l) => l.kind == ConsoleLineKind.thinking))
-            IconButton(
-              icon: Icon(
-                  _hideThinking ? Icons.psychology_outlined : Icons.psychology,
-                  size: 18),
-              tooltip: _hideThinking
-                  ? 'Show the model\'s internal thinking'
-                  : 'Hide the model\'s internal thinking',
-              color: _hideThinking
-                  ? const Color(0xFF6B7280)
-                  : const Color(0xFF7C8598),
-              onPressed: () => setState(() => _hideThinking = !_hideThinking),
-            ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 14, horizontal: 4),
             child: ActiveModelChip(),
@@ -108,9 +100,14 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
           if (state.startedAt != null)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 4),
-              child: Text(_fmt(state.elapsed(DateTime.now())),
-                  style: const TextStyle(
-                      fontFamily: 'Menlo', fontSize: 12, color: Color(0xFF8A8A8E))),
+              child: Text(
+                _fmt(state.elapsed(DateTime.now())),
+                style: const TextStyle(
+                  fontFamily: 'Menlo',
+                  fontSize: 12,
+                  color: Color(0xFF8A8A8E),
+                ),
+              ),
             ),
           _PhaseChip(phase: state.phase),
           const SizedBox(width: 8),
@@ -119,7 +116,9 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
               onPressed: notifier.stop,
               icon: const Icon(Icons.stop_circle_outlined, size: 16),
               label: const Text('Stop'),
-              style: TextButton.styleFrom(foregroundColor: const Color(0xFFFF453A)),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFFFF453A),
+              ),
             ),
           const SizedBox(width: 8),
         ],
@@ -133,15 +132,19 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
               children: [
                 Expanded(
                   child: _Console(
-                    lines: _hideThinking
-                        ? state.console
-                            .where((l) => l.kind != ConsoleLineKind.thinking)
-                            .toList()
-                        : state.console,
+                    lines: state.console,
                     controller: _scroll,
+                    running: !state.phase.isTerminal,
+                    collapsed: _collapsedThinking,
+                    onToggleBlock: (i) => setState(() {
+                      _collapsedThinking.contains(i)
+                          ? _collapsedThinking.remove(i)
+                          : _collapsedThinking.add(i);
+                    }),
                   ),
                 ),
-                if (state.phase == RunPhase.awaitingApproval && state.plan != null)
+                if (state.phase == RunPhase.awaitingApproval &&
+                    state.plan != null)
                   _ApprovalPanel(
                     state: state,
                     onToggleEdit: notifier.toggleEdit,
@@ -155,9 +158,11 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
                       notifier.markFeatureShipped();
                       Navigator.of(context).pop(true);
                     },
-                    onClose: () => Navigator.of(context).pop(state.featureShipped),
+                    onClose: () =>
+                        Navigator.of(context).pop(state.featureShipped),
                   ),
-                if (state.phase == RunPhase.failed || state.phase == RunPhase.stopped)
+                if (state.phase == RunPhase.failed ||
+                    state.phase == RunPhase.stopped)
                   _FailedBar(
                     error: state.error,
                     stopped: state.phase == RunPhase.stopped,
@@ -199,29 +204,82 @@ class _PhaseChip extends StatelessWidget {
         color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        if (phase.isBusy)
-          SizedBox(
-            width: 11,
-            height: 11,
-            child: CircularProgressIndicator(strokeWidth: 2, color: color),
-          )
-        else
-          Icon(Icons.circle, size: 9, color: color),
-        const SizedBox(width: 6),
-        Text(phase.label, style: TextStyle(fontSize: 12, color: color)),
-      ]),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (phase.isBusy)
+            SizedBox(
+              width: 11,
+              height: 11,
+              child: CircularProgressIndicator(strokeWidth: 2, color: color),
+            )
+          else
+            Icon(Icons.circle, size: 9, color: color),
+          const SizedBox(width: 6),
+          Text(phase.label, style: TextStyle(fontSize: 12, color: color)),
+        ],
+      ),
     );
   }
 }
 
+/// One rendered console item: either a normal line, or a collapsible block of
+/// consecutive internal-thinking lines.
+class _ConsoleItem {
+  _ConsoleItem.line(this.line, this.startIndex) : think = null;
+  _ConsoleItem.think(this.think, this.startIndex) : line = null;
+  final ConsoleLine? line;
+  final List<ConsoleLine>? think;
+  final int startIndex;
+  bool get isThinking => think != null;
+}
+
 class _Console extends StatelessWidget {
-  const _Console({required this.lines, required this.controller});
+  const _Console({
+    required this.lines,
+    required this.controller,
+    required this.running,
+    required this.collapsed,
+    required this.onToggleBlock,
+  });
+
   final List<ConsoleLine> lines;
   final ScrollController controller;
+  final bool running;
+  final Set<int> collapsed;
+  final ValueChanged<int> onToggleBlock;
+
+  static const _streamed = {
+    ConsoleLineKind.stdout,
+    ConsoleLineKind.stderr,
+    ConsoleLineKind.thinking,
+    ConsoleLineKind.presentation,
+  };
+
+  /// Groups consecutive internal-thinking lines into a single collapsible item.
+  List<_ConsoleItem> _items() {
+    final items = <_ConsoleItem>[];
+    var i = 0;
+    while (i < lines.length) {
+      if (lines[i].kind == ConsoleLineKind.thinking) {
+        final start = i;
+        final group = <ConsoleLine>[];
+        while (i < lines.length && lines[i].kind == ConsoleLineKind.thinking) {
+          group.add(lines[i]);
+          i++;
+        }
+        items.add(_ConsoleItem.think(group, start));
+      } else {
+        items.add(_ConsoleItem.line(lines[i], i));
+        i++;
+      }
+    }
+    return items;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final items = _items();
     return Scrollbar(
       controller: controller,
       thumbVisibility: true,
@@ -230,40 +288,143 @@ class _Console extends StatelessWidget {
         controller: controller,
         primary: false,
         padding: const EdgeInsets.fromLTRB(14, 12, 22, 12),
-        itemCount: lines.length,
-        itemBuilder: (_, i) {
-        final l = lines[i];
-        // Streamed prose (reasoning / presentation / command output) is shown
-        // without a per-line timestamp so long transcripts read cleanly.
-        const streamed = {
-          ConsoleLineKind.stdout,
-          ConsoleLineKind.stderr,
-          ConsoleLineKind.thinking,
-          ConsoleLineKind.presentation,
-        };
-        final showTs = !streamed.contains(l.kind);
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 2),
-          child: RichText(
-            text: TextSpan(children: [
-              if (showTs)
-                TextSpan(
-                  text: '${l.timestamp}  ',
-                  style: const TextStyle(
-                      fontFamily: 'Menlo', fontSize: 11, color: Color(0xFF4B5563)),
-                ),
-              TextSpan(
-                text: l.text,
-                style: TextStyle(
-                    fontFamily: 'Menlo',
-                    fontSize: 12.5,
-                    height: 1.4,
-                    color: l.color),
-              ),
-            ]),
-          ),
-        );
+        itemCount: items.length,
+        itemBuilder: (_, idx) {
+          final item = items[idx];
+          if (item.isThinking) {
+            return _ThinkingBlock(
+              lines: item.think!,
+              collapsed: collapsed.contains(item.startIndex),
+              // The trailing block while a run is going is the one streaming.
+              active: running && idx == items.length - 1,
+              onToggle: () => onToggleBlock(item.startIndex),
+            );
+          }
+          return _lineWidget(item.line!);
         },
+      ),
+    );
+  }
+
+  static Widget _lineWidget(ConsoleLine l) {
+    final showTs = !_streamed.contains(l.kind);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: RichText(
+        text: TextSpan(
+          children: [
+            if (showTs)
+              TextSpan(
+                text: '${l.timestamp}  ',
+                style: const TextStyle(
+                  fontFamily: 'Menlo',
+                  fontSize: 11,
+                  color: Color(0xFF4B5563),
+                ),
+              ),
+            TextSpan(
+              text: l.text,
+              style: TextStyle(
+                fontFamily: 'Menlo',
+                fontSize: 12.5,
+                height: 1.4,
+                color: l.color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A collapsible block of the model's internal chain-of-thought.
+class _ThinkingBlock extends StatelessWidget {
+  const _ThinkingBlock({
+    required this.lines,
+    required this.collapsed,
+    required this.active,
+    required this.onToggle,
+  });
+
+  final List<ConsoleLine> lines;
+  final bool collapsed;
+  final bool active;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    const dim = Color(0xFF7C8598);
+    final count = lines.where((l) => l.text.trim().isNotEmpty).length;
+    final label = active
+        ? 'Thinking…'
+        : 'Internal thinking · $count line${count == 1 ? '' : 's'}';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onToggle,
+              borderRadius: BorderRadius.circular(4),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      collapsed ? Icons.chevron_right : Icons.expand_more,
+                      size: 16,
+                      color: dim,
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontFamily: 'Menlo',
+                        fontSize: 12,
+                        color: dim,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (active) ...[
+                      const SizedBox(width: 8),
+                      const SizedBox(
+                        width: 9,
+                        height: 9,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.5,
+                          color: dim,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (!collapsed)
+            Padding(
+              padding: const EdgeInsets.only(left: 14, top: 2, bottom: 2),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final l in lines)
+                    Text(
+                      l.text,
+                      style: const TextStyle(
+                        fontFamily: 'Menlo',
+                        fontSize: 12,
+                        height: 1.4,
+                        color: Color(0xFF6B7280),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -329,7 +490,10 @@ class _ApprovalPanel extends StatelessWidget {
                 Text(
                   '${state.approvedEditCount} edit(s), '
                   '${state.approvedCommandCount} command(s) approved',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF9CA3AF),
+                  ),
                 ),
                 const Spacer(),
                 FilledButton.icon(
@@ -347,8 +511,11 @@ class _ApprovalPanel extends StatelessWidget {
 }
 
 class _EditCard extends StatelessWidget {
-  const _EditCard(
-      {required this.edit, required this.skipped, required this.onToggle});
+  const _EditCard({
+    required this.edit,
+    required this.skipped,
+    required this.onToggle,
+  });
   final ProposedEdit edit;
   final bool skipped;
   final VoidCallback onToggle;
@@ -361,29 +528,42 @@ class _EditCard extends StatelessWidget {
       child: ExpansionTile(
         dense: true,
         tilePadding: const EdgeInsets.symmetric(horizontal: 12),
-        leading: Icon(edit.isNewFile ? Icons.note_add_outlined : Icons.edit_outlined,
-            size: 18, color: skipped ? const Color(0xFF6B7280) : const Color(0xFFE8A04C)),
-        title: Text(edit.path,
-            style: TextStyle(
-                fontFamily: 'Menlo',
-                fontSize: 12.5,
-                decoration: skipped ? TextDecoration.lineThrough : null,
-                color: skipped ? const Color(0xFF6B7280) : const Color(0xFFE5E5E7))),
+        leading: Icon(
+          edit.isNewFile ? Icons.note_add_outlined : Icons.edit_outlined,
+          size: 18,
+          color: skipped ? const Color(0xFF6B7280) : const Color(0xFFE8A04C),
+        ),
+        title: Text(
+          edit.path,
+          style: TextStyle(
+            fontFamily: 'Menlo',
+            fontSize: 12.5,
+            decoration: skipped ? TextDecoration.lineThrough : null,
+            color: skipped ? const Color(0xFF6B7280) : const Color(0xFFE5E5E7),
+          ),
+        ),
         subtitle: edit.rationale.isEmpty
             ? null
-            : Text(edit.rationale,
-                style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
+            : Text(
+                edit.rationale,
+                style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+              ),
         trailing: _SkipToggle(skipped: skipped, onToggle: onToggle),
         childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        children: [DiffView(oldText: edit.oldContent, newText: edit.newContent)],
+        children: [
+          DiffView(oldText: edit.oldContent, newText: edit.newContent),
+        ],
       ),
     );
   }
 }
 
 class _CommandCard extends StatelessWidget {
-  const _CommandCard(
-      {required this.command, required this.skipped, required this.onToggle});
+  const _CommandCard({
+    required this.command,
+    required this.skipped,
+    required this.onToggle,
+  });
   final ProposedCommand command;
   final bool skipped;
   final VoidCallback onToggle;
@@ -395,17 +575,27 @@ class _CommandCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
         dense: true,
-        leading: Icon(Icons.terminal,
-            size: 18,
-            color: skipped ? const Color(0xFF6B7280) : const Color(0xFF64B5F6)),
-        title: Text(command.human,
-            style: TextStyle(
-                fontSize: 12.5,
-                decoration: skipped ? TextDecoration.lineThrough : null,
-                color: skipped ? const Color(0xFF6B7280) : const Color(0xFFE5E5E7))),
-        subtitle: Text('\$ ${command.raw}',
-            style: const TextStyle(
-                fontFamily: 'Menlo', fontSize: 11.5, color: Color(0xFF9CA3AF))),
+        leading: Icon(
+          Icons.terminal,
+          size: 18,
+          color: skipped ? const Color(0xFF6B7280) : const Color(0xFF64B5F6),
+        ),
+        title: Text(
+          command.human,
+          style: TextStyle(
+            fontSize: 12.5,
+            decoration: skipped ? TextDecoration.lineThrough : null,
+            color: skipped ? const Color(0xFF6B7280) : const Color(0xFFE5E5E7),
+          ),
+        ),
+        subtitle: Text(
+          '\$ ${command.raw}',
+          style: const TextStyle(
+            fontFamily: 'Menlo',
+            fontSize: 11.5,
+            color: Color(0xFF9CA3AF),
+          ),
+        ),
         trailing: _SkipToggle(skipped: skipped, onToggle: onToggle),
       ),
     );
@@ -421,10 +611,13 @@ class _SkipToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextButton(
       onPressed: onToggle,
-      child: Text(skipped ? 'Skipped' : 'Approved',
-          style: TextStyle(
-              fontSize: 12,
-              color: skipped ? const Color(0xFF6B7280) : const Color(0xFF81C784))),
+      child: Text(
+        skipped ? 'Skipped' : 'Approved',
+        style: TextStyle(
+          fontSize: 12,
+          color: skipped ? const Color(0xFF6B7280) : const Color(0xFF81C784),
+        ),
+      ),
     );
   }
 }
@@ -442,77 +635,110 @@ class _Timeline extends StatelessWidget {
   ];
 
   int get _phaseOrder => switch (state.phase) {
-        RunPhase.idle || RunPhase.planning => 0,
-        RunPhase.awaitingApproval => 1,
-        RunPhase.applying => 2,
-        RunPhase.running => 3,
-        RunPhase.verifying => 4,
-        _ => 5,
-      };
+    RunPhase.idle || RunPhase.planning => 0,
+    RunPhase.awaitingApproval => 1,
+    RunPhase.applying => 2,
+    RunPhase.running => 3,
+    RunPhase.verifying => 4,
+    _ => 5,
+  };
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(14),
       children: [
-        const Text('STEPS',
-            style: TextStyle(
-                fontSize: 11, letterSpacing: 1, color: Color(0xFF6B7280))),
+        const Text(
+          'STEPS',
+          style: TextStyle(
+            fontSize: 11,
+            letterSpacing: 1,
+            color: Color(0xFF6B7280),
+          ),
+        ),
         const SizedBox(height: 8),
-        for (var i = 0; i < _steps.length; i++)
-          _stepRow(_steps[i].$1, i),
+        for (var i = 0; i < _steps.length; i++) _stepRow(_steps[i].$1, i),
         if (state.appliedEditPaths.isNotEmpty) ...[
           const SizedBox(height: 20),
-          const Text('APPLIED EDITS',
-              style: TextStyle(
-                  fontSize: 11, letterSpacing: 1, color: Color(0xFF6B7280))),
+          const Text(
+            'APPLIED EDITS',
+            style: TextStyle(
+              fontSize: 11,
+              letterSpacing: 1,
+              color: Color(0xFF6B7280),
+            ),
+          ),
           const SizedBox(height: 6),
           for (final path in state.appliedEditPaths)
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
-              child: Row(children: [
-                Expanded(
-                  child: Text(path,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      path,
                       style: const TextStyle(
-                          fontFamily: 'Menlo',
-                          fontSize: 11,
-                          color: Color(0xFF9CA3AF)),
-                      overflow: TextOverflow.ellipsis),
-                ),
-                InkWell(
-                  onTap: () => onUndo(path),
-                  child: const Padding(
-                    padding: EdgeInsets.all(2),
-                    child: Text('undo',
-                        style: TextStyle(fontSize: 11, color: Color(0xFFE8A04C))),
+                        fontFamily: 'Menlo',
+                        fontSize: 11,
+                        color: Color(0xFF9CA3AF),
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-              ]),
+                  InkWell(
+                    onTap: () => onUndo(path),
+                    child: const Padding(
+                      padding: EdgeInsets.all(2),
+                      child: Text(
+                        'undo',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFFE8A04C),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
         ],
         if (state.verifications.isNotEmpty) ...[
           const SizedBox(height: 20),
-          Text('VERIFY  ${state.verifications.where((v) => v.passed).length}/'
-              '${state.verifications.length}',
-              style: const TextStyle(
-                  fontSize: 11, letterSpacing: 1, color: Color(0xFF6B7280))),
+          Text(
+            'VERIFY  ${state.verifications.where((v) => v.passed).length}/'
+            '${state.verifications.length}',
+            style: const TextStyle(
+              fontSize: 11,
+              letterSpacing: 1,
+              color: Color(0xFF6B7280),
+            ),
+          ),
           const SizedBox(height: 6),
           for (final v in state.verifications)
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
-              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Icon(v.passed ? Icons.check_circle : Icons.remove_circle_outline,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    v.passed ? Icons.check_circle : Icons.remove_circle_outline,
                     size: 13,
                     color: v.passed
                         ? const Color(0xFF81C784)
-                        : const Color(0xFF6B7280)),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(v.requirement,
+                        : const Color(0xFF6B7280),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      v.requirement,
                       style: const TextStyle(
-                          fontSize: 11, color: Color(0xFF9CA3AF))),
-                ),
-              ]),
+                        fontSize: 11,
+                        color: Color(0xFF9CA3AF),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
         ],
       ],
@@ -520,35 +746,42 @@ class _Timeline extends StatelessWidget {
   }
 
   Widget _stepRow(String label, int index) {
-    final done = _phaseOrder > index + 1 ||
+    final done =
+        _phaseOrder > index + 1 ||
         (state.phase.isTerminal && state.phase == RunPhase.done);
     final active = _phaseOrder == index + 1 && !state.phase.isTerminal;
     final color = done
         ? const Color(0xFF81C784)
         : active
-            ? const Color(0xFFE8A04C)
-            : const Color(0xFF4B5563);
+        ? const Color(0xFFE8A04C)
+        : const Color(0xFF4B5563);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Row(children: [
-        Icon(
+      child: Row(
+        children: [
+          Icon(
             done
                 ? Icons.check_circle
                 : active
-                    ? Icons.radio_button_checked
-                    : Icons.radio_button_unchecked,
+                ? Icons.radio_button_checked
+                : Icons.radio_button_unchecked,
             size: 15,
-            color: color),
-        const SizedBox(width: 8),
-        Text(label, style: TextStyle(fontSize: 13, color: color)),
-      ]),
+            color: color,
+          ),
+          const SizedBox(width: 8),
+          Text(label, style: TextStyle(fontSize: 13, color: color)),
+        ],
+      ),
     );
   }
 }
 
 class _DoneBar extends StatelessWidget {
-  const _DoneBar(
-      {required this.alreadyShipped, required this.onShip, required this.onClose});
+  const _DoneBar({
+    required this.alreadyShipped,
+    required this.onShip,
+    required this.onClose,
+  });
   final bool alreadyShipped;
   final VoidCallback onShip;
   final VoidCallback onClose;
@@ -561,22 +794,29 @@ class _DoneBar extends StatelessWidget {
         color: Color(0x2281C784),
         border: Border(top: BorderSide(color: Color(0xFF1C1C1E))),
       ),
-      child: Row(children: [
-        const Icon(Icons.check_circle_outline,
-            size: 18, color: Color(0xFF81C784)),
-        const SizedBox(width: 10),
-        const Expanded(
-          child: Text('Run complete. Mark this feature as shipped?',
-              style: TextStyle(fontSize: 13, color: Color(0xFFE5E5E7))),
-        ),
-        TextButton(onPressed: onClose, child: const Text('Close')),
-        const SizedBox(width: 8),
-        FilledButton.icon(
-          onPressed: onShip,
-          icon: const Icon(Icons.local_shipping_outlined, size: 16),
-          label: const Text('Mark shipped'),
-        ),
-      ]),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.check_circle_outline,
+            size: 18,
+            color: Color(0xFF81C784),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'Run complete. Mark this feature as shipped?',
+              style: TextStyle(fontSize: 13, color: Color(0xFFE5E5E7)),
+            ),
+          ),
+          TextButton(onPressed: onClose, child: const Text('Close')),
+          const SizedBox(width: 8),
+          FilledButton.icon(
+            onPressed: onShip,
+            icon: const Icon(Icons.local_shipping_outlined, size: 16),
+            label: const Text('Mark shipped'),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -602,18 +842,25 @@ class _FailedBar extends StatelessWidget {
         color: color.withValues(alpha: 0.13),
         border: const Border(top: BorderSide(color: Color(0xFF1C1C1E))),
       ),
-      child: Row(children: [
-        Icon(stopped ? Icons.stop_circle_outlined : Icons.error_outline,
-            size: 18, color: color),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(stopped ? 'Stopped.' : (error ?? 'The run failed.'),
-              style: const TextStyle(fontSize: 13, color: Color(0xFFE5E5E7))),
-        ),
-        TextButton(onPressed: onRetry, child: const Text('Try again')),
-        const SizedBox(width: 8),
-        TextButton(onPressed: onClose, child: const Text('Close')),
-      ]),
+      child: Row(
+        children: [
+          Icon(
+            stopped ? Icons.stop_circle_outlined : Icons.error_outline,
+            size: 18,
+            color: color,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              stopped ? 'Stopped.' : (error ?? 'The run failed.'),
+              style: const TextStyle(fontSize: 13, color: Color(0xFFE5E5E7)),
+            ),
+          ),
+          TextButton(onPressed: onRetry, child: const Text('Try again')),
+          const SizedBox(width: 8),
+          TextButton(onPressed: onClose, child: const Text('Close')),
+        ],
+      ),
     );
   }
 }
