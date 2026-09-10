@@ -210,15 +210,20 @@ class _Console extends StatelessWidget {
         itemCount: lines.length,
         itemBuilder: (_, i) {
         final l = lines[i];
+        // Streamed output (reasoning / command output) is shown without a
+        // per-line timestamp so long transcripts read cleanly.
+        final showTs = l.kind != ConsoleLineKind.stdout &&
+            l.kind != ConsoleLineKind.stderr;
         return Padding(
           padding: const EdgeInsets.only(bottom: 2),
           child: RichText(
             text: TextSpan(children: [
-              TextSpan(
-                text: '${l.timestamp}  ',
-                style: const TextStyle(
-                    fontFamily: 'Menlo', fontSize: 11, color: Color(0xFF4B5563)),
-              ),
+              if (showTs)
+                TextSpan(
+                  text: '${l.timestamp}  ',
+                  style: const TextStyle(
+                      fontFamily: 'Menlo', fontSize: 11, color: Color(0xFF4B5563)),
+                ),
               TextSpan(
                 text: l.text,
                 style: TextStyle(

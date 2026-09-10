@@ -54,9 +54,9 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
   final _runner = CommandRunner();
 
   // Streaming-display state for the planning phase.
-  final _reasonBuf = StringBuffer(); // model's chain-of-thought (shown)
-  final _contentBuf = StringBuffer(); // the answer preamble before the JSON
-  bool _streamLineStarted = false;
+  final _contentBuf = StringBuffer(); // the answer text (used to find the JSON)
+  String _partial = ''; // current unfinished streamed line
+  bool _streamStarted = false;
   bool _jsonSeen = false;
   Timer? _waitTimer;
 
@@ -92,20 +92,24 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     ref.read(implActiveRunsProvider.notifier).set(arg, p);
   }
 
-  /// Renders the model's live reasoning/preamble as a single console line we
-  /// keep rewriting as tokens arrive (tail-capped so it stays readable).
-  void _setStreamLine(String text) {
-    const cap = 1600;
-    final shown = text.length > cap ? '…${text.substring(text.length - cap)}' : text;
-    final line = ConsoleLine(ConsoleLineKind.narration,
-        shown.isEmpty ? 'Thinking…' : shown, DateTime.now());
-    if (!_streamLineStarted || state.console.isEmpty) {
-      _streamLineStarted = true;
-      state = state.copyWith(console: [...state.console, line]);
-    } else {
-      final trimmed = [...state.console]..removeLast();
-      state = state.copyWith(console: [...trimmed, line]);
+  /// Appends streamed text to the console like a terminal: text accumulates on
+  /// the current line until a newline closes it and opens the next. This keeps
+  /// the full thought process as real, scrollable lines (no truncation).
+  void _appendStream(String text) {
+    if (text.isEmpty) return;
+    final combined = (_streamStarted ? _partial : '') + text;
+    final segs = combined.split('\n');
+    final console = [...state.console];
+    if (_streamStarted && console.isNotEmpty) {
+      console.removeLast(); // drop the old partial line; we re-add it updated
     }
+    for (var i = 0; i < segs.length - 1; i++) {
+      console.add(ConsoleLine(ConsoleLineKind.stdout, segs[i], DateTime.now()));
+    }
+    console.add(ConsoleLine(ConsoleLineKind.stdout, segs.last, DateTime.now()));
+    _partial = segs.last;
+    _streamStarted = true;
+    state = state.copyWith(console: console);
   }
 
   /// Handles one streamed delta. Reasoning models stream their chain-of-thought
@@ -116,21 +120,21 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     if (gen != _gen) return; // stale stream from a stopped/reset run
     _waitTimer?.cancel();
     if (thinking) {
-      _reasonBuf.write(text);
-      _setStreamLine(_reasonBuf.toString().trim());
+      _appendStream(text);
       return;
     }
     if (_jsonSeen) return;
+    final before = _contentBuf.length;
     _contentBuf.write(text);
-    final c = _contentBuf.toString();
-    final brace = c.indexOf('{');
+    final brace = _contentBuf.toString().indexOf('{');
     if (brace >= 0) {
       _jsonSeen = true;
-      final prose = c.substring(0, brace).trim();
-      if (prose.isNotEmpty) _setStreamLine(prose);
+      // Show only the preamble that arrived before the JSON began.
+      final visible = (brace - before).clamp(0, text.length);
+      if (visible > 0) _appendStream(text.substring(0, visible));
       _log(ConsoleLineKind.info, 'Writing the plan…');
     } else {
-      _setStreamLine(c.trim());
+      _appendStream(text);
     }
   }
 
@@ -139,9 +143,9 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     if (state.phase != RunPhase.idle) return;
     final gen = ++_gen;
     _brief = brief;
-    _reasonBuf.clear();
     _contentBuf.clear();
-    _streamLineStarted = false;
+    _partial = '';
+    _streamStarted = false;
     _jsonSeen = false;
     state = state.copyWith(startedAt: DateTime.now(), error: null);
     _phase(RunPhase.planning);
@@ -157,7 +161,7 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     // Reassure the user while we wait for the first streamed token — a large
     // cloud model can take a while to start, and a static console looks stuck.
     _waitTimer = Timer.periodic(const Duration(seconds: 8), (t) {
-      if (_streamLineStarted || state.phase != RunPhase.planning) {
+      if (_streamStarted || state.phase != RunPhase.planning) {
         t.cancel();
         return;
       }
@@ -318,9 +322,9 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     _gen++; // invalidate any stale stream before a fresh start
     _waitTimer?.cancel();
     _brief = null;
-    _reasonBuf.clear();
     _contentBuf.clear();
-    _streamLineStarted = false;
+    _partial = '';
+    _streamStarted = false;
     _jsonSeen = false;
     ref.read(implActiveRunsProvider.notifier).set(arg, RunPhase.idle);
     state = ImplRunState.initial(state.runId);
