@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/filesystem/project_file_repository.dart';
 import '../../../data/local_db/forge_database.dart';
+import '../../implementation/models/run_session.dart';
 import '../../implementation/providers/implementation_notifier.dart';
 import '../../implementation/providers/implementation_providers.dart';
 import '../../implementation/screens/implementation_screen.dart';
@@ -16,6 +17,7 @@ import '../models/tracker_enums.dart';
 import '../providers/tracker_providers.dart';
 import '../releases/release_providers.dart';
 import '../scan/feature_scan.dart';
+import '../widgets/active_model_chip.dart';
 import '../widgets/feature_edit_dialog.dart';
 import '../widgets/scan_review_sheet.dart';
 import '../widgets/status_chip.dart';
@@ -79,6 +81,10 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
           ],
         ),
         actions: [
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+            child: ActiveModelChip(),
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 10),
             child: _ProjectStatusMenu(
@@ -153,6 +159,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
 
   List<Widget> _group(FeatureStatus status, List<Feature> items) {
     if (items.isEmpty) return const [];
+    final activeRuns = ref.watch(implActiveRunsProvider);
     return [
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
@@ -167,6 +174,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
       ),
       ...items.map((f) => _FeatureTile(
             feature: f,
+            runPhase: activeRuns[f.id],
             onSetStatus: (s) => ref
                 .read(featureListProvider(project.id).notifier)
                 .setStatus(f, s),
@@ -219,6 +227,26 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     if (!ref.read(entitlementProvider)) {
       messenger.showSnackBar(const SnackBar(
           content: Text('Build with AI is a Pro feature.')));
+      return;
+    }
+
+    // If a run for this feature already exists (still working, awaiting
+    // approval, or finished), just re-open its window — never start a second
+    // run or re-flip status. This is what keeps a build going when you leave
+    // and come back, without resending the task.
+    final activePhase = ref.read(implActiveRunsProvider)[feature.id];
+    if (activePhase != null && activePhase != RunPhase.idle) {
+      await Navigator.of(context).push<bool>(MaterialPageRoute(
+        builder: (_) => ImplementationScreen(
+          brief: ImplBrief(
+            projectPath: project.path,
+            projectName: project.name,
+            repoPath: '',
+            featureId: feature.id,
+            featureTitle: feature.title,
+          ),
+        ),
+      ));
       return;
     }
     final config = await ProjectFileRepository.readProjectConfig(project.path);
@@ -545,6 +573,7 @@ class _FeatureTile extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onBuild,
+    this.runPhase,
   });
 
   final Feature feature;
@@ -553,12 +582,20 @@ class _FeatureTile extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onBuild;
 
+  /// Non-null when a Build with AI run for this feature is live (any phase);
+  /// drives the status dot on the board.
+  final RunPhase? runPhase;
+
   @override
   Widget build(BuildContext context) {
     final status = FeatureStatus.fromWire(feature.status);
+    final phase = runPhase;
+    final hasRun = phase != null && phase != RunPhase.idle;
     return ListTile(
       dense: true,
-      leading: Icon(Icons.circle, size: 12, color: status.color),
+      leading: hasRun
+          ? _RunDot(phase)
+          : Icon(Icons.circle, size: 12, color: status.color),
       title: Text(feature.title,
           style: const TextStyle(fontSize: 13, color: Color(0xFFE5E5E7))),
       subtitle: _subtitle(),
@@ -649,6 +686,76 @@ class _FeatureTile extends StatelessWidget {
           Text(meta,
               style: const TextStyle(fontSize: 10, color: Color(0xFF6B7280))),
       ],
+    );
+  }
+}
+
+/// The board's live indicator for a feature with a Build-with-AI run:
+/// yellow (pulsing) = the AI is actively working; blue = waiting for your
+/// approval; green = done; red = failed/stopped.
+class _RunDot extends StatefulWidget {
+  const _RunDot(this.phase);
+  final RunPhase phase;
+
+  @override
+  State<_RunDot> createState() => _RunDotState();
+}
+
+class _RunDotState extends State<_RunDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  ({Color color, bool pulse, String tip}) get _spec => switch (widget.phase) {
+        RunPhase.awaitingApproval => (
+            color: const Color(0xFF64B5F6),
+            pulse: false,
+            tip: 'Waiting for your approval'
+          ),
+        RunPhase.done => (
+            color: const Color(0xFF81C784),
+            pulse: false,
+            tip: 'Build complete'
+          ),
+        RunPhase.failed || RunPhase.stopped => (
+            color: const Color(0xFFFF453A),
+            pulse: false,
+            tip: 'Build failed or stopped'
+          ),
+        _ => (
+            color: const Color(0xFFFFB74D),
+            pulse: true,
+            tip: 'AI is working…'
+          ),
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final spec = _spec;
+    final dot = Container(
+      width: 12,
+      height: 12,
+      decoration: BoxDecoration(color: spec.color, shape: BoxShape.circle),
+    );
+    return Tooltip(
+      message: spec.tip,
+      child: SizedBox(
+        width: 16,
+        height: 16,
+        child: Center(
+          child: spec.pulse
+              ? FadeTransition(opacity: _c, child: dot)
+              : dot,
+        ),
+      ),
     );
   }
 }

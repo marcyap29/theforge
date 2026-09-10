@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -20,20 +22,36 @@ class ImplementationScreen extends ConsumerStatefulWidget {
 
 class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
   final _scroll = ScrollController();
+  Timer? _ticker;
 
   String get _featureId => widget.brief.featureId;
 
   @override
   void initState() {
     super.initState();
+    // start() is idempotent (guards on idle), so re-entering an in-flight or
+    // finished run re-attaches rather than restarting.
     Future.microtask(
         () => ref.read(implRunProvider(_featureId).notifier).start(widget.brief));
+    // Tick once a second so the header's elapsed time advances.
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
+    _ticker?.cancel();
     _scroll.dispose();
     super.dispose();
+  }
+
+  String _elapsed(DateTime? from) {
+    if (from == null) return '';
+    final s = DateTime.now().difference(from).inSeconds;
+    final m = s ~/ 60;
+    final r = s % 60;
+    return '${m.toString().padLeft(2, '0')}:${r.toString().padLeft(2, '0')}';
   }
 
   void _autoScroll() {
@@ -59,6 +77,13 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
         title: Text('Build: ${widget.brief.featureTitle}',
             style: const TextStyle(fontSize: 15)),
         actions: [
+          if (state.startedAt != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 4),
+              child: Text(_elapsed(state.startedAt),
+                  style: const TextStyle(
+                      fontFamily: 'Menlo', fontSize: 12, color: Color(0xFF8A8A8E))),
+            ),
           _PhaseChip(phase: state.phase),
           const SizedBox(width: 8),
           if (!state.phase.isTerminal && state.phase != RunPhase.idle)
@@ -95,9 +120,14 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
                     },
                     onClose: () => Navigator.of(context).pop(state.featureShipped),
                   ),
-                if (state.phase == RunPhase.failed)
+                if (state.phase == RunPhase.failed || state.phase == RunPhase.stopped)
                   _FailedBar(
                     error: state.error,
+                    stopped: state.phase == RunPhase.stopped,
+                    onRetry: () {
+                      notifier.reset();
+                      Future.microtask(() => notifier.start(widget.brief));
+                    },
                     onClose: () => Navigator.of(context).pop(false),
                   ),
               ],
@@ -499,25 +529,36 @@ class _DoneBar extends StatelessWidget {
 }
 
 class _FailedBar extends StatelessWidget {
-  const _FailedBar({required this.error, required this.onClose});
+  const _FailedBar({
+    required this.error,
+    required this.stopped,
+    required this.onRetry,
+    required this.onClose,
+  });
   final String? error;
+  final bool stopped;
+  final VoidCallback onRetry;
   final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
+    final color = stopped ? const Color(0xFF9E9E9E) : const Color(0xFFFF453A);
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: const BoxDecoration(
-        color: Color(0x22FF453A),
-        border: Border(top: BorderSide(color: Color(0xFF1C1C1E))),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.13),
+        border: const Border(top: BorderSide(color: Color(0xFF1C1C1E))),
       ),
       child: Row(children: [
-        const Icon(Icons.error_outline, size: 18, color: Color(0xFFFF453A)),
+        Icon(stopped ? Icons.stop_circle_outlined : Icons.error_outline,
+            size: 18, color: color),
         const SizedBox(width: 10),
         Expanded(
-          child: Text(error ?? 'The run failed.',
+          child: Text(stopped ? 'Stopped.' : (error ?? 'The run failed.'),
               style: const TextStyle(fontSize: 13, color: Color(0xFFE5E5E7))),
         ),
+        TextButton(onPressed: onRetry, child: const Text('Try again')),
+        const SizedBox(width: 8),
         TextButton(onPressed: onClose, child: const Text('Close')),
       ]),
     );

@@ -54,6 +54,53 @@ class OllamaProvider extends LlmProvider {
     return message['content'] as String;
   }
 
+  @override
+  Stream<String> completeStream({
+    required String systemPrompt,
+    required String userPrompt,
+    required double temperature,
+    required String modelId,
+    int? maxTokens,
+  }) async* {
+    final client = http.Client();
+    try {
+      final request = http.Request('POST', Uri.parse('$baseUrl/api/chat'))
+        ..headers.addAll(_headers())
+        ..body = jsonEncode({
+          'model': modelId,
+          'stream': true,
+          'options': {'temperature': temperature},
+          'messages': [
+            {'role': 'system', 'content': systemPrompt},
+            {'role': 'user', 'content': userPrompt},
+          ],
+        });
+      final response = await client.send(request);
+      if (response.statusCode != 200) {
+        final body = await response.stream.bytesToString();
+        throw Exception('Ollama error ${response.statusCode}: ${_truncate(body)}');
+      }
+      // Ollama streams newline-delimited JSON objects, each with a partial
+      // `message.content` and a `done` flag on the last.
+      await for (final line in response.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())) {
+        if (line.trim().isEmpty) continue;
+        try {
+          final obj = jsonDecode(line) as Map<String, dynamic>;
+          final msg = obj['message'] as Map<String, dynamic>?;
+          final chunk = msg?['content'] as String?;
+          if (chunk != null && chunk.isNotEmpty) yield chunk;
+          if (obj['done'] == true) break;
+        } catch (_) {
+          // Ignore any non-JSON keep-alive line.
+        }
+      }
+    } finally {
+      client.close();
+    }
+  }
+
   static Future<List<ModelInfo>> fetchModels(String baseUrl,
       {String? apiKey}) async {
     final response = await http.get(

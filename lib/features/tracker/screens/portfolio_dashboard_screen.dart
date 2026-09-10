@@ -6,6 +6,7 @@ import '../../projects/providers/providers.dart';
 import '../../projects/screens/new_project_screen.dart';
 import '../../projects/screens/project_detail_screen.dart';
 import '../providers/tracker_providers.dart';
+import '../widgets/active_model_chip.dart';
 import '../widgets/project_card.dart';
 import 'project_tracker_screen.dart';
 
@@ -164,6 +165,10 @@ class _PortfolioDashboardScreenState
           : AppBar(
               title: const Text('The Forge — Portfolio'),
               actions: [
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+                  child: ActiveModelChip(),
+                ),
                 IconButton(
                   icon: const Icon(Icons.folder_outlined),
                   tooltip: 'All projects',

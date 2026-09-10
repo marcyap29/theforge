@@ -30,26 +30,35 @@ class ImplAgent {
     String? lockedSpec,
     String? goalStatement,
     List<String> components = const [],
+    void Function(String delta)? onDelta,
   }) async {
     final files = await ImplWorkspace.gatherRepoFiles(repoPath);
 
-    final raw = await _llm.complete(
+    final userPrompt = _userPrompt(
+      featureTitle: featureTitle,
+      featureDescription: featureDescription,
+      targetVersion: targetVersion,
+      lockedSpec: lockedSpec,
+      goalStatement: goalStatement,
+      components: components,
+      files: files,
+    );
+
+    // Stream the response so the UI can show the model "thinking" live, while
+    // we accumulate the full text to parse the JSON plan once it completes.
+    final buffer = StringBuffer();
+    await for (final delta in _llm.completeStream(
       role: LlmRole.executor,
       temperature: 0.2,
       maxTokens: 4000,
       systemPrompt: _systemPrompt,
-      userPrompt: _userPrompt(
-        featureTitle: featureTitle,
-        featureDescription: featureDescription,
-        targetVersion: targetVersion,
-        lockedSpec: lockedSpec,
-        goalStatement: goalStatement,
-        components: components,
-        files: files,
-      ),
-    );
+      userPrompt: userPrompt,
+    )) {
+      buffer.write(delta);
+      onDelta?.call(delta);
+    }
 
-    return _parse(raw, repoPath);
+    return _parse(buffer.toString(), repoPath);
   }
 
   static const _systemPrompt = '''
@@ -66,7 +75,9 @@ edits that implements the feature. Commands should be limited to safe,
 non-interactive build/test/dependency steps (e.g. install deps, run tests).
 Never propose destructive commands (rm -rf, git reset --hard, force-push).
 
-Respond with ONLY a JSON object, no prose, no code fences:
+First, briefly narrate your plan in 1-3 short sentences of plain English so the
+user can follow your thinking. THEN output the JSON object (and nothing after
+it). The JSON must be a single top-level object with no code fences:
 {
   "rationale": "one short paragraph on your approach",
   "edits": [

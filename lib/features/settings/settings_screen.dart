@@ -6,6 +6,39 @@ import '../../services/llm/llm_provider.dart';
 import 'settings_notifier.dart';
 import 'settings_providers.dart';
 
+/// Dropdown sentinel meaning "let me type a model id the list doesn't have".
+const _customModelSentinel = '__custom_model__';
+
+/// Prompts for a free-form model id so users can pick any model their key
+/// unlocks (e.g. any Ollama Cloud model), not just the curated list.
+Future<String?> _promptCustomModel(BuildContext context, String initial) {
+  final controller = TextEditingController(text: initial);
+  return showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Custom model'),
+      content: TextField(
+        controller: controller,
+        autofocus: true,
+        style: const TextStyle(fontFamily: 'Menlo', fontSize: 13),
+        decoration: const InputDecoration(
+          hintText: 'e.g. qwen3.5:cloud or gpt-4o',
+          helperText: 'Enter any model id your provider/key supports.',
+        ),
+        onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+        FilledButton(
+          onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+          child: const Text('Use model'),
+        ),
+      ],
+    ),
+  );
+}
+
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -587,40 +620,65 @@ class _RoleCard extends ConsumerWidget {
             const SizedBox(width: 8),
             Expanded(
               child: DropdownButtonFormField<String>(
+                isExpanded: true,
                 initialValue: assignment.modelId.isNotEmpty
                     ? assignment.modelId
                     : null,
-                items: models
-                    .map(
-                      (m) => DropdownMenuItem(
-                        value: m.id,
-                        child: Text(
-                          m.displayName,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    )
-                    .toList(growable: false),
-                onChanged: models.isEmpty
-                    ? null
-                    : (m) async {
-                        if (m == null) return;
-                        await ref
-                            .read(settingsProvider.notifier)
-                            .setRoleAssignment(
-                              role,
-                              ModelAssignment(
-                                providerType: assignment.providerType,
-                                modelId: m,
-                              ),
-                            );
-                      },
+                items: [
+                  for (final m in models)
+                    DropdownMenuItem(
+                      value: m.id,
+                      child: Text(m.displayName,
+                          overflow: TextOverflow.ellipsis),
+                    ),
+                  // Keep a custom/typed model selectable even if it isn't in
+                  // the known list (e.g. a new Ollama Cloud model).
+                  if (assignment.modelId.isNotEmpty &&
+                      !models.any((m) => m.id == assignment.modelId))
+                    DropdownMenuItem(
+                      value: assignment.modelId,
+                      child: Text('${assignment.modelId} (custom)',
+                          overflow: TextOverflow.ellipsis),
+                    ),
+                  const DropdownMenuItem(
+                    value: _customModelSentinel,
+                    child: Text('Custom model…'),
+                  ),
+                ],
+                onChanged: (m) async {
+                  if (m == null) return;
+                  final notifier = ref.read(settingsProvider.notifier);
+                  if (m == _customModelSentinel) {
+                    final entered =
+                        await _promptCustomModel(context, assignment.modelId);
+                    if (entered == null || entered.isEmpty) return;
+                    await notifier.setRoleAssignment(
+                      role,
+                      ModelAssignment(
+                          providerType: assignment.providerType,
+                          modelId: entered),
+                    );
+                    return;
+                  }
+                  await notifier.setRoleAssignment(
+                    role,
+                    ModelAssignment(
+                        providerType: assignment.providerType, modelId: m),
+                  );
+                },
                 decoration: const InputDecoration(
                   labelText: 'Model',
                   isDense: true,
                 ),
               ),
             ),
+            if (assignment.providerType == LlmProviderType.ollama)
+              IconButton(
+                icon: const Icon(Icons.refresh, size: 18),
+                tooltip: 'Refresh available models',
+                onPressed: () =>
+                    ref.read(settingsProvider.notifier).refreshOllama(),
+              ),
           ],
         ),
       ],

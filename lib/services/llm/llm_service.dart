@@ -40,6 +40,50 @@ class LlmService {
     );
   }
 
+  /// Streaming variant of [complete]: yields text deltas as they arrive. Same
+  /// role → provider → model resolution.
+  Stream<String> completeStream({
+    required String systemPrompt,
+    required String userPrompt,
+    required double temperature,
+    required LlmRole role,
+    int? maxTokens,
+  }) {
+    final assignment = settings.roleAssignments[role];
+    if (assignment == null) {
+      throw Exception('No role assignment for ${role.name}.');
+    }
+    var modelId = assignment.modelId;
+    if (modelId.isEmpty) {
+      modelId = modelsFor(assignment.providerType).firstOrNull?.id ?? '';
+    }
+    if (modelId.isEmpty) {
+      throw Exception(
+        'No model selected for ${role.name} role. Open Settings to configure.',
+      );
+    }
+    final provider = _buildProvider(assignment.providerType);
+    return provider.completeStream(
+      systemPrompt: systemPrompt,
+      userPrompt: userPrompt,
+      temperature: temperature,
+      modelId: modelId,
+      maxTokens: maxTokens,
+    );
+  }
+
+  /// The provider + model that will service a given role — for surfacing the
+  /// active model in the UI.
+  ({LlmProviderType provider, String modelId})? resolve(LlmRole role) {
+    final assignment = settings.roleAssignments[role];
+    if (assignment == null) return null;
+    var modelId = assignment.modelId;
+    if (modelId.isEmpty) {
+      modelId = modelsFor(assignment.providerType).firstOrNull?.id ?? '';
+    }
+    return (provider: assignment.providerType, modelId: modelId);
+  }
+
   LlmProvider _buildProvider(LlmProviderType type) {
     switch (type) {
       case LlmProviderType.ollama:

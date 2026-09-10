@@ -140,6 +140,7 @@ class ImplRunState {
     this.verifications = const [],
     this.error,
     this.featureShipped = false,
+    this.startedAt,
   });
 
   factory ImplRunState.initial(String runId) => ImplRunState(
@@ -152,6 +153,9 @@ class ImplRunState {
   final RunPhase phase;
   final List<ConsoleLine> console;
   final AgentPlan? plan;
+
+  /// When the run began — powers the elapsed-time display in the header.
+  final DateTime? startedAt;
 
   /// Indices of proposed edits/commands the user chose to skip.
   final Set<int> skippedEdits;
@@ -178,6 +182,7 @@ class ImplRunState {
     List<VerifyResult>? verifications,
     String? error,
     bool? featureShipped,
+    DateTime? startedAt,
   }) {
     return ImplRunState(
       runId: runId,
@@ -190,6 +195,7 @@ class ImplRunState {
       verifications: verifications ?? this.verifications,
       error: error,
       featureShipped: featureShipped ?? this.featureShipped,
+      startedAt: startedAt ?? this.startedAt,
     );
   }
 }

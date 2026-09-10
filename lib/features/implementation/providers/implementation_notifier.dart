@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/command_runner.dart';
@@ -37,12 +39,22 @@ class ImplBrief {
 
 /// One implementation run per feature. AutoDispose so state resets and the
 /// backups/console are released when the window closes.
-final implRunProvider = NotifierProvider.autoDispose
-    .family<ImplRunNotifier, ImplRunState, String>(ImplRunNotifier.new);
+// KeepAlive (not autoDispose) so a build keeps running when the window is
+// closed and the user navigates back to the board — re-opening re-attaches to
+// the same live run instead of restarting it.
+final implRunProvider =
+    NotifierProvider.family<ImplRunNotifier, ImplRunState, String>(
+  ImplRunNotifier.new,
+);
 
-class ImplRunNotifier extends AutoDisposeFamilyNotifier<ImplRunState, String> {
+class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
   ImplBrief? _brief;
   final _runner = CommandRunner();
+
+  // Streaming-display state for the planning phase.
+  final _streamBuf = StringBuffer();
+  bool _streamLineStarted = false;
+  bool _jsonSeen = false;
 
   @override
   ImplRunState build(String featureId) {
@@ -58,11 +70,52 @@ class ImplRunNotifier extends AutoDisposeFamilyNotifier<ImplRunState, String> {
     );
   }
 
-  /// Kicks off the run: asks the agent for a plan, then waits for approval.
+  /// Sets the run phase AND mirrors it to the app-level registry so the tracker
+  /// board's status dot updates live.
+  void _phase(RunPhase p) {
+    state = state.copyWith(phase: p);
+    ref.read(implActiveRunsProvider.notifier).set(arg, p);
+  }
+
+  /// Renders the model's streamed prose as a single live console line that we
+  /// keep rewriting as tokens arrive.
+  void _setStreamLine(String text) {
+    final line = ConsoleLine(ConsoleLineKind.narration,
+        text.isEmpty ? 'Thinking…' : text, DateTime.now());
+    if (!_streamLineStarted) {
+      _streamLineStarted = true;
+      state = state.copyWith(console: [...state.console, line]);
+    } else {
+      final trimmed = [...state.console]..removeLast();
+      state = state.copyWith(console: [...trimmed, line]);
+    }
+  }
+
+  /// Handles one streamed token: shows the plain-English preamble live, then
+  /// hides the raw JSON (which the parser consumes) behind a steady indicator.
+  void _onDelta(String delta) {
+    _streamBuf.write(delta);
+    if (_jsonSeen) return;
+    final text = _streamBuf.toString();
+    final brace = text.indexOf('{');
+    if (brace >= 0) {
+      _jsonSeen = true;
+      _setStreamLine(text.substring(0, brace).trim());
+      _log(ConsoleLineKind.info, 'Writing the plan…');
+    } else {
+      _setStreamLine(text.trim());
+    }
+  }
+
+  /// Kicks off the run: streams the agent's plan, then waits for approval.
   Future<void> start(ImplBrief brief) async {
     if (state.phase != RunPhase.idle) return;
     _brief = brief;
-    state = state.copyWith(phase: RunPhase.planning, error: null);
+    _streamBuf.clear();
+    _streamLineStarted = false;
+    _jsonSeen = false;
+    state = state.copyWith(startedAt: DateTime.now(), error: null);
+    _phase(RunPhase.planning);
     _log(ConsoleLineKind.narration, 'Planning: "${brief.featureTitle}"');
     _log(ConsoleLineKind.info, 'Repo: ${brief.repoPath}');
     try {
@@ -75,18 +128,23 @@ class ImplRunNotifier extends AutoDisposeFamilyNotifier<ImplRunState, String> {
         lockedSpec: brief.lockedSpec,
         goalStatement: brief.goalStatement,
         components: brief.components,
+        onDelta: _onDelta,
       );
-      _log(ConsoleLineKind.narration, plan.rationale);
+      // The user may have stopped while the stream was in flight.
+      if (state.phase == RunPhase.stopped) return;
       _log(
         ConsoleLineKind.info,
         'Proposed ${plan.edits.length} file change'
         '${plan.edits.length == 1 ? '' : 's'} and ${plan.commands.length} '
         'command${plan.commands.length == 1 ? '' : 's'}.',
       );
-      state = state.copyWith(plan: plan, phase: RunPhase.awaitingApproval);
+      state = state.copyWith(plan: plan);
+      _phase(RunPhase.awaitingApproval);
     } catch (e) {
+      if (state.phase == RunPhase.stopped) return;
       _log(ConsoleLineKind.error, 'Planning failed: $e');
-      state = state.copyWith(phase: RunPhase.failed, error: e.toString());
+      state = state.copyWith(error: e.toString());
+      _phase(RunPhase.failed);
     }
   }
 
@@ -112,7 +170,7 @@ class ImplRunNotifier extends AutoDisposeFamilyNotifier<ImplRunState, String> {
     if (state.phase != RunPhase.awaitingApproval) return;
 
     // --- Apply edits ---
-    state = state.copyWith(phase: RunPhase.applying);
+    _phase(RunPhase.applying);
     final applied = {...state.appliedEditPaths};
     for (var i = 0; i < plan.edits.length; i++) {
       if (state.skippedEdits.contains(i)) continue;
@@ -134,7 +192,7 @@ class ImplRunNotifier extends AutoDisposeFamilyNotifier<ImplRunState, String> {
     state = state.copyWith(appliedEditPaths: applied);
 
     // --- Run commands (streamed) ---
-    state = state.copyWith(phase: RunPhase.running);
+    _phase(RunPhase.running);
     for (var i = 0; i < plan.commands.length; i++) {
       if (state.skippedCommands.contains(i)) continue;
       final cmd = plan.commands[i];
@@ -157,7 +215,7 @@ class ImplRunNotifier extends AutoDisposeFamilyNotifier<ImplRunState, String> {
 
     // --- Verify against the Handoff checklist ---
     if (brief.checklist.isNotEmpty) {
-      state = state.copyWith(phase: RunPhase.verifying);
+      _phase(RunPhase.verifying);
       _log(ConsoleLineKind.narration, 'Verifying against the Handoff checklist…');
       final results = await ImplWorkspace.verify(
         repoPath: brief.repoPath,
@@ -171,7 +229,7 @@ class ImplRunNotifier extends AutoDisposeFamilyNotifier<ImplRunState, String> {
     }
 
     _log(ConsoleLineKind.narration, 'Run complete.');
-    state = state.copyWith(phase: RunPhase.done);
+    _phase(RunPhase.done);
   }
 
   /// Reverses one applied edit from its backup.
@@ -196,7 +254,19 @@ class ImplRunNotifier extends AutoDisposeFamilyNotifier<ImplRunState, String> {
     _runner.cancel();
     if (!state.phase.isTerminal) {
       _log(ConsoleLineKind.info, 'Stopped by user.');
-      state = state.copyWith(phase: RunPhase.stopped);
+      _phase(RunPhase.stopped);
     }
+  }
+
+  /// Clears a finished/stopped/failed run so the user can build the feature
+  /// again from scratch.
+  void reset() {
+    if (!state.phase.isTerminal) return;
+    _brief = null;
+    _streamBuf.clear();
+    _streamLineStarted = false;
+    _jsonSeen = false;
+    ref.read(implActiveRunsProvider.notifier).set(arg, RunPhase.idle);
+    state = ImplRunState.initial(state.runId);
   }
 }
