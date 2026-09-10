@@ -47,7 +47,19 @@ enum RunPhase {
 }
 
 /// The kind of a single console line, used for color-coding the activity log.
-enum ConsoleLineKind { narration, command, stdout, stderr, success, error, info }
+/// [thinking] is the model's internal chain-of-thought (dim, collapsible);
+/// [presentation] is what the model chooses to share with the user (green).
+enum ConsoleLineKind {
+  narration,
+  command,
+  stdout,
+  stderr,
+  success,
+  error,
+  info,
+  thinking,
+  presentation,
+}
 
 /// One line in the activity console.
 @immutable
@@ -66,6 +78,8 @@ class ConsoleLine {
         ConsoleLineKind.success => const Color(0xFF81C784),
         ConsoleLineKind.error => const Color(0xFFFF453A),
         ConsoleLineKind.info => const Color(0xFF6B7280),
+        ConsoleLineKind.thinking => const Color(0xFF7C8598), // dim, internal
+        ConsoleLineKind.presentation => const Color(0xFF81C784), // green, shared
       };
 
   String get timestamp {

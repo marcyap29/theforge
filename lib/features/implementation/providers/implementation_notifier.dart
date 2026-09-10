@@ -56,6 +56,7 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
   // Streaming-display state for the planning phase.
   final _contentBuf = StringBuffer(); // the answer text (used to find the JSON)
   String _partial = ''; // current unfinished streamed line
+  ConsoleLineKind _partialKind = ConsoleLineKind.thinking;
   bool _streamStarted = false;
   bool _jsonSeen = false;
   Timer? _waitTimer;
@@ -94,33 +95,38 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
 
   /// Appends streamed text to the console like a terminal: text accumulates on
   /// the current line until a newline closes it and opens the next. This keeps
-  /// the full thought process as real, scrollable lines (no truncation).
-  void _appendStream(String text) {
+  /// the full stream as real, scrollable lines (no truncation). [kind] lets us
+  /// distinguish the model's internal reasoning from its external presentation;
+  /// a kind change starts a fresh line.
+  void _appendStream(String text, ConsoleLineKind kind) {
     if (text.isEmpty) return;
-    final combined = (_streamStarted ? _partial : '') + text;
+    final continuing = _streamStarted && kind == _partialKind;
+    final combined = (continuing ? _partial : '') + text;
     final segs = combined.split('\n');
     final console = [...state.console];
-    if (_streamStarted && console.isNotEmpty) {
+    if (continuing && console.isNotEmpty) {
       console.removeLast(); // drop the old partial line; we re-add it updated
     }
     for (var i = 0; i < segs.length - 1; i++) {
-      console.add(ConsoleLine(ConsoleLineKind.stdout, segs[i], DateTime.now()));
+      console.add(ConsoleLine(kind, segs[i], DateTime.now()));
     }
-    console.add(ConsoleLine(ConsoleLineKind.stdout, segs.last, DateTime.now()));
+    console.add(ConsoleLine(kind, segs.last, DateTime.now()));
     _partial = segs.last;
+    _partialKind = kind;
     _streamStarted = true;
     state = state.copyWith(console: console);
   }
 
   /// Handles one streamed delta. Reasoning models stream their chain-of-thought
-  /// as [thinking] deltas — shown live so you watch it think — while the real
-  /// answer (the JSON plan) arrives as content deltas, which we hide behind a
-  /// "Writing the plan…" indicator (and the agent parses).
+  /// as [thinking] deltas — the model's INTERNAL thoughts (dim, collapsible) —
+  /// while the real answer arrives as content deltas: the plain-English
+  /// preamble it wants to SHARE (green) followed by the JSON plan (hidden and
+  /// parsed).
   void _onDelta(String text, bool thinking, int gen) {
     if (gen != _gen) return; // stale stream from a stopped/reset run
     _waitTimer?.cancel();
     if (thinking) {
-      _appendStream(text);
+      _appendStream(text, ConsoleLineKind.thinking);
       return;
     }
     if (_jsonSeen) return;
@@ -129,12 +135,14 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     final brace = _contentBuf.toString().indexOf('{');
     if (brace >= 0) {
       _jsonSeen = true;
-      // Show only the preamble that arrived before the JSON began.
+      // Show only the presentation that arrived before the JSON began.
       final visible = (brace - before).clamp(0, text.length);
-      if (visible > 0) _appendStream(text.substring(0, visible));
+      if (visible > 0) {
+        _appendStream(text.substring(0, visible), ConsoleLineKind.presentation);
+      }
       _log(ConsoleLineKind.info, 'Writing the plan…');
     } else {
-      _appendStream(text);
+      _appendStream(text, ConsoleLineKind.presentation);
     }
   }
 
@@ -146,6 +154,7 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     _contentBuf.clear();
     _partial = '';
     _streamStarted = false;
+    _partialKind = ConsoleLineKind.thinking;
     _jsonSeen = false;
     state = state.copyWith(startedAt: DateTime.now(), error: null);
     _phase(RunPhase.planning);

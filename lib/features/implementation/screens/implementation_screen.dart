@@ -24,6 +24,7 @@ class ImplementationScreen extends ConsumerStatefulWidget {
 class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
   final _scroll = ScrollController();
   Timer? _ticker;
+  bool _hideThinking = false;
 
   String get _featureId => widget.brief.featureId;
 
@@ -87,6 +88,19 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
         title: Text('Build: ${widget.brief.featureTitle}',
             style: const TextStyle(fontSize: 15)),
         actions: [
+          if (state.console.any((l) => l.kind == ConsoleLineKind.thinking))
+            IconButton(
+              icon: Icon(
+                  _hideThinking ? Icons.psychology_outlined : Icons.psychology,
+                  size: 18),
+              tooltip: _hideThinking
+                  ? 'Show the model\'s internal thinking'
+                  : 'Hide the model\'s internal thinking',
+              color: _hideThinking
+                  ? const Color(0xFF6B7280)
+                  : const Color(0xFF7C8598),
+              onPressed: () => setState(() => _hideThinking = !_hideThinking),
+            ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 14, horizontal: 4),
             child: ActiveModelChip(),
@@ -117,7 +131,16 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
             flex: 3,
             child: Column(
               children: [
-                Expanded(child: _Console(lines: state.console, controller: _scroll)),
+                Expanded(
+                  child: _Console(
+                    lines: _hideThinking
+                        ? state.console
+                            .where((l) => l.kind != ConsoleLineKind.thinking)
+                            .toList()
+                        : state.console,
+                    controller: _scroll,
+                  ),
+                ),
                 if (state.phase == RunPhase.awaitingApproval && state.plan != null)
                   _ApprovalPanel(
                     state: state,
@@ -210,10 +233,15 @@ class _Console extends StatelessWidget {
         itemCount: lines.length,
         itemBuilder: (_, i) {
         final l = lines[i];
-        // Streamed output (reasoning / command output) is shown without a
-        // per-line timestamp so long transcripts read cleanly.
-        final showTs = l.kind != ConsoleLineKind.stdout &&
-            l.kind != ConsoleLineKind.stderr;
+        // Streamed prose (reasoning / presentation / command output) is shown
+        // without a per-line timestamp so long transcripts read cleanly.
+        const streamed = {
+          ConsoleLineKind.stdout,
+          ConsoleLineKind.stderr,
+          ConsoleLineKind.thinking,
+          ConsoleLineKind.presentation,
+        };
+        final showTs = !streamed.contains(l.kind);
         return Padding(
           padding: const EdgeInsets.only(bottom: 2),
           child: RichText(
