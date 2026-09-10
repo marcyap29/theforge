@@ -570,9 +570,12 @@ class _RoleCard extends ConsumerWidget {
                     .toList(growable: false),
                 onChanged: (p) async {
                   if (p == null) return;
+                  // Default to the provider's first model so a role never ends
+                  // up with a provider but no model (which breaks every call).
+                  final defaultModel = modelsFor(p).firstOrNull?.id ?? '';
                   await ref.read(settingsProvider.notifier).setRoleAssignment(
                         role,
-                        ModelAssignment(providerType: p, modelId: ''),
+                        ModelAssignment(providerType: p, modelId: defaultModel),
                       );
                 },
                 decoration: const InputDecoration(

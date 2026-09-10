@@ -19,7 +19,13 @@ class LlmService {
     if (assignment == null) {
       throw Exception('No role assignment for ${role.name}.');
     }
-    if (assignment.modelId.isEmpty) {
+    // Defensive: if a role somehow has a provider but no model, fall back to
+    // that provider's first model rather than failing the whole call.
+    var modelId = assignment.modelId;
+    if (modelId.isEmpty) {
+      modelId = modelsFor(assignment.providerType).firstOrNull?.id ?? '';
+    }
+    if (modelId.isEmpty) {
       throw Exception(
         'No model selected for ${role.name} role. Open Settings to configure.',
       );
@@ -29,7 +35,7 @@ class LlmService {
       systemPrompt: systemPrompt,
       userPrompt: userPrompt,
       temperature: temperature,
-      modelId: assignment.modelId,
+      modelId: modelId,
       maxTokens: maxTokens,
     );
   }
