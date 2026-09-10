@@ -593,11 +593,25 @@ class _FeatureTile extends StatelessWidget {
     final hasRun = phase != null && phase != RunPhase.idle;
     return ListTile(
       dense: true,
+      // A feature with a live AI build is tappable — clicking it re-opens the
+      // build window so you can watch progress, without going through the menu.
+      onTap: hasRun ? onBuild : null,
+      mouseCursor: hasRun ? SystemMouseCursors.click : null,
       leading: hasRun
           ? _RunDot(phase)
           : Icon(Icons.circle, size: 12, color: status.color),
-      title: Text(feature.title,
-          style: const TextStyle(fontSize: 13, color: Color(0xFFE5E5E7))),
+      title: Row(
+        children: [
+          Flexible(
+            child: Text(feature.title,
+                style: const TextStyle(fontSize: 13, color: Color(0xFFE5E5E7))),
+          ),
+          if (hasRun) ...[
+            const SizedBox(width: 8),
+            Icon(Icons.open_in_new, size: 12, color: phase.dotColor),
+          ],
+        ],
+      ),
       subtitle: _subtitle(),
       trailing: PopupMenuButton<_TileAction>(
         icon: const Icon(Icons.more_vert, size: 18, color: Color(0xFF8A8A8E)),
@@ -714,27 +728,17 @@ class _RunDotState extends State<_RunDot>
     super.dispose();
   }
 
-  ({Color color, bool pulse, String tip}) get _spec => switch (widget.phase) {
+  ({bool pulse, String tip}) get _spec => switch (widget.phase) {
         RunPhase.awaitingApproval => (
-            color: const Color(0xFF64B5F6),
             pulse: false,
-            tip: 'Waiting for your approval'
+            tip: 'Waiting for your approval — tap to open'
           ),
-        RunPhase.done => (
-            color: const Color(0xFF81C784),
-            pulse: false,
-            tip: 'Build complete'
-          ),
+        RunPhase.done => (pulse: false, tip: 'Build complete — tap to open'),
         RunPhase.failed || RunPhase.stopped => (
-            color: const Color(0xFFFF453A),
             pulse: false,
-            tip: 'Build failed or stopped'
+            tip: 'Build failed or stopped — tap to open'
           ),
-        _ => (
-            color: const Color(0xFFFFB74D),
-            pulse: true,
-            tip: 'AI is working…'
-          ),
+        _ => (pulse: true, tip: 'AI is working… tap to watch'),
       };
 
   @override
@@ -743,7 +747,8 @@ class _RunDotState extends State<_RunDot>
     final dot = Container(
       width: 12,
       height: 12,
-      decoration: BoxDecoration(color: spec.color, shape: BoxShape.circle),
+      decoration:
+          BoxDecoration(color: widget.phase.dotColor, shape: BoxShape.circle),
     );
     return Tooltip(
       message: spec.tip,
@@ -751,9 +756,7 @@ class _RunDotState extends State<_RunDot>
         width: 16,
         height: 16,
         child: Center(
-          child: spec.pulse
-              ? FadeTransition(opacity: _c, child: dot)
-              : dot,
+          child: spec.pulse ? FadeTransition(opacity: _c, child: dot) : dot,
         ),
       ),
     );

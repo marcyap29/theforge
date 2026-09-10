@@ -34,6 +34,16 @@ enum RunPhase {
       this == RunPhase.done ||
       this == RunPhase.failed ||
       this == RunPhase.stopped;
+
+  /// Board/status dot color: yellow = working, blue = awaiting approval,
+  /// green = done, red = failed/stopped.
+  Color get dotColor => switch (this) {
+        RunPhase.awaitingApproval => const Color(0xFF64B5F6),
+        RunPhase.done => const Color(0xFF81C784),
+        RunPhase.failed || RunPhase.stopped => const Color(0xFFFF453A),
+        RunPhase.idle => const Color(0xFF6B7280),
+        _ => const Color(0xFFFFB74D),
+      };
 }
 
 /// The kind of a single console line, used for color-coding the activity log.
