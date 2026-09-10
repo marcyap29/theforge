@@ -87,7 +87,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.radar),
-            tooltip: 'Suggest features (from docs + repo)',
+            tooltip: 'Scan Repo and Documents',
             onPressed: _scanRepo,
           ),
           IconButton(
@@ -614,8 +614,8 @@ class _EmptyState extends StatelessWidget {
               style: TextStyle(color: Color(0xFF9CA3AF))),
           const SizedBox(height: 4),
           const Text(
-            'Suggest a feature list from this project\'s documents (and repo, if '
-            'linked), or add manually.',
+            'Scan this project\'s documents (and repo, if linked) to propose a '
+            'feature list, or add manually.',
             style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
           ),
           const SizedBox(height: 16),
@@ -625,7 +625,7 @@ class _EmptyState extends StatelessWidget {
               FilledButton.icon(
                 onPressed: onScan,
                 icon: const Icon(Icons.radar, size: 18),
-                label: const Text('Suggest features'),
+                label: const Text('Scan Repo and Documents'),
               ),
               const SizedBox(width: 12),
               OutlinedButton.icon(
