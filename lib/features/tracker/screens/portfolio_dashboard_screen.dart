@@ -7,6 +7,7 @@ import '../../projects/screens/new_project_screen.dart';
 import '../../projects/screens/project_detail_screen.dart';
 import '../providers/tracker_providers.dart';
 import '../widgets/active_model_chip.dart';
+import '../widgets/portfolio_digest.dart';
 import '../widgets/project_card.dart';
 import 'project_tracker_screen.dart';
 
@@ -162,37 +163,7 @@ class _PortfolioDashboardScreenState
                 ),
               ],
             )
-          : AppBar(
-              title: const Text('The Forge — Portfolio'),
-              actions: [
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 14, horizontal: 4),
-                  child: ActiveModelChip(),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.folder_outlined),
-                  tooltip: 'All projects',
-                  onPressed: () =>
-                      Navigator.of(context).pushNamed('/projects'),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.monitor_heart_outlined),
-                  tooltip: 'Watch Mode',
-                  onPressed: () => Navigator.of(context).pushNamed('/watch'),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.settings),
-                  tooltip: 'Settings',
-                  onPressed: () =>
-                      Navigator.of(context).pushNamed('/settings'),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  tooltip: 'Refresh',
-                  onPressed: _refresh,
-                ),
-              ],
-            ),
+          : null,
       floatingActionButton: _isSelecting
           ? null
           : FloatingActionButton.extended(
@@ -203,9 +174,36 @@ class _PortfolioDashboardScreenState
               icon: const Icon(Icons.add),
               label: const Text('New Project'),
             ),
-      body: portfolioAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
+      body: Column(
+        children: [
+          if (!_isSelecting)
+            ForgeAppHeader(trailing: [
+              const ActiveModelChip(),
+              IconButton(
+                icon: const Icon(Icons.folder_outlined, size: 18),
+                tooltip: 'All projects',
+                onPressed: () => Navigator.of(context).pushNamed('/projects'),
+              ),
+              IconButton(
+                icon: const Icon(Icons.monitor_heart_outlined, size: 18),
+                tooltip: 'Watch Mode',
+                onPressed: () => Navigator.of(context).pushNamed('/watch'),
+              ),
+              IconButton(
+                icon: const Icon(Icons.settings, size: 18),
+                tooltip: 'Settings',
+                onPressed: () => Navigator.of(context).pushNamed('/settings'),
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh, size: 18),
+                tooltip: 'Refresh',
+                onPressed: _refresh,
+              ),
+            ]),
+          Expanded(
+            child: portfolioAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -231,6 +229,15 @@ class _PortfolioDashboardScreenState
             onRefresh: _refresh,
             child: CustomScrollView(
               slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(26, 22, 26, 0),
+                    child: PortfolioDigestPanel(
+                      onCatchUp: _catchMeUp,
+                      onOpenProject: _openTracker,
+                    ),
+                  ),
+                ),
                 SliverToBoxAdapter(child: _SummaryStrip(entries: entries)),
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 90),
@@ -274,8 +281,24 @@ class _PortfolioDashboardScreenState
             ),
           );
         },
-      ),
+              ),
+            ),
+          ],
+        ),
     );
+  }
+
+  Future<void> _catchMeUp() async {
+    final digest = ref.read(portfolioDigestProvider).valueOrNull;
+    final moved = digest?.moved ?? const [];
+    final all = digest?.deltas ?? const [];
+    final target = moved.isNotEmpty
+        ? moved.first.entry
+        : (all.isNotEmpty ? all.first.entry : null);
+    await markPortfolioSeen(ref);
+    ref.invalidate(portfolioProvider);
+    ref.invalidate(portfolioDigestProvider);
+    if (target != null && mounted) _openTracker(target);
   }
 
   Future<void> _openDetail(PortfolioEntry entry) async {

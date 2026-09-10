@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../features/interview/providers/interview_providers.dart';
 import '../features/interview/ui/interview_screen.dart';
+import '../features/launch/launch_screen.dart';
 import '../features/projects/screens/projects_list_screen.dart';
 import '../features/projects/screens/pull_ingestion_progress_screen.dart';
 import '../features/projects/screens/pull_ingestion_summary_screen.dart';
@@ -17,7 +18,7 @@ import '../features/watch/decision_screen.dart';
 import '../features/watch/spec_drift_screen.dart';
 import '../features/watch/watch_dashboard_screen.dart';
 import 'text_scale_notifier.dart';
-import 'theme/app_theme.dart';
+import 'theme/forge_theme.dart';
 
 final routeObserver = RouteObserver<ModalRoute<dynamic>>();
 
@@ -31,8 +32,8 @@ class TheForgeApp extends ConsumerWidget {
     return MaterialApp(
       title: 'The Forge',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark,
-      darkTheme: AppTheme.dark,
+      theme: ForgeTheme.dark,
+      darkTheme: ForgeTheme.dark,
       themeMode: ThemeMode.dark,
       navigatorObservers: [routeObserver],
       builder: (context, child) {
@@ -83,7 +84,8 @@ class TheForgeApp extends ConsumerWidget {
       },
       initialRoute: '/',
       routes: {
-        '/': (context) => const PortfolioDashboardScreen(),
+        '/': (context) => const LaunchScreen(),
+        '/home': (context) => const PortfolioDashboardScreen(),
         '/projects': (context) => const ProjectsListScreen(),
         '/interview': (context) {
           final args = ModalRoute.of(context)?.settings.arguments;

@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="The Forge">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#152A40"/>
+      <stop offset="1" stop-color="#08131F"/>
+    </linearGradient>
+    <linearGradient id="ember" x1="0.25" y1="0" x2="0.75" y2="1">
+      <stop offset="0" stop-color="#FFC46B"/>
+      <stop offset="0.48" stop-color="#FF7A2F"/>
+      <stop offset="1" stop-color="#B4451C"/>
+    </linearGradient>
+    <linearGradient id="brassGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#A9793F"/>
+      <stop offset="1" stop-color="#8A6234"/>
+    </linearGradient>
+    <radialGradient id="heat" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FF7A2F" stop-opacity="0.32"/>
+      <stop offset="0.55" stop-color="#7A3826" stop-opacity="0.13"/>
+      <stop offset="1" stop-color="#7A3826" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="core" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#EFE7D8" stop-opacity="0.95"/>
+      <stop offset="0.35" stop-color="#FFC46B" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#FFC46B" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <path d="M 1024.00 512.00 L 1023.93 631.24 L 1023.72 669.32 L 1023.37 696.98 L 1022.88 719.47 L 1022.24 738.75 L 1021.47 755.78 L 1020.55 771.13 L 1019.49 785.16 L 1018.29 798.12 L 1016.95 810.17 L 1015.46 821.46 L 1013.83 832.08 L 1012.04 842.12 L 1010.12 851.63 L 1008.04 860.66 L 1005.81 869.27 L 1003.43 877.48 L 1000.90 885.33 L 998.22 892.83 L 995.37 900.02 L 992.37 906.92 L 989.21 913.53 L 985.88 919.87 L 982.38 925.96 L 978.72 931.81 L 974.88 937.42 L 970.87 942.81 L 966.67 947.99 L 962.29 952.96 L 957.72 957.72 L 952.96 962.29 L 947.99 966.67 L 942.81 970.87 L 937.42 974.88 L 931.81 978.72 L 925.96 982.38 L 919.87 985.88 L 913.53 989.21 L 906.92 992.37 L 900.02 995.37 L 892.83 998.22 L 885.33 1000.90 L 877.48 1003.43 L 869.27 1005.81 L 860.66 1008.04 L 851.63 1010.12 L 842.12 1012.04 L 832.08 1013.83 L 821.46 1015.46 L 810.17 1016.95 L 798.12 1018.29 L 785.16 1019.49 L 771.13 1020.55 L 755.78 1021.47 L 738.75 1022.24 L 719.47 1022.88 L 696.98 1023.37 L 669.32 1023.72 L 631.24 1023.93 L 512.00 1024.00 L 392.76 1023.93 L 354.68 1023.72 L 327.02 1023.37 L 304.53 1022.88 L 285.25 1022.24 L 268.22 1021.47 L 252.87 1020.55 L 238.84 1019.49 L 225.88 1018.29 L 213.83 1016.95 L 202.54 1015.46 L 191.92 1013.83 L 181.88 1012.04 L 172.37 1010.12 L 163.34 1008.04 L 154.73 1005.81 L 146.52 1003.43 L 138.67 1000.90 L 131.17 998.22 L 123.98 995.37 L 117.08 992.37 L 110.47 989.21 L 104.13 985.88 L 98.04 982.38 L 92.19 978.72 L 86.58 974.88 L 81.19 970.87 L 76.01 966.67 L 71.04 962.29 L 66.28 957.72 L 61.71 952.96 L 57.33 947.99 L 53.13 942.81 L 49.12 937.42 L 45.28 931.81 L 41.62 925.96 L 38.12 919.87 L 34.79 913.53 L 31.63 906.92 L 28.63 900.02 L 25.78 892.83 L 23.10 885.33 L 20.57 877.48 L 18.19 869.27 L 15.96 860.66 L 13.88 851.63 L 11.96 842.12 L 10.17 832.08 L 8.54 821.46 L 7.05 810.17 L 5.71 798.12 L 4.51 785.16 L 3.45 771.13 L 2.53 755.78 L 1.76 738.75 L 1.12 719.47 L 0.63 696.98 L 0.28 669.32 L 0.07 631.24 L 0.00 512.00 L 0.07 392.76 L 0.28 354.68 L 0.63 327.02 L 1.12 304.53 L 1.76 285.25 L 2.53 268.22 L 3.45 252.87 L 4.51 238.84 L 5.71 225.88 L 7.05 213.83 L 8.54 202.54 L 10.17 191.92 L 11.96 181.88 L 13.88 172.37 L 15.96 163.34 L 18.19 154.73 L 20.57 146.52 L 23.10 138.67 L 25.78 131.17 L 28.63 123.98 L 31.63 117.08 L 34.79 110.47 L 38.12 104.13 L 41.62 98.04 L 45.28 92.19 L 49.12 86.58 L 53.13 81.19 L 57.33 76.01 L 61.71 71.04 L 66.28 66.28 L 71.04 61.71 L 76.01 57.33 L 81.19 53.13 L 86.58 49.12 L 92.19 45.28 L 98.04 41.62 L 104.13 38.12 L 110.47 34.79 L 117.08 31.63 L 123.98 28.63 L 131.17 25.78 L 138.67 23.10 L 146.52 20.57 L 154.73 18.19 L 163.34 15.96 L 172.37 13.88 L 181.88 11.96 L 191.92 10.17 L 202.54 8.54 L 213.83 7.05 L 225.88 5.71 L 238.84 4.51 L 252.87 3.45 L 268.22 2.53 L 285.25 1.76 L 304.53 1.12 L 327.02 0.63 L 354.68 0.28 L 392.76 0.07 L 512.00 0.00 L 631.24 0.07 L 669.32 0.28 L 696.98 0.63 L 719.47 1.12 L 738.75 1.76 L 755.78 2.53 L 771.13 3.45 L 785.16 4.51 L 798.12 5.71 L 810.17 7.05 L 821.46 8.54 L 832.08 10.17 L 842.12 11.96 L 851.63 13.88 L 860.66 15.96 L 869.27 18.19 L 877.48 20.57 L 885.33 23.10 L 892.83 25.78 L 900.02 28.63 L 906.92 31.63 L 913.53 34.79 L 919.87 38.12 L 925.96 41.62 L 931.81 45.28 L 937.42 49.12 L 942.81 53.13 L 947.99 57.33 L 952.96 61.71 L 957.72 66.28 L 962.29 71.04 L 966.67 76.01 L 970.87 81.19 L 974.88 86.58 L 978.72 92.19 L 982.38 98.04 L 985.88 104.13 L 989.21 110.47 L 992.37 117.08 L 995.37 123.98 L 998.22 131.17 L 1000.90 138.67 L 1003.43 146.52 L 1005.81 154.73 L 1008.04 163.34 L 1010.12 172.37 L 1012.04 181.88 L 1013.83 191.92 L 1015.46 202.54 L 1016.95 213.83 L 1018.29 225.88 L 1019.49 238.84 L 1020.55 252.87 L 1021.47 268.22 L 1022.24 285.25 L 1022.88 304.53 L 1023.37 327.02 L 1023.72 354.68 L 1023.93 392.76 Z" fill="url(#tile)"/>
+  <g>
+    <line x1="512.00" y1="182.00" x2="512.00" y2="156.00" stroke="#A9793F" stroke-opacity="0.85" stroke-width="7" stroke-linecap="round"/>
+    <line x1="547.54" y1="173.86" x2="549.21" y2="157.95" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="582.69" y1="179.43" x2="586.02" y2="163.78" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="617.07" y1="188.64" x2="622.01" y2="173.42" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="650.29" y1="201.39" x2="656.80" y2="186.78" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="677.00" y1="226.21" x2="690.00" y2="203.69" stroke="#A9793F" stroke-opacity="0.85" stroke-width="7" stroke-linecap="round"/>
+    <line x1="711.85" y1="236.93" x2="721.25" y2="223.99" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="739.50" y1="259.33" x2="750.21" y2="247.44" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="764.67" y1="284.50" x2="776.56" y2="273.79" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="787.07" y1="312.15" x2="800.01" y2="302.75" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="797.79" y1="347.00" x2="820.31" y2="334.00" stroke="#A9793F" stroke-opacity="0.85" stroke-width="7" stroke-linecap="round"/>
+    <line x1="822.61" y1="373.71" x2="837.22" y2="367.20" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="835.36" y1="406.93" x2="850.58" y2="401.99" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="844.57" y1="441.31" x2="860.22" y2="437.98" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="850.14" y1="476.46" x2="866.05" y2="474.79" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="842.00" y1="512.00" x2="868.00" y2="512.00" stroke="#A9793F" stroke-opacity="0.85" stroke-width="7" stroke-linecap="round"/>
+    <line x1="850.14" y1="547.54" x2="866.05" y2="549.21" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="844.57" y1="582.69" x2="860.22" y2="586.02" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="835.36" y1="617.07" x2="850.58" y2="622.01" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="822.61" y1="650.29" x2="837.22" y2="656.80" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="797.79" y1="677.00" x2="820.31" y2="690.00" stroke="#A9793F" stroke-opacity="0.85" stroke-width="7" stroke-linecap="round"/>
+    <line x1="787.07" y1="711.85" x2="800.01" y2="721.25" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="764.67" y1="739.50" x2="776.56" y2="750.21" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="739.50" y1="764.67" x2="750.21" y2="776.56" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="711.85" y1="787.07" x2="721.25" y2="800.01" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="677.00" y1="797.79" x2="690.00" y2="820.31" stroke="#A9793F" stroke-opacity="0.85" stroke-width="7" stroke-linecap="round"/>
+    <line x1="650.29" y1="822.61" x2="656.80" y2="837.22" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="373.71" y1="822.61" x2="367.20" y2="837.22" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="347.00" y1="797.79" x2="334.00" y2="820.31" stroke="#A9793F" stroke-opacity="0.85" stroke-width="7" stroke-linecap="round"/>
+    <line x1="312.15" y1="787.07" x2="302.75" y2="800.01" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="284.50" y1="764.67" x2="273.79" y2="776.56" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="259.33" y1="739.50" x2="247.44" y2="750.21" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="236.93" y1="711.85" x2="223.99" y2="721.25" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="226.21" y1="677.00" x2="203.69" y2="690.00" stroke="#A9793F" stroke-opacity="0.85" stroke-width="7" stroke-linecap="round"/>
+    <line x1="201.39" y1="650.29" x2="186.78" y2="656.80" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="188.64" y1="617.07" x2="173.42" y2="622.01" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="179.43" y1="582.69" x2="163.78" y2="586.02" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="173.86" y1="547.54" x2="157.95" y2="549.21" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="182.00" y1="512.00" x2="156.00" y2="512.00" stroke="#A9793F" stroke-opacity="0.85" stroke-width="7" stroke-linecap="round"/>
+    <line x1="173.86" y1="476.46" x2="157.95" y2="474.79" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="179.43" y1="441.31" x2="163.78" y2="437.98" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="188.64" y1="406.93" x2="173.42" y2="401.99" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="201.39" y1="373.71" x2="186.78" y2="367.20" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="226.21" y1="347.00" x2="203.69" y2="334.00" stroke="#A9793F" stroke-opacity="0.85" stroke-width="7" stroke-linecap="round"/>
+    <line x1="236.93" y1="312.15" x2="223.99" y2="302.75" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="259.33" y1="284.50" x2="247.44" y2="273.79" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="284.50" y1="259.33" x2="273.79" y2="247.44" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="312.15" y1="236.93" x2="302.75" y2="223.99" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="347.00" y1="226.21" x2="334.00" y2="203.69" stroke="#A9793F" stroke-opacity="0.85" stroke-width="7" stroke-linecap="round"/>
+    <line x1="373.71" y1="201.39" x2="367.20" y2="186.78" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="406.93" y1="188.64" x2="401.99" y2="173.42" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="441.31" y1="179.43" x2="437.98" y2="163.78" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <line x1="476.46" y1="173.86" x2="474.79" y2="157.95" stroke="#6C7C88" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+    <!-- unbuilt remainder: the dial the build has not reached yet -->
+    <path d="M 794.62 411.36 A 300.00 300.00 0 0 1 614.61 793.91" fill="none" stroke="#6C7C88"
+          stroke-opacity="0.30" stroke-width="20.0" stroke-linecap="round"/>
+    <!-- progress arc: brass, the part that is forged -->
+    <path d="M 409.39 793.91 A 300.00 300.00 0 1 1 794.62 411.36" fill="none" stroke="url(#brassGrad)"
+          stroke-width="20.0" stroke-linecap="round"/>
+    <!-- current-position marker: where the build actually is -->
+    <line x1="762.59" y1="422.77"
+          x2="826.65" y2="399.96"
+          stroke="#EFE7D8" stroke-opacity="0.92" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="512.0" cy="512.0" r="300" fill="url(#heat)"/>
+    <path d="M 512.00 382.00 Q 540.08 495.10 728.00 512.00 Q 540.08 528.90 512.00 642.00 Q 483.92 528.90 296.00 512.00 Q 483.92 495.10 512.00 382.00 Z" fill="url(#ember)"/>
+    <circle cx="512.0" cy="512.0" r="62" fill="url(#core)"/>
+    <circle cx="512.0" cy="512.0" r="13" fill="#EFE7D8"/>
+  </g>
+</svg>
