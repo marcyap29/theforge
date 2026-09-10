@@ -214,78 +214,45 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
             _ModeCard(
               icon: Icons.auto_awesome,
               accentColor: const Color(0xFFE8A04C),
-              title: 'IMPORT → SPEC',
-              tagline: 'Generate docs from an import.',
+              title: 'DESCRIBE A NEW APP',
+              tagline: 'Start something new.',
               description:
-                  'Paste a description, doc, or transcript (and optionally a '
-                  'linked repo). The LLM drafts the spec set in one shot — you '
-                  'review, then it generates.',
-              dimensions: const [
-                'Description',
-                'Document',
-                'Transcript',
-                'Repo',
-              ],
-              selected: _flow == _Flow.importDoc,
+                  'Paste an idea, doc, or transcript (and optionally a linked '
+                  'repo) — the AI drafts the full spec set, you review, then it '
+                  'generates.',
+              selected: _flow == _Flow.importDoc || _flow == _Flow.build,
               onTap: _creating
                   ? null
                   : () => setState(() => _flow = _Flow.importDoc),
+              footer: Row(
+                children: [
+                  _MethodChip(
+                    label: 'Paste an idea',
+                    selected: _flow == _Flow.importDoc,
+                    onTap: _creating
+                        ? null
+                        : () => setState(() => _flow = _Flow.importDoc),
+                  ),
+                  const SizedBox(width: 8),
+                  _MethodChip(
+                    label: 'Answer guided questions',
+                    selected: _flow == _Flow.build,
+                    onTap: _creating
+                        ? null
+                        : () => setState(() => _flow = _Flow.build),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 12),
-            _ModeCard(
-              icon: Icons.build_outlined,
-              accentColor: const Color(0xFFE8A04C),
-              title: 'BUILD INTERVIEW',
-              tagline: 'Define what gets built.',
-              description:
-                  'For new products. Produces a locked spec and /goal for '
-                  'executor agents.',
-              dimensions: const [
-                'Core purpose',
-                'Identity model',
-                'Platform',
-                'Scope boundary',
-              ],
-              selected: _flow == _Flow.build,
-              onTap: _creating
-                  ? null
-                  : () => setState(() => _flow = _Flow.build),
-            ),
-            const SizedBox(height: 12),
-            _ModeCard(
-              icon: Icons.fact_check_outlined,
-              accentColor: const Color(0xFF94A3B8),
-              title: 'AUDIT INTERVIEW',
-              tagline: 'Establish current state.',
-              description:
-                  'Identify the status of a project based on interviewing '
-                  'the team. Produces an auditable Current State Spec and '
-                  'Blocker Registry.',
-              dimensions: const [
-                'Project goal',
-                'Active blockers',
-                'Decision debt',
-                'AI & token usage',
-              ],
-              selected: _flow == _Flow.audit,
-              onTap: _creating
-                  ? null
-                  : () => setState(() => _flow = _Flow.audit),
-            ),
             _ModeCard(
               icon: Icons.search_outlined,
               accentColor: const Color(0xFFA78BFA),
-              title: 'PROJECT ONBOARDING',
-              tagline: 'Map an existing codebase.',
+              title: 'BRING IN EXISTING CODE',
+              tagline: 'Onboard a repo you already have.',
               description:
-                  'Onboard an existing repo for The Forge to analyze and '
-                  'start producing auditable specs.',
-              dimensions: const [
-                'Architecture',
-                'Data flow',
-                'API surface',
-                'Dependencies',
-              ],
+                  'Point The Forge at an existing repo — it analyzes the code '
+                  'and starts producing an auditable spec.',
               selected: _flow == _Flow.pull,
               onTap: _creating
                   ? null
@@ -354,9 +321,9 @@ class _ModeCard extends StatelessWidget {
     required this.title,
     required this.tagline,
     required this.description,
-    required this.dimensions,
     required this.selected,
     required this.onTap,
+    this.footer,
   });
 
   final IconData icon;
@@ -364,9 +331,11 @@ class _ModeCard extends StatelessWidget {
   final String title;
   final String tagline;
   final String description;
-  final List<String> dimensions;
   final bool selected;
   final VoidCallback? onTap;
+
+  /// Optional content shown below the description (e.g. a method sub-toggle).
+  final Widget? footer;
 
   static const _amberBorder = Color(0xFFE8A04C);
   static const _amberBackground = Color(0x1AE8A04C);
@@ -432,17 +401,62 @@ class _ModeCard extends StatelessWidget {
                   color: Color(0xFF9CA3AF),
                 ),
               ),
-              const SizedBox(height: 10),
-              Text(
-                '8 dimensions: ${dimensions.join(', ')}…',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontFamily: 'Menlo',
-                  color: Color(0xFF6B7280),
-                ),
-              ),
+              if (footer != null) ...[
+                const SizedBox(height: 12),
+                footer!,
+              ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A small selectable pill used inside a mode card to choose the method
+/// (e.g. paste vs guided questions).
+class _MethodChip extends StatelessWidget {
+  const _MethodChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: selected ? const Color(0x33E8A04C) : const Color(0xFF141416),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: selected ? const Color(0xFFE8A04C) : const Color(0xFF2C2C2E),
+            ),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(
+              selected ? Icons.radio_button_checked : Icons.radio_button_off,
+              size: 13,
+              color: selected ? const Color(0xFFE8A04C) : const Color(0xFF6B7280),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: selected ? const Color(0xFFE5E5E7) : const Color(0xFF9CA3AF),
+              ),
+            ),
+          ]),
         ),
       ),
     );
