@@ -194,6 +194,10 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
       );
       // Ignore a stream that finished after the user stopped or restarted.
       if (gen != _gen || state.phase == RunPhase.stopped) return;
+      // Always surface a plain-English takeaway in green.
+      if (plan.summary.isNotEmpty) {
+        _log(ConsoleLineKind.presentation, 'Summary: ${plan.summary}');
+      }
       _log(
         ConsoleLineKind.info,
         'Proposed ${plan.edits.length} file change'

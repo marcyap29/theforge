@@ -126,11 +126,14 @@ class ProposedCommand {
 @immutable
 class AgentPlan {
   const AgentPlan({
+    required this.summary,
     required this.rationale,
     required this.edits,
     required this.commands,
   });
 
+  /// One short plain-English sentence for the user (always shown, in green).
+  final String summary;
   final String rationale;
   final List<ProposedEdit> edits;
   final List<ProposedCommand> commands;

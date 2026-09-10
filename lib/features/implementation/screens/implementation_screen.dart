@@ -73,6 +73,23 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
     return _scroll.position.pixels >= _scroll.position.maxScrollExtent - 120;
   }
 
+  /// Start-line indices of each consecutive internal-thinking block.
+  static List<int> _thinkingStarts(List<ConsoleLine> lines) {
+    final starts = <int>[];
+    var i = 0;
+    while (i < lines.length) {
+      if (lines[i].kind == ConsoleLineKind.thinking) {
+        starts.add(i);
+        while (i < lines.length && lines[i].kind == ConsoleLineKind.thinking) {
+          i++;
+        }
+      } else {
+        i++;
+      }
+    }
+    return starts;
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(implRunProvider(_featureId));
@@ -83,6 +100,13 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
     // process isn't interrupted.
     ref.listen(implRunProvider(_featureId), (prev, next) {
       if (!identical(prev?.console, next.console) && _isAtBottom) _autoScroll();
+      // Tidy up when the run finishes successfully: fold the internal thinking.
+      if (prev?.phase != RunPhase.done && next.phase == RunPhase.done) {
+        final starts = _thinkingStarts(next.console);
+        if (starts.isNotEmpty) {
+          setState(() => _collapsedThinking.addAll(starts));
+        }
+      }
     });
 
     return Scaffold(

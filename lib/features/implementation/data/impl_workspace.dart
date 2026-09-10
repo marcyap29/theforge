@@ -48,6 +48,52 @@ class ImplWorkspace {
     return out;
   }
 
+  /// Well-known documentation files, in priority order, that ground the agent
+  /// in the project's architecture and conventions.
+  static const _keyDocPaths = [
+    'README.md',
+    'CLAUDE.md',
+    'claude.md',
+    'ARCHITECTURE.md',
+    'tracking md files/ARCHITECTURE.md',
+    'agents md files/agents.md',
+    'docs/ARCHITECTURE.md',
+    'docs/architecture.md',
+    'CONTRIBUTING.md',
+  ];
+
+  /// Concatenates the project's key docs (README, architecture, agent guide…)
+  /// within a size budget so the agent understands the codebase's structure and
+  /// conventions before proposing changes. Returns null if none are found.
+  static Future<String?> gatherKeyDocs(
+    String repoPath, {
+    int budget = 12000,
+    int perFileCap = 4000,
+  }) async {
+    final buf = StringBuffer();
+    var remaining = budget;
+    final seen = <String>{}; // dedupe case-insensitive-filesystem duplicates
+    for (final rel in _keyDocPaths) {
+      if (remaining <= 0) break;
+      final f = File(p.join(repoPath, rel));
+      if (!f.existsSync()) continue;
+      if (!seen.add(f.absolute.path.toLowerCase())) continue;
+      String c;
+      try {
+        c = await f.readAsString();
+      } catch (_) {
+        continue;
+      }
+      if (c.trim().isEmpty) continue;
+      if (c.length > perFileCap) c = '${c.substring(0, perFileCap)}\n…(truncated)';
+      if (c.length > remaining) c = c.substring(0, remaining);
+      buf..writeln('### $rel')..writeln(c)..writeln();
+      remaining -= c.length;
+    }
+    final s = buf.toString().trim();
+    return s.isEmpty ? null : s;
+  }
+
   /// Reads a repo-relative file, returning '' if it does not exist.
   static Future<String> readRepoFile(String repoPath, String rel) async {
     final f = File(p.join(repoPath, rel));

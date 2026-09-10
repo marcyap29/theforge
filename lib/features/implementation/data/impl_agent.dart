@@ -33,6 +33,7 @@ class ImplAgent {
     void Function(String text, bool thinking)? onDelta,
   }) async {
     final files = await ImplWorkspace.gatherRepoFiles(repoPath);
+    final keyDocs = await ImplWorkspace.gatherKeyDocs(repoPath);
 
     final userPrompt = _userPrompt(
       featureTitle: featureTitle,
@@ -42,6 +43,7 @@ class ImplAgent {
       goalStatement: goalStatement,
       components: components,
       files: files,
+      keyDocs: keyDocs,
     );
 
     // Stream the response so the UI can show the model reason live. Reasoning
@@ -76,10 +78,14 @@ edits that implements the feature. Commands should be limited to safe,
 non-interactive build/test/dependency steps (e.g. install deps, run tests).
 Never propose destructive commands (rm -rf, git reset --hard, force-push).
 
+Use the provided project DOCUMENTATION (README, architecture, agent guide) and
+the SPEC to follow the codebase's existing structure and conventions.
+
 First, briefly narrate your plan in 1-3 short sentences of plain English so the
 user can follow your thinking. THEN output the JSON object (and nothing after
 it). The JSON must be a single top-level object with no code fences:
 {
+  "summary": "ONE short sentence telling the user what you will do",
   "rationale": "one short paragraph on your approach",
   "edits": [
     {"path": "repo/relative/path.ext", "rationale": "why", "content": "FULL new file content"}
@@ -98,6 +104,7 @@ it). The JSON must be a single top-level object with no code fences:
     String? goalStatement,
     List<String> components = const [],
     required List<String> files,
+    String? keyDocs,
   }) {
     final b = StringBuffer()
       ..writeln('# Feature to implement')
@@ -123,6 +130,12 @@ it). The JSON must be a single top-level object with no code fences:
       if (spec.length > 6000) spec = '${spec.substring(0, 6000)}\n…(truncated)';
       b..writeln('## Locked spec (context)')..writeln(spec)..writeln();
     }
+    if (keyDocs != null && keyDocs.trim().isNotEmpty) {
+      b
+        ..writeln('## Project documentation (context)')
+        ..writeln(keyDocs.trim())
+        ..writeln();
+    }
     b
       ..writeln('## Repo files (${files.length})')
       ..writeln(files.join('\n'));
@@ -142,6 +155,7 @@ it). The JSON must be a single top-level object with no code fences:
     }
 
     final rationale = (decoded['rationale'] ?? '').toString().trim();
+    final summary = (decoded['summary'] ?? '').toString().trim();
 
     final edits = <ProposedEdit>[];
     for (final e in (decoded['edits'] as List?) ?? const []) {
@@ -173,7 +187,12 @@ it). The JSON must be a single top-level object with no code fences:
       throw ImplAgentException(
           'The agent proposed no changes. Try refining the feature description.');
     }
-    return AgentPlan(rationale: rationale, edits: edits, commands: commands);
+    return AgentPlan(
+      summary: summary.isNotEmpty ? summary : rationale,
+      rationale: rationale,
+      edits: edits,
+      commands: commands,
+    );
   }
 
   /// Extracts the first balanced JSON object from a possibly fenced response.
