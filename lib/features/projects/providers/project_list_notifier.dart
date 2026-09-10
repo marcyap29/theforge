@@ -12,6 +12,7 @@ class ProjectListNotifier extends AsyncNotifier<List<Project>> {
 
     final paths = await fileRepo.scanProjectPaths();
     final now = DateTime.now().millisecondsSinceEpoch;
+    final foundIds = paths.map(p.basename).toSet();
 
     for (final path in paths) {
       final id = p.basename(path);
@@ -27,6 +28,18 @@ class ProjectListNotifier extends AsyncNotifier<List<Project>> {
             createdAt: now,
           ),
         );
+      }
+    }
+
+    // Prune stale index rows: any project no longer present under the canonical
+    // projects root (e.g. left over from a previous root that pointed at a code
+    // repo). This removes ONLY index/tracker rows — never a folder — so a
+    // mis-indexed source repo can't linger as a deletable project.
+    for (final proj in await db.getAllProjects()) {
+      if (!foundIds.contains(proj.id)) {
+        await db.deleteFeaturesForProject(proj.id);
+        await db.removeTracking(proj.id);
+        await db.removeProject(proj.id);
       }
     }
 

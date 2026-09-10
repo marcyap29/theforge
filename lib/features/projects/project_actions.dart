@@ -1,22 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
 
 import '../../data/filesystem/project_file_repository.dart';
 import '../../data/local_db/forge_database.dart';
 
-/// Permanently deletes a project everywhere it lives: the on-disk folder
-/// (which also carries the tracker `tracker/*.json` mirror), the drift
+/// Permanently deletes a project everywhere it lives: the on-disk workspace
+/// folder (which also carries the tracker `tracker/*.json` mirror), the drift
 /// `Projects` index row, and its tracker rows (`Features` + `ProjectTracking`).
-/// Filesystem failures are swallowed so DB rows are still cleaned up.
+///
+/// SAFETY: the folder is deleted ONLY when it lives inside the canonical Forge
+/// projects home. A row pointing elsewhere (e.g. a stale index entry aimed at a
+/// linked code repo) has its index purged but its folder is never touched —
+/// deleting a project must never delete your source code.
 Future<void> deleteProjectCascade(
   ProjectFileRepository repo,
   ForgeDatabase db,
   Project project,
 ) async {
-  try {
-    await repo.deleteProject(project.path);
-  } catch (_) {
-    // Folder may already be gone or unwritable — still purge the index.
+  final root = await ProjectFileRepository.canonicalRootPath();
+  if (p.isWithin(root, project.path)) {
+    try {
+      await repo.deleteProject(project.path);
+    } catch (_) {
+      // Folder may already be gone or unwritable — still purge the index.
+    }
   }
+  // Outside the projects home → purge the index only (never rmdir).
   await db.deleteFeaturesForProject(project.id);
   await db.removeTracking(project.id);
   await db.removeProject(project.id);

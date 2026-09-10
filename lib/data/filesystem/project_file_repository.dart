@@ -39,10 +39,13 @@ class ProjectFileRepository {
   /// can always find a project's documentation even as code repos move or are
   /// deleted. Link a code repo per-project via the Repo Path row instead, and
   /// use "Export docs…" to copy deliverables into a repo when wanted.
-  static Future<Directory> _defaultRootDir() async {
+  static Future<String> canonicalRootPath() async {
     final docs = await getApplicationDocumentsDirectory();
-    return Directory(p.join(docs.path, 'The Forge Projects'));
+    return p.join(docs.path, 'The Forge Projects');
   }
+
+  static Future<Directory> _defaultRootDir() async =>
+      Directory(await canonicalRootPath());
 
   Future<String> createProject(String projectName, ProjectMode mode) async {
     final root = await _rootDirProvider();
