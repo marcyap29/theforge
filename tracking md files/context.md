@@ -4,6 +4,23 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-11 — Claude Code [Vibecode-in-app + re-edit shipped — v0.4.4]
+
+**Branch:** main · **App:** v0.4.4
+
+### Done
+- **Persistent vibecode prompt** in the Build window (`_VibeInput`): always-available text box; typing an instruction when the agent is idle calls `notifier.steer()` → `_plan(previousPlan, feedback)`. Replaced the phase-limited Revise box (removed `revise()`, the approval-panel Revise field).
+- **Esc interrupts** the running task (`CallbackShortcuts` + `Focus(autofocus)` → `stop()` when busy), like Ctrl-C in a terminal.
+- **Re-edit shipped features:** the "Build with AI" tile action is now shown for any non-archived feature (labelled "Re-build / edit with AI" when shipped), so a finished feature isn't locked. Files: `project_tracker_screen.dart`.
+
+### Verification
+`dart analyze lib/` clean · `flutter test` 15/15.
+
+### Next
+Real §MB entitlement backend; cancel in-flight model call on Stop (Esc currently marks stopped but the two-pass HTTP stream runs to completion in the background); per-screen ForgeTheme color migration; bundle fonts.
+
+---
+
 ## Session: 2026-09-10 — Claude Code [Onboarding: create-a-code-folder + review hardening — v0.4.1]
 
 **Branch:** main · **App:** v0.4.1

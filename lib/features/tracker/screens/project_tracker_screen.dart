@@ -689,13 +689,17 @@ class _FeatureTile extends StatelessWidget {
           }
         },
         itemBuilder: (_) => [
-          if (status.isActive) ...[
-            const PopupMenuItem(
+          // Available on any non-archived feature — including shipped ones, so
+          // a finished feature can be re-opened and edited/extended.
+          if (status != FeatureStatus.archived) ...[
+            PopupMenuItem(
               value: _TileAction.build_,
               child: Row(children: [
-                Icon(Icons.auto_awesome, size: 16, color: Color(0xFFE8A04C)),
-                SizedBox(width: 8),
-                Text('Build with AI'),
+                const Icon(Icons.auto_awesome, size: 16, color: Color(0xFFE8A04C)),
+                const SizedBox(width: 8),
+                Text(status == FeatureStatus.shipped
+                    ? 'Re-build / edit with AI'
+                    : 'Build with AI'),
               ]),
             ),
             const PopupMenuDivider(),

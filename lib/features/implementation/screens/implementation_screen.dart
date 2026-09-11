@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../tracker/widgets/active_model_chip.dart';
@@ -147,67 +148,161 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: CallbackShortcuts(
+        bindings: {
+          // Interrupt the running task, like Ctrl-C / Esc in a terminal.
+          const SingleActivator(LogicalKeyboardKey.escape): () {
+            if (state.phase.isBusy) notifier.stop();
+          },
+        },
+        child: Focus(
+          autofocus: true,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                flex: 3,
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: _Console(
+                        lines: state.console,
+                        controller: _scroll,
+                        running: !state.phase.isTerminal,
+                        collapsed: _collapsedThinking,
+                        onToggleBlock: (i) => setState(() {
+                          _collapsedThinking.contains(i)
+                              ? _collapsedThinking.remove(i)
+                              : _collapsedThinking.add(i);
+                        }),
+                      ),
+                    ),
+                    if (state.phase == RunPhase.awaitingApproval &&
+                        state.plan != null)
+                      _ApprovalPanel(
+                        state: state,
+                        onToggleEdit: notifier.toggleEdit,
+                        onToggleCommand: notifier.toggleCommand,
+                        onApply: notifier.applyAndRun,
+                        onEditContent: notifier.editProposedContent,
+                        onEditCommand: notifier.editProposedCommand,
+                      ),
+                    if (state.phase == RunPhase.done)
+                      _DoneBar(
+                        alreadyShipped: state.featureShipped,
+                        canFix: state.canFix,
+                        onShip: () {
+                          notifier.markFeatureShipped();
+                          Navigator.of(context).pop(true);
+                        },
+                        onFix: notifier.fix,
+                        onClose: () =>
+                            Navigator.of(context).pop(state.featureShipped),
+                      ),
+                    if (state.phase == RunPhase.failed ||
+                        state.phase == RunPhase.stopped)
+                      _FailedBar(
+                        error: state.error,
+                        stopped: state.phase == RunPhase.stopped,
+                        onRetry: () {
+                          notifier.reset();
+                          Future.microtask(() => notifier.start(widget.brief));
+                        },
+                        onClose: () => Navigator.of(context).pop(false),
+                      ),
+                    // Always-available vibecode prompt.
+                    _VibeInput(
+                      busy: state.phase.isBusy,
+                      onSend: notifier.steer,
+                    ),
+                  ],
+                ),
+              ),
+              Container(width: 1, color: const Color(0xFF1C1C1E)),
+              SizedBox(
+                width: 260,
+                child: _Timeline(state: state, onUndo: notifier.undo),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The persistent "vibecode" prompt at the bottom of the build window — type an
+/// instruction any time the agent is idle and it re-plans. Like Claude Code's
+/// input box.
+class _VibeInput extends StatefulWidget {
+  const _VibeInput({required this.busy, required this.onSend});
+  final bool busy;
+  final ValueChanged<String> onSend;
+
+  @override
+  State<_VibeInput> createState() => _VibeInputState();
+}
+
+class _VibeInputState extends State<_VibeInput> {
+  final _c = TextEditingController();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  void _send() {
+    final t = _c.text.trim();
+    if (t.isEmpty || widget.busy) return;
+    widget.onSend(t);
+    _c.clear();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0F0F10),
+        border: Border(top: BorderSide(color: Color(0xFF1C1C1E))),
+      ),
+      child: Row(
         children: [
           Expanded(
-            flex: 3,
-            child: Column(
-              children: [
-                Expanded(
-                  child: _Console(
-                    lines: state.console,
-                    controller: _scroll,
-                    running: !state.phase.isTerminal,
-                    collapsed: _collapsedThinking,
-                    onToggleBlock: (i) => setState(() {
-                      _collapsedThinking.contains(i)
-                          ? _collapsedThinking.remove(i)
-                          : _collapsedThinking.add(i);
-                    }),
-                  ),
+            child: TextField(
+              controller: _c,
+              enabled: !widget.busy,
+              onSubmitted: (_) => _send(),
+              style:
+                  const TextStyle(fontSize: 12.5, color: Color(0xFFE5E5E7)),
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: widget.busy
+                    ? 'Working… press Esc to stop'
+                    : 'Message the AI — what should it build or change next?',
+                hintStyle: const TextStyle(
+                    color: Color(0xFF6B7280), fontSize: 12.5),
+                filled: true,
+                fillColor: const Color(0xFF0A0A0B),
+                border: const OutlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF2C2C2E)),
                 ),
-                if (state.phase == RunPhase.awaitingApproval &&
-                    state.plan != null)
-                  _ApprovalPanel(
-                    state: state,
-                    onToggleEdit: notifier.toggleEdit,
-                    onToggleCommand: notifier.toggleCommand,
-                    onApply: notifier.applyAndRun,
-                    onRevise: notifier.revise,
-                    onEditContent: notifier.editProposedContent,
-                    onEditCommand: notifier.editProposedCommand,
-                  ),
-                if (state.phase == RunPhase.done)
-                  _DoneBar(
-                    alreadyShipped: state.featureShipped,
-                    canFix: state.canFix,
-                    onShip: () {
-                      notifier.markFeatureShipped();
-                      Navigator.of(context).pop(true);
-                    },
-                    onFix: notifier.fix,
-                    onClose: () =>
-                        Navigator.of(context).pop(state.featureShipped),
-                  ),
-                if (state.phase == RunPhase.failed ||
-                    state.phase == RunPhase.stopped)
-                  _FailedBar(
-                    error: state.error,
-                    stopped: state.phase == RunPhase.stopped,
-                    onRetry: () {
-                      notifier.reset();
-                      Future.microtask(() => notifier.start(widget.brief));
-                    },
-                    onClose: () => Navigator.of(context).pop(false),
-                  ),
-              ],
+                enabledBorder: const OutlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF2C2C2E)),
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              ),
             ),
           ),
-          Container(width: 1, color: const Color(0xFF1C1C1E)),
-          SizedBox(
-            width: 260,
-            child: _Timeline(state: state, onUndo: notifier.undo),
+          const SizedBox(width: 8),
+          FilledButton(
+            onPressed: widget.busy ? null : _send,
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            ),
+            child: const Icon(Icons.arrow_upward, size: 18),
           ),
         ],
       ),
@@ -465,7 +560,6 @@ class _ApprovalPanel extends StatefulWidget {
     required this.onToggleEdit,
     required this.onToggleCommand,
     required this.onApply,
-    required this.onRevise,
     required this.onEditContent,
     required this.onEditCommand,
   });
@@ -474,7 +568,6 @@ class _ApprovalPanel extends StatefulWidget {
   final ValueChanged<int> onToggleEdit;
   final ValueChanged<int> onToggleCommand;
   final VoidCallback onApply;
-  final ValueChanged<String> onRevise;
   final void Function(int index, String content) onEditContent;
   final void Function(int index, String raw, String human) onEditCommand;
 
@@ -483,21 +576,6 @@ class _ApprovalPanel extends StatefulWidget {
 }
 
 class _ApprovalPanelState extends State<_ApprovalPanel> {
-  final _revise = TextEditingController();
-
-  @override
-  void dispose() {
-    _revise.dispose();
-    super.dispose();
-  }
-
-  void _submitRevise() {
-    final text = _revise.text.trim();
-    if (text.isEmpty) return;
-    widget.onRevise(text);
-    _revise.clear();
-  }
-
   /// Opens a full editor on a proposed file so the user can hand-tweak the
   /// content before applying.
   Future<void> _editContent(int index) async {
@@ -667,37 +745,6 @@ class _ApprovalPanelState extends State<_ApprovalPanel> {
                   ),
               ],
             ),
-          ),
-          // Steer the AI: type an instruction and it re-plans.
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-            child: Row(children: [
-              Expanded(
-                child: TextField(
-                  controller: _revise,
-                  onSubmitted: (_) => _submitRevise(),
-                  style: const TextStyle(fontSize: 12.5, color: Color(0xFFE5E5E7)),
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    hintText: 'Tell the AI what to change…',
-                    hintStyle: TextStyle(color: Color(0xFF6B7280), fontSize: 12.5),
-                    filled: true,
-                    fillColor: Color(0xFF0A0A0B),
-                    border: OutlineInputBorder(
-                      borderSide: BorderSide(color: Color(0xFF2C2C2E)),
-                    ),
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                onPressed: _submitRevise,
-                icon: const Icon(Icons.autorenew, size: 16),
-                label: const Text('Revise'),
-              ),
-            ]),
           ),
           Padding(
             padding: const EdgeInsets.all(12),

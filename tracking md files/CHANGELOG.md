@@ -2,6 +2,14 @@
 
 ---
 
+## v0.4.4 — 2026-09-11
+
+- **Vibecode in the app** — the Build window now has a **persistent prompt box** at the bottom (like Claude Code): type an instruction any time the agent is idle (awaiting approval, or after a run finished/failed) and it re-plans with your message. Replaces the phase-limited "Revise" box.
+- **Esc to interrupt** — pressing Escape stops the running task, like Ctrl-C in a terminal.
+- **Re-edit shipped features** — "Build with AI" is now available on shipped features too (labelled "Re-build / edit with AI"), so a finished feature can be re-opened and edited/extended instead of being locked.
+
+---
+
 ## v0.4.3 — 2026-09-10
 
 - **Build with AI now edits via targeted find/replace hunks, not full-file rewrites.** The model returns small `{find, replace}` hunks (exact snippets) for existing files and only returns full `content` for brand-new files. This fixes at the root both the truncation-driven "did not return valid JSON" failures (BUG-IMPL-004 — the model was asked to reproduce a whole file it only saw the first 6k chars of) and the full-file-rewrite corruption that dropped code (BUG-IMPL-003). Files are now read at a much larger cap (24k/file, 90k total) so hunks match reliably. Unlocatable hunks are skipped with a note instead of failing the run.

@@ -151,14 +151,16 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     await _plan();
   }
 
-  /// Re-plans from the current plan plus the user's steering instruction — the
-  /// "tell the AI what to change" path.
-  Future<void> revise(String feedback) async {
-    if (_brief == null || state.plan == null) return;
-    if (state.phase != RunPhase.awaitingApproval) return;
-    if (feedback.trim().isEmpty) return;
-    _log(ConsoleLineKind.command, '↻ Revise: ${feedback.trim()}');
-    await _plan(previousPlan: state.plan, feedback: feedback.trim());
+  /// The always-available "vibecode" input: steer the AI with a free-text
+  /// instruction. Works whenever the agent is idle between actions — awaiting
+  /// approval, or after a run finished/failed/was stopped. A fresh planning
+  /// round folds the instruction (and the current plan, if any) into context.
+  Future<void> steer(String message) async {
+    final m = message.trim();
+    if (m.isEmpty || _brief == null) return;
+    if (state.phase.isBusy) return; // can't steer mid-work — Stop first
+    _log(ConsoleLineKind.command, '▸ $m');
+    await _plan(previousPlan: state.plan, feedback: m);
   }
 
   /// Shared planning body used by both [start] and [revise].
