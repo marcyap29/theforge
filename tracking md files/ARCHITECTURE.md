@@ -394,7 +394,7 @@ The Forge's first hands-on-keyboard mode: an in-app agent that implements a trac
 | Layer | File | Responsibility |
 |---|---|---|
 | **Models** | `models/run_session.dart` | `RunPhase`, `ConsoleLine` (kinds incl. `thinking` / `presentation`), `ProposedEdit`, `ProposedCommand`, `AgentPlan`, `ImplRunState` |
-| **Brains** | `data/impl_agent.dart` | Two-pass scout → plan LLM pipeline; revision block for modify-plan / fix |
+| **Brains** | `data/impl_agent.dart` | Two-pass scout → plan LLM pipeline; revision block for modify-plan / fix; `buildUserContext` (public/static) assembles the always-on block incl. the ingested reference-context slot, with visible over-budget trim markers |
 | **Hands (repo)** | `data/impl_workspace.dart` | Gather repo files + `gatherKeyDocs`, apply edits with `.forge/impl_backups/` Undo, checklist verify |
 | **Hands (shell)** | `data/command_runner.dart` | `Process.start` streamed subprocess + denylist + 3-min timeout — the FIRST streamed subprocess in the app |
 | **Conductor** | `providers/implementation_notifier.dart` | keepAlive per-feature run state machine; `_plan` shared by start / revise / fix; generation counter for stale-stream safety |
@@ -404,7 +404,7 @@ The Forge's first hands-on-keyboard mode: an in-app agent that implements a trac
 
 ### Propose → approve → verify loop
 
-1. **Scout** — pass one reads the repo (`gatherKeyDocs` + file gather) and the feature's tracker context; the agent narrates its understanding (streamed as `thinking` / `presentation` lines).
+1. **Scout** — pass one reads the repo (`gatherKeyDocs` + file gather), the feature's tracker context, and the project's **ingested reference context** (`.forge/ingested/reference_context.md`, re-read each round by `_plan` — the same pool the interview/spec use); the agent narrates its understanding (streamed as `thinking` / `presentation` lines).
 2. **Plan** — pass two produces an `AgentPlan`: an ordered set of `ProposedEdit`s and `ProposedCommand`s. The model returns targeted **find/replace hunks** for existing files (full `content` only for brand-new files); the parser applies the hunks to the current file to compute the new content, so untouched code is never re-emitted (roots out the whole-file-rewrite drop, BUG-IMPL-003). Edits are shown as an LCS diff.
 3. **Approve** — nothing touches disk until the user approves. The user can approve, **edit** the plan, or **revise** it (free-text feedback → re-plan via the shared revision block).
 4. **Apply** — approved edits are written; the prior file contents are backed up to `.forge/impl_backups/` so any change is one-click **Undo**-able. Approved commands run through `command_runner` (streamed, denylisted, timed out).

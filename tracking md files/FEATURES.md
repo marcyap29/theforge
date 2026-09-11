@@ -45,6 +45,7 @@
 | Feature | Status | Notes |
 |---|---|---|
 | Build with AI (implementation agent) | Shipped v0.4.0 | `lib/features/implementation/**`; two-pass scout→plan, propose-approve-verify, streamed build window |
+| Ingested reference context in builds | Shipped v0.4.8 | Builder reads `.forge/ingested/reference_context.md` (same pool as interview/spec) each planning round; always-on `## Reference context` slot in `ImplAgent.buildUserContext`; console shows `Loaded reference context (~N words)`; visible over-budget trim markers; spec cap 6k→12k |
 | Live reasoning streaming | Shipped v0.4.0 | `LlmService.completeStream` + `LlmDelta{text, thinking}`; Ollama/Claude/OpenAI real streaming; reasoning shown in collapsible `thinking` console line |
 | Modify-plan (edit / revise) | Shipped v0.4.0 | Edit the proposed plan inline or revise via free-text feedback → re-plan through shared revision block |
 | Fix-on-failure | Shipped v0.4.0 | Verify failure (e.g. `dart analyze`) routes back through `_plan` in fix mode for a corrective plan |

@@ -34,6 +34,7 @@ class ImplAgent {
     required String repoPath,
     String? lockedSpec,
     String? goalStatement,
+    String? ingestedContext,
     List<String> components = const [],
     AgentPlan? previousPlan,
     String? feedback,
@@ -42,12 +43,13 @@ class ImplAgent {
   }) async {
     final files = await ImplWorkspace.gatherRepoFiles(repoPath);
     final keyDocs = await ImplWorkspace.gatherKeyDocs(repoPath);
-    var context = _userPrompt(
+    var context = buildUserContext(
       featureTitle: featureTitle,
       featureDescription: featureDescription,
       targetVersion: targetVersion,
       lockedSpec: lockedSpec,
       goalStatement: goalStatement,
+      ingestedContext: ingestedContext,
       components: components,
       files: files,
       keyDocs: keyDocs,
@@ -253,12 +255,27 @@ it). The JSON must be a single top-level object with no code fences:
 }
 ''';
 
-  String _userPrompt({
+  /// Trims [s] to [cap] characters, appending a VISIBLE marker when it must cut
+  /// so the user (and the model) can see context was dropped, rather than losing
+  /// it silently. The old code hard-cut the spec at 6k chars with no signal.
+  static String _cap(String s, int cap, {required String what}) {
+    if (s.length <= cap) return s;
+    final dropped = s.length - cap;
+    return '${s.substring(0, cap)}\n'
+        '…($what trimmed — $dropped chars dropped; move the load-bearing detail '
+        'to the top of the spec or a reference doc)';
+  }
+
+  /// Builds the always-on context block the plan is grounded in: the feature,
+  /// project goal, locked spec, ingested reference docs, project documentation,
+  /// and the repo file list. Public + static so it can be unit-tested directly.
+  static String buildUserContext({
     required String featureTitle,
     String? featureDescription,
     String? targetVersion,
     String? lockedSpec,
     String? goalStatement,
+    String? ingestedContext,
     List<String> components = const [],
     required List<String> files,
     String? keyDocs,
@@ -283,9 +300,19 @@ it). The JSON must be a single top-level object with no code fences:
         ..writeln();
     }
     if (lockedSpec != null && lockedSpec.trim().isNotEmpty) {
-      var spec = lockedSpec.trim();
-      if (spec.length > 6000) spec = '${spec.substring(0, 6000)}\n…(truncated)';
-      b..writeln('## Locked spec (context)')..writeln(spec)..writeln();
+      b
+        ..writeln('## Locked spec (context)')
+        ..writeln(_cap(lockedSpec.trim(), 12000, what: 'spec'))
+        ..writeln();
+    }
+    // The ingested reference pool — the SAME context the interview and spec
+    // stages already use. Wiring it in here is what stops the builder from
+    // starting cold on every feature.
+    if (ingestedContext != null && ingestedContext.trim().isNotEmpty) {
+      b
+        ..writeln('## Reference context (ingested documents)')
+        ..writeln(_cap(ingestedContext.trim(), 12000, what: 'reference context'))
+        ..writeln();
     }
     if (keyDocs != null && keyDocs.trim().isNotEmpty) {
       b

@@ -4,6 +4,31 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-11 — Claude Code [Wire ingested reference context into Build-with-AI — v0.4.8]
+
+**Branch:** main · **App:** v0.4.8
+
+### Why
+Marc is starting `ar_mechanic` from scratch with The Forge and wasn't sure a feature build actually receives the full context of what he wants when older documents are present. Investigation confirmed the gap: the ingested reference pool (`.forge/ingested/reference_context.md`) was read by the **interview** (`interview_notifier.dart`) and **spec generation** (`spec_notifier.dart`) but **never by the build agent** (`impl_agent.dart`). The builder started cold on every feature — locked spec (silently truncated at 6k), a fixed key-doc whitelist, and the code file list only. No RAG/embeddings exist anywhere; retrieval is the LLM "scout" pass over the file list.
+
+### Decision (agreed with Marc)
+First pass = **Layer 3 only**: always-on core + scouted extras; **no embeddings yet** (LLM scout is already a retrieval mechanism); smallest safe change. Feature-build memory (Layer 4), a unified manifest + doc-aware scout (Layers 1–2), and optional embeddings (Layer 5) are deferred.
+
+### Done
+- `impl_agent.dart`: `proposePlan` gains a `String? ingestedContext` param; `_userPrompt` → public static **`buildUserContext`** (now unit-testable) with a new always-on **`## Reference context (ingested documents)`** slot.
+- Replaced the silent 6k spec cut with a shared **`_cap`** helper that appends a visible `…(trimmed — N chars dropped …)` marker; spec cap raised 6k → 12k; reference context capped at 12k with the same visible marker.
+- `implementation_notifier.dart`: `_plan` reads `readIngestedSummary(brief.projectPath)` each round (picks up docs added mid-session), logs `Loaded reference context (~N words)` (or a nudge when empty), and passes it into `proposePlan`. New import: `projects/providers/providers.dart`.
+- New test `test/impl_agent_test.dart` (4 cases): reference slot present/absent, visible over-budget trim for both reference context and spec.
+
+### Verification
+`dart analyze lib/` clean · `flutter test` **19/19** green.
+
+### Next
+- Layer 4: after a build ships, write a durable "what we built + why" record back into the pool so future features retrieve it ("gained + remains").
+- Layers 1–2: unify specs/handoffs/past features into one manifest and extend the scout to select doc-pool entries, not just code files.
+
+---
+
 ## Session: 2026-09-11 — Claude Code [Build-with-AI compose screen + action buttons — v0.4.7]
 
 **Branch:** main · **App:** v0.4.7

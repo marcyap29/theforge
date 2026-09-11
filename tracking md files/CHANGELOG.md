@@ -2,6 +2,14 @@
 
 ---
 
+## v0.4.8 — 2026-09-11
+
+- **Builds now start with your reference docs, not just code.** The Build-with-AI agent reads the project's **ingested reference context** — the same document pool the interview and spec stages already use — on every planning round. Previously the builder only saw the locked spec (silently cut at 6k chars), a fixed doc whitelist, and the code file list; the intake docs never reached it. Add docs on the project and they now ground every feature build.
+- **You can see the context load.** The build console prints `Loaded reference context (~N words)` (or a nudge to add docs if the pool is empty), so it's no longer a mystery whether the app had your context.
+- **No more silent truncation.** Over-budget spec/reference context is now marked with a visible `…(trimmed — N chars dropped)` note instead of being cut without warning, and the spec cap was raised from 6k to 12k chars.
+
+---
+
 ## v0.4.7 — 2026-09-11
 
 - **Build with AI no longer auto-runs.** Opening the window now shows a **compose screen** with on-screen hints — nothing is sent to the AI until you choose. Type what you want done in the prompt box (pre-filled with the feature's description) and press ↑, or use the new right-side **action buttons**.

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/filesystem/project_file_repository.dart';
 import '../../../services/llm/llm_provider.dart';
 import '../../../services/llm/llm_service_provider.dart';
+import '../../projects/providers/providers.dart';
 import '../data/command_runner.dart';
 import '../data/impl_agent.dart';
 import '../data/impl_workspace.dart';
@@ -206,6 +207,25 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     _streamStarted = false;
     _partialKind = ConsoleLineKind.thinking;
     _phase(RunPhase.planning);
+
+    // Load the project's ingested reference context — the SAME pool the
+    // interview and spec stages already read — so the build starts with the
+    // intake docs, not just code. Re-read each round so docs added mid-session
+    // are picked up, and surface a line so the user can SEE context was loaded.
+    String? ingestedContext;
+    try {
+      ingestedContext = await ref
+          .read(projectFileRepositoryProvider)
+          .readIngestedSummary(brief.projectPath);
+    } catch (_) {}
+    if (ingestedContext != null && ingestedContext.trim().isNotEmpty) {
+      final words = ingestedContext.trim().split(RegExp(r'\s+')).length;
+      _log(ConsoleLineKind.info, 'Loaded reference context (~$words words)');
+    } else {
+      _log(ConsoleLineKind.info,
+          'No reference context yet — add docs on the project to ground builds.');
+    }
+
     _log(ConsoleLineKind.info, 'Waiting for the model to respond…');
 
     // Reassure the user while we wait for the first streamed token — a large
@@ -230,6 +250,7 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
         repoPath: brief.repoPath,
         lockedSpec: brief.lockedSpec,
         goalStatement: brief.goalStatement,
+        ingestedContext: ingestedContext,
         components: brief.components,
         previousPlan: previousPlan,
         feedback: feedback,
