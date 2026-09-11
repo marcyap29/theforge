@@ -30,5 +30,5 @@ Records go in `bugtracker/records/` — one file per bug.
 | BUG-LLM-001 | LLM | Reasoning models (glm-5.3, gpt-oss:120b) stream chain-of-thought in `message.thinking` with empty `content`; console sat on "Planning…" — now surface typed content+thinking deltas + wait-heartbeat | 2026-09-10 |
 | BUG-IMPL-001 | IMPL | Stop during planning + "Try again" crashed build window — uncancellable stream's stale continuation raced restarted run; added generation counter `_gen` + empty-console guard | 2026-09-10 |
 | BUG-IMPL-002 | IMPL | "Apply & Run" quit the whole app — unbounded console growth, no command denylist/timeout, unguarded `applyAndRun`; capped 5000 lines + denylist + 3-min timeout + wrap | 2026-09-10 |
-| BUG-IMPL-003 | IMPL | "Build with AI" full-file rewrite dropped ~345 lines / gutted code so it wouldn't compile — full-file edits can omit code; two-pass read-then-edit + preserve instruction + Undo (Mitigated) | 2026-09-10 |
+| BUG-IMPL-003 | IMPL | "Build with AI" full-file rewrite dropped ~345 lines / wouldn't compile — root-fixed in v0.4.3 by switching to find/replace hunks (untouched code never re-emitted) | 2026-09-10 |
 | BUG-IMPL-004 | IMPL | Build with AI "Planning failed: did not return valid JSON" — reasoning model spent the turn thinking; unmanaged Ollama generation; forced JSON-only + num_predict + bigger budget + auto-retry | 2026-09-10 |

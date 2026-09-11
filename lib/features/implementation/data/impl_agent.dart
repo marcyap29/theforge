@@ -68,14 +68,17 @@ class ImplAgent {
     final wanted = _parseFileList(scoutRaw);
 
     // Read the chosen files (bounded) so Pass 2 edits real code, not guesses.
+    // Files are given whole up to a generous cap — a truncated file makes the
+    // model's find/replace hunks miss (or, worse under full-file mode, drop
+    // code), so we keep as much as the budget allows.
     final readFiles = <String, String>{};
-    var budget = 40000;
+    var budget = 90000;
     for (final rel in wanted) {
       if (readFiles.length >= 12 || budget <= 0) break;
       final content = await ImplWorkspace.readRepoFile(repoPath, rel);
       if (content.isEmpty) continue;
       var c = content;
-      if (c.length > 6000) c = '${c.substring(0, 6000)}\n…(truncated)';
+      if (c.length > 24000) c = '${c.substring(0, 24000)}\n…(truncated)';
       if (c.length > budget) c = c.substring(0, budget);
       readFiles[rel] = c;
       budget -= c.length;
@@ -210,14 +213,20 @@ non-interactive build/test/dependency steps (e.g. install deps, run tests).
 Never propose destructive commands (rm -rf, git reset --hard, force-push).
 
 Use the provided project DOCUMENTATION (README, architecture, agent guide) and
-the SPEC to follow the codebase's existing structure and conventions. When
-CURRENT FILE CONTENTS are provided, base your edits on that exact code —
-preserve everything you are not intentionally changing (do not drop imports,
-methods, or unrelated code); return the COMPLETE updated file.
+the SPEC to follow the codebase's existing structure and conventions.
 
-You already have all the files you are going to get. Do NOT ask to open more
-files and do NOT stop to explain — if a detail is uncertain, make your best
-reasonable choice and proceed. Your entire final answer MUST be the JSON object.
+HOW TO EDIT — do NOT rewrite whole files. For each EXISTING file you change,
+return a small set of "hunks". Each hunk's "find" is an EXACT, verbatim copy of
+a snippet that currently exists in that file (copy it character-for-character,
+including whitespace, and include enough surrounding lines to be UNIQUE within
+the file); "replace" is the new text that should take its place. Change only
+what is needed. For a brand-NEW file, return "content" (the whole file) instead
+of hunks. Never return whole-file "content" for a file that already exists.
+
+You already have all the files you are going to get (their CURRENT contents are
+provided below). Do NOT ask to open more files and do NOT stop to explain — if a
+detail is uncertain, make your best reasonable choice and proceed. Your entire
+final answer MUST be the JSON object.
 
 First, briefly narrate your plan in 1-3 short sentences of plain English so the
 user can follow your thinking. THEN output the JSON object (and nothing after
@@ -226,7 +235,10 @@ it). The JSON must be a single top-level object with no code fences:
   "summary": "ONE short sentence telling the user what you will do",
   "rationale": "one short paragraph on your approach",
   "edits": [
-    {"path": "repo/relative/path.ext", "rationale": "why", "content": "FULL new file content"}
+    {"path": "lib/existing.dart", "rationale": "why",
+     "hunks": [{"find": "exact snippet copied from the file", "replace": "new snippet"}]},
+    {"path": "lib/brand_new_file.dart", "rationale": "why",
+     "content": "FULL content of the NEW file"}
   ],
   "commands": [
     {"human": "plain-English description", "raw": "exact command line"}
@@ -299,16 +311,52 @@ it). The JSON must be a single top-level object with no code fences:
     for (final e in (decoded['edits'] as List?) ?? const []) {
       if (e is! Map) continue;
       final path = (e['path'] ?? '').toString().trim();
-      final content = e['content']?.toString();
-      if (path.isEmpty || content == null) continue;
+      if (path.isEmpty) continue;
       // Never let the model write outside the linked repo.
       if (!ImplWorkspace.isPathSafe(repoPath, path)) continue;
       final oldContent = await ImplWorkspace.readRepoFile(repoPath, path);
+      var rationale = (e['rationale'] ?? '').toString().trim();
+      final content = e['content']?.toString();
+      final hunks = e['hunks'] as List?;
+
+      String newContent;
+      if (oldContent.isEmpty) {
+        // New file: full content required.
+        if (content == null || content.isEmpty) continue;
+        newContent = content;
+      } else if (hunks != null && hunks.isNotEmpty) {
+        // Existing file: apply exact-match find/replace hunks.
+        newContent = oldContent;
+        var missed = 0;
+        for (final h in hunks) {
+          if (h is! Map) continue;
+          final find = h['find']?.toString();
+          final replace = h['replace']?.toString() ?? '';
+          if (find == null || find.isEmpty) continue;
+          if (newContent.contains(find)) {
+            newContent = newContent.replaceFirst(find, replace);
+          } else {
+            missed++;
+          }
+        }
+        if (newContent == oldContent) continue; // nothing applied — drop it
+        if (missed > 0) {
+          rationale = rationale.isEmpty
+              ? '$missed change(s) could not be located and were skipped'
+              : '$rationale (note: $missed change(s) could not be located)';
+        }
+      } else if (content != null && content.isNotEmpty) {
+        // Fallback: the model returned whole-file content for an existing file.
+        newContent = content;
+      } else {
+        continue;
+      }
+
       edits.add(ProposedEdit(
         path: path,
-        rationale: (e['rationale'] ?? '').toString().trim(),
+        rationale: rationale,
         oldContent: oldContent,
-        newContent: content,
+        newContent: newContent,
       ));
     }
 

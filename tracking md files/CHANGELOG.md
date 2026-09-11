@@ -2,6 +2,13 @@
 
 ---
 
+## v0.4.3 — 2026-09-10
+
+- **Build with AI now edits via targeted find/replace hunks, not full-file rewrites.** The model returns small `{find, replace}` hunks (exact snippets) for existing files and only returns full `content` for brand-new files. This fixes at the root both the truncation-driven "did not return valid JSON" failures (BUG-IMPL-004 — the model was asked to reproduce a whole file it only saw the first 6k chars of) and the full-file-rewrite corruption that dropped code (BUG-IMPL-003). Files are now read at a much larger cap (24k/file, 90k total) so hunks match reliably. Unlocatable hunks are skipped with a note instead of failing the run.
+- The build STEPS timeline no longer shows every step green when a run actually failed.
+
+---
+
 ## v0.4.2 — 2026-09-10
 
 - Fixed Build with AI "Planning failed: did not return valid JSON" (BUG-IMPL-004) on heavy reasoning models — the model spent its turn thinking and never emitted JSON. Ollama now sends `num_predict` (generous ceiling so thinking can't starve the answer), the plan pass budget is larger (8000; scout 4000), the prompt forbids "asking for more files" and forces JSON-only output, and the agent auto-retries once before failing. Tip: prefer an instruction-following/coder model for Build with AI.

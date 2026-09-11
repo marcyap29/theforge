@@ -405,7 +405,7 @@ The Forge's first hands-on-keyboard mode: an in-app agent that implements a trac
 ### Propose → approve → verify loop
 
 1. **Scout** — pass one reads the repo (`gatherKeyDocs` + file gather) and the feature's tracker context; the agent narrates its understanding (streamed as `thinking` / `presentation` lines).
-2. **Plan** — pass two produces an `AgentPlan`: an ordered set of `ProposedEdit`s (full-file rewrites, shown as an LCS diff) and `ProposedCommand`s.
+2. **Plan** — pass two produces an `AgentPlan`: an ordered set of `ProposedEdit`s and `ProposedCommand`s. The model returns targeted **find/replace hunks** for existing files (full `content` only for brand-new files); the parser applies the hunks to the current file to compute the new content, so untouched code is never re-emitted (roots out the whole-file-rewrite drop, BUG-IMPL-003). Edits are shown as an LCS diff.
 3. **Approve** — nothing touches disk until the user approves. The user can approve, **edit** the plan, or **revise** it (free-text feedback → re-plan via the shared revision block).
 4. **Apply** — approved edits are written; the prior file contents are backed up to `.forge/impl_backups/` so any change is one-click **Undo**-able. Approved commands run through `command_runner` (streamed, denylisted, timed out).
 5. **Verify** — `impl_workspace` runs the checklist verify (e.g. `dart analyze`) against the result.

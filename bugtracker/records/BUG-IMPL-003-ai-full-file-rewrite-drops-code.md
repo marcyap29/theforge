@@ -3,7 +3,7 @@
 **ID:** BUG-IMPL-003
 **Area:** IMPL
 **Severity:** High
-**Status:** Mitigated / Open-risk 2026-09-10
+**Status:** Fixed 2026-09-10 (root fix v0.4.3; earlier: Mitigated)
 
 ---
 
@@ -22,20 +22,22 @@ The agent returns the **complete** new file content per edit (reliable to apply,
 but the model can omit or drop code it didn't mean to change). The two-pass loop
 (read the file first) reduces this but does not guarantee it.
 
-## Fix / Mitigation
+## Fix
 
-Two-pass read-then-edit + a "preserve everything you aren't intentionally
-changing" instruction + per-edit Undo; the hand-edit and Revise/Fix loops let
-the user correct it. **Not fully solved** — the model can still drop code on a
-full-file rewrite.
+**Root fix (v0.4.3):** switched the edit mechanism from whole-file rewrites to
+targeted **find/replace hunks**. The model now returns small `{find, replace}`
+snippets for existing files (only brand-new files get full `content`), so
+untouched code is never re-emitted and therefore can never be dropped. A hunk
+whose `find` doesn't match is skipped with a note rather than corrupting the
+file. Also fixed BUG-IMPL-004 (truncation) as a side effect. Earlier mitigations
+still apply: two-pass read-then-edit, per-edit Undo, hand-edit + Revise/Fix.
 
 ## Prevention Rule
 
-See BUG_PREVENTION.md — "Always `dart analyze` (and prefer a build/test) before
-committing anything Build-with-AI produced; never commit AI edits unreviewed.
-Future: switch to diff/patch-based edits and add an automatic post-edit compile
-check."
+See BUG_PREVENTION.md — "Prefer diff/find-replace edits over whole-file
+rewrites, and always `dart analyze` (prefer a build/test) before committing
+anything Build-with-AI produced."
 
 ## Commit
 
-n/a — incident; the corrupted files were reverted, never committed.
+Incident reverted (never committed). Root fix: v0.4.3.

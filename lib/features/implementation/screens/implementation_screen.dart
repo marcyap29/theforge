@@ -994,10 +994,12 @@ class _Timeline extends StatelessWidget {
   }
 
   Widget _stepRow(String label, int index) {
-    final done =
-        _phaseOrder > index + 1 ||
-        (state.phase.isTerminal && state.phase == RunPhase.done);
-    final active = _phaseOrder == index + 1 && !state.phase.isTerminal;
+    // Only a successful finish marks every step done. On failed/stopped the
+    // steps stay grey (not misleadingly green); mid-run, steps before the
+    // current one are done.
+    final done = state.phase == RunPhase.done ||
+        (!state.phase.isTerminal && _phaseOrder > index + 1);
+    final active = !state.phase.isTerminal && _phaseOrder == index + 1;
     final color = done
         ? const Color(0xFF81C784)
         : active
