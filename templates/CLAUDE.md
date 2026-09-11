@@ -1,22 +1,12 @@
-# Claude Context Guide — The Forge
+<!-- TEMPLATE — replace {{PLACEHOLDERS}} and delete this line. Part of the Docs Templates system. -->
 
-**Version:** 1.1.0
-**Last Updated:** 2026-09-11
-**Stack:** Flutter (desktop-first, macOS primary) · drift (SQLite) · BYOK/Ollama-Cloud LLMs
+# Claude Context Guide — {{PROJECT_NAME}}
+
+**Version:** 1.0.0
+**Last Updated:** YYYY-MM-DD
+**Stack:** {{STACK}}
 
 This is the Claude-specific onboarding and SOP file. Non-Claude agents should use `operations md files/startup.md` instead.
-
----
-
-## Standing Rules (always on)
-
-These are non-negotiable defaults for **every** change to this repo — do them without being asked:
-
-1. **Docs ship with code.** Any code change updates ALL affected documentation in the same commit: `bugtracker/` (a record + `BUG_PREVENTION.md` + master index for any bug fixed), `tracking md files/ARCHITECTURE.md`, `FEATURES.md`, `CHANGELOG.md`, `context.md` (session block), `backlog.md`/`planner.md`, `operations md files/CONFIGURATION_MANAGEMENT.md`, and any overview (`DOCS/THE_FORGE_CONTEXT.md`).
-2. **A feature is only "done" when its docs are updated, committed, and pushed.** When a feature is implemented / marked shipped: bump `CHANGELOG.md`, mark it ✅ in `backlog.md`, add the `FEATURES.md` row, update `ARCHITECTURE.md` if the shape changed, prepend a `context.md` block → then `git commit` + `git push origin main`.
-3. **Use the templates.** New docs (and new repos seeded from The Forge) follow the reusable scaffold in **`templates/`** (the generalized version of this doc system). Pull structure from there rather than improvising.
-4. **Never commit un-analyzed code.** `dart analyze lib/` clean + `flutter test` green before committing — especially anything Build-with-AI produced (it can drop code).
-5. **Commit trailer:** end messages with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
 ---
 
@@ -108,7 +98,6 @@ PROMPT RECEIVED
 ┌─────────────────────────────────────────────────────────────────┐
 │ STEP 3D — DOCUMENT                                              │
 │                                                                 │
-│  Read:  agents md files/agents_doc_backup.md                   │
 │  Do:    Update CONFIGURATION_MANAGEMENT.md after doc changes    │
 │  Do:    Archive deprecated content; append session block        │
 └─────────────────────────────────────────────────────────────────┘
@@ -116,7 +105,6 @@ PROMPT RECEIVED
 ┌─────────────────────────────────────────────────────────────────┐
 │ STEP 3E — AUDIT                                                 │
 │                                                                 │
-│  Read:  agents md files/agents_devsecops.md                    │
 │  Read:  agents md files/SECURITY_CHECKLIST.md                  │
 └─────────────────────────────────────────────────────────────────┘
       │
@@ -126,16 +114,16 @@ PROMPT RECEIVED
 │                                                                 │
 │  Read every file before touching it (use the Read tool)        │
 │  Implement against the plan; check Key Invariants while coding  │
-│  Resolve ambiguity before writing code, not after              │
+│  Resolve ambiguity before writing code, not after               │
 └─────────────────────────────────────────────────────────────────┘
       │
       ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ STEP 5 — REVIEW (do not skip any item)                          │
 │                                                                 │
-│  Linter:  dart analyze lib/[affected directory]/                │
+│  Linter:  {{LINT_COMMAND}}                                      │
 │           zero new warnings or errors from your changes         │
-│  Tests:   flutter test (affected area); fix any failures caused │
+│  Tests:   {{TEST_COMMAND}} (affected area); fix failures caused │
 │  Verify:  check each item in the STEP 2.5 definition of done    │
 │  Done?    confirm every user-requested function actually works  │
 └─────────────────────────────────────────────────────────────────┘
@@ -148,7 +136,7 @@ PROMPT RECEIVED
 │  Update: tracking md files/planner.md → cross off tasks         │
 │  Update: tracking md files/backlog.md → mark shipped items ✅   │
 │  Update: operations md files/CONFIGURATION_MANAGEMENT.md        │
-│  Write:  DOCS/Coding Lessons/FOR_MARC_[topic].md                │
+│  Write:  DOCS/Coding Lessons/FOR_{{OWNER}}_[topic].md           │
 │          → after any significant task (investigation, plan,     │
 │            fix, feature). Follow the 9-step format in           │
 │            DOCS/Coding Lessons/README.md.                       │
@@ -172,9 +160,10 @@ PROMPT RECEIVED
 | **ARCHITECTURE.md** | System architecture | `tracking md files/ARCHITECTURE.md` |
 | **CONFIGURATION_MANAGEMENT.md** | Docs inventory and change log | `operations md files/CONFIGURATION_MANAGEMENT.md` |
 | **BUG_PREVENTION.md** | Check before coding in risky areas | `bugtracker/BUG_PREVENTION.md` |
-| **backend.md** | Firebase + SwarmSpace API reference | `backend.md` |
+| **backend.md** | Backend / external API reference | `backend.md` |
 | **llm_tier_field_guide.md** | Tier-based guidance for sub-agents | `agents md files/llm_tier_field_guide.md` |
-| **templates/** | Reusable doc/config scaffold (seed new projects; keep this system in sync) | `templates/` |
+
+<!-- Add project-specific rows here as you create docs. Delete rows for docs you don't use. -->
 
 ---
 
@@ -190,57 +179,48 @@ PROMPT RECEIVED
 
 ---
 
-## Learning Collaboration — How to Work With Marc
+## Learning Collaboration — How to Work With {{OWNER}}
 
-Marc learns by example and by understanding nuance — not by reading theory. Treat every session as if you have **four hours** to teach the 80/20 of what matters. These rules apply whenever Marc is in the room.
+<!-- Keep this section if the project owner wants to learn alongside you; delete it otherwise. -->
 
-**1. Think out loud.**
-Before touching a file, narrate your reasoning in plain English. Not "I will edit `interview_notifier.dart`" — but *why* you're touching it, what problem it solves, and what tradeoff you made choosing this approach over alternatives. One sentence is enough; silence is not.
+{{OWNER}} learns by example and by understanding nuance — not by reading theory. Treat every session as if you have **four hours** to teach the 80/20 of what matters. These rules apply whenever {{OWNER}} is in the room.
+
+**1. Think out loud.** Before touching a file, narrate your reasoning in plain English — *why* you're touching it, what problem it solves, and what tradeoff you made choosing this approach. One sentence is enough; silence is not.
 
 **2. Scale the explanation to the task.**
 - Complex multi-file change → explain the architecture and the key decision, then implement.
-- Small, self-contained change → explain what you're doing AND ask Marc to either write the code himself or explain the principle back to you before you write it.
+- Small, self-contained change → explain what you're doing AND ask {{OWNER}} to write it or explain the principle back before you write it.
 - Trivial one-liner → just name what the line does and why it belongs here.
 
-**3. Ask Marc to try first on simple tasks.**
-If the task is something a junior developer could handle — a widget tweak, a state variable, a simple parser — pause and say: *"Want to take a crack at this? Here's the shape of what we need…"* Then give him enough context to attempt it.
+**3. Ask {{OWNER}} to try first on simple tasks.** If a junior dev could handle it, pause: *"Want to take a crack at this? Here's the shape of what we need…"*
 
-**4. When Marc attempts something:**
-- If correct: affirm specifically what he got right and why it works.
-- If close but wrong: don't rewrite it — point to the exact line or concept that needs adjustment and ask him to fix it.
-- If wrong: give a small working example of the correct pattern (ideally from this codebase), then ask him to apply it to the specific case.
+**4. When {{OWNER}} attempts something:** affirm what's right and why; if close-but-wrong, point to the exact line to adjust; if wrong, give a small working example from this codebase, then ask them to apply it.
 
-**5. Name the pattern, not just the fix.**
-After solving any non-trivial problem, name the underlying principle in one sentence. Examples: *"This is the 'lift state up' pattern — the widget that needs the data owns it, not the child that displays it."* or *"We made the Column a child of the Row's Column instead of inside the Row itself — same principle as keeping wide widgets out of flex layouts."* Named patterns stick; anonymous fixes don't.
+**5. Name the pattern, not just the fix.** After solving a non-trivial problem, name the underlying principle in one sentence. Named patterns stick; anonymous fixes don't.
 
-**6. The 80/20 rule.**
-Focus on the concepts that recur across 80% of tasks: state ownership, widget tree layout, async/await and when it matters, provider patterns, and the read-before-write discipline. Don't deep-dive into edge cases unless Marc explicitly asks — teach the main road first.
+**6. The 80/20 rule.** Focus on concepts that recur across 80% of tasks. Teach the main road first; deep-dive edge cases only when asked.
 
 ---
 
 ## Key Invariants
 
-- **Locked specs are immutable.** Once written, a locked spec is never modified. Amendments produce a new versioned spec. Never overwrite.
-- **No executor starts without a complete project folder.** The `README.md`, locked spec, bullet handoff, and setup worksheet must all exist before any executor agent is invoked.
-- **Firestore writes are append-only for audit trail.** The `/audit/` subcollection is never modified — only appended. Same pattern as CHRONICLE.
-- **Secrets are never hardcoded.** Firebase config, API keys, and SwarmSpace tokens are read from environment variables or `.env` files that are gitignored.
-- **`dart analyze` must be clean.** Zero new warnings or errors before reporting done.
-- **A feature isn't done until its docs are updated, committed, and pushed** (Standing Rules #1–2). Every implemented/shipped feature updates the docs (via `templates/`) in the same commit, then pushes.
-- **Interview state lives in the Flutter app.** Do not push mid-interview state to Firestore — only write on phase completion (spec locked, worksheet complete, handoff generated).
+<!-- List the non-negotiable rules for THIS project. These are the guardrails an agent must never violate. Examples below — replace with your own. -->
+
+- **{{Invariant 1}}** — {{why it must hold; what breaks if violated}}.
+- **Secrets are never hardcoded.** Config, API keys, and tokens are read from environment variables or gitignored files.
+- **`{{LINT_COMMAND}}` must be clean.** Zero new warnings or errors before reporting done.
 
 ---
 
 ## Conditional File Triggers
 
+<!-- Map "when I'm about to touch X, read Y first." Replace rows with your project's risky areas. -->
+
 | Situation | Files to read |
 |---|---|
-| Touching Firestore schema or data layer | `backend.md`, `bugtracker/BUG_PREVENTION.md` |
-| Touching interview logic or confidence dimensions | `DOCS/forge/workflow_template.md` |
-| Touching spec generation (Firebase Function) | `backend.md`, `bugtracker/BUG_PREVENTION.md` |
+| Touching the data layer / schema | `backend.md`, `bugtracker/BUG_PREVENTION.md` |
 | Touching UI / UX | `tracking md files/UI_UX.md` |
 | Touching auth or billing | `bugtracker/BUG_PREVENTION.md`, `agents md files/SECURITY_CHECKLIST.md` |
-| Refactoring / simplifying | `agents md files/agents_code_simplifier.md` |
-| Bugtracker work | `agents md files/agents_bugtracker.md`, `bugtracker/BUGTRACKER_MASTER_INDEX.md` |
 | Assigning work to an external agent | `agents md files/agent_scoping.md`, `agents md files/llm_tier_field_guide.md` |
 
 ---
@@ -259,4 +239,4 @@ Focus on the concepts that recur across 80% of tasks: state ownership, widget tr
 
 ---
 
-*Version 1.0.0 — Initial setup from Starter Repo. The Forge — Orbital AI.*
+*Version 1.0.0 — Initialized from the Docs Templates system.*
