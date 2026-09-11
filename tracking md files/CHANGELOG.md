@@ -2,6 +2,25 @@
 
 ---
 
+## v0.4.0 — 2026-09-10
+
+- Build with AI (§BWAI, Pro) — from a tracked feature, The Forge itself calls the LLM to implement it: a propose-&-approve loop that applies approved edits with per-step Undo (`.forge/impl_backups/<runId>/`), runs approved commands with live streamed output (`Process.start`), and verifies against the Handoff checklist; new `lib/features/implementation/` module
+- Two-pass read-then-edit loop — scout picks files → The Forge reads them → the agent plans edits grounded in real code (plus repo docs: README/ARCHITECTURE/CLAUDE.md/agents.md)
+- Real token streaming across all LLM providers — `LlmDelta{text,thinking}` + `completeStream`; reasoning models (glm-5.3, gpt-oss:120b) stream their chain-of-thought live (Ollama `message.thinking`)
+- Build console — visible scrollbar + smart stick-to-bottom, reasoning as real scrollable lines, internal thinking (dim) vs external presentation (green), collapsible inline "thinking" block, guaranteed green Summary, active-model chip + wait-heartbeat + elapsed timer
+- Modify / Revise / Fix — hand-edit a proposed file's content or a command; **Revise** (steer the AI → re-plan); **Fix-on-failure** (feed command failures + failed checklist items back to the agent for a corrective plan)
+- Runs survive navigation (keepAlive) and re-attach on reopen; per-feature board status dots; tap an in-progress feature to open its run
+- Release tracking — new `Releases` drift table (schemaVersion 2→3), a per-version Releases view, and "Cut release" → deterministic notes → CHANGELOG.md + optional git tag
+- New Project reduced to two vibecoder choices (§NP2) — "Describe a new app" (Import→Spec, Paste/Guided sub-toggle) and "Bring in existing code" (onboarding); audit-interview retired from the picker
+- Forge design kit (§UIK) — new `ForgeTheme` (navy + ember/brass metals), the Hearth Dial mark (`lib/core/widgets/hearth_dial.dart`), a launch splash driven by real boot steps, a first-run onboarding screen, a portfolio digest ("what changed since you last looked"), and `ForgeAppHeader`; design language v2: `rust (#7A3826)` marks blocked/stuck
+
+### Fixed
+
+- BUG-LLM-001 — reasoning models showed nothing while streaming (only `content` was read; now reads the thinking channel too)
+- BUG-IMPL-001 — Stop → Try again crashed (stale-stream race; fixed with a generation counter)
+- BUG-IMPL-002 — app quit on Apply & Run (unbounded console + unsafe/hung command; fixed with a console cap + command denylist + 3-min timeout + guarded run)
+- BUG-IMPL-003 — a Build-with-AI run on The Forge corrupted `app.dart` + `settings_notifier.dart` via a full-file rewrite that dropped code; caught in review and reverted (never shipped); real fix (diff-based edits) tracked as a follow-up
+
 ## v0.3.0 — 2026-09-10
 
 - Portfolio Tracker — new home dashboard plus per-project feature board with status tracking (idea/planned/in_progress/blocked/shipped/archived)

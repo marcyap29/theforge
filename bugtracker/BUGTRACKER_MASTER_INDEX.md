@@ -1,7 +1,7 @@
 # Bugtracker Master Index — The Forge
 
 Bug IDs: `BUG-<AREA>-<NNN>`
-Areas: `INTERVIEW` · `UI` · `SPECGEN` · `SETTINGS` · `AUTH` · `BILLING` · `DATA`
+Areas: `INTERVIEW` · `UI` · `SPECGEN` · `SETTINGS` · `AUTH` · `BILLING` · `DATA` · `LLM` · `IMPL`
 
 Records go in `bugtracker/records/` — one file per bug.
 
@@ -27,3 +27,7 @@ Records go in `bugtracker/records/` — one file per bug.
 | BUG-SETTINGS-002 | SETTINGS | Changing a role's provider left `modelId` empty → every LLM call threw "No model selected"; provider dropdown now auto-selects first model | 2026-09-10 |
 | BUG-UI-003 | UI | macOS folder picker silently did nothing — app-modal `getDirectoryPath` failed to present; added `lockParentWindow` + error snackbars | 2026-09-10 |
 | BUG-DATA-001 | DATA | Deleting a project could rm-rf a real source repo — no guard that path was inside canonical root; fenced deletion + prune stale index rows | 2026-09-10 |
+| BUG-LLM-001 | LLM | Reasoning models (glm-5.3, gpt-oss:120b) stream chain-of-thought in `message.thinking` with empty `content`; console sat on "Planning…" — now surface typed content+thinking deltas + wait-heartbeat | 2026-09-10 |
+| BUG-IMPL-001 | IMPL | Stop during planning + "Try again" crashed build window — uncancellable stream's stale continuation raced restarted run; added generation counter `_gen` + empty-console guard | 2026-09-10 |
+| BUG-IMPL-002 | IMPL | "Apply & Run" quit the whole app — unbounded console growth, no command denylist/timeout, unguarded `applyAndRun`; capped 5000 lines + denylist + 3-min timeout + wrap | 2026-09-10 |
+| BUG-IMPL-003 | IMPL | "Build with AI" full-file rewrite dropped ~345 lines / gutted code so it wouldn't compile — full-file edits can omit code; two-pass read-then-edit + preserve instruction + Undo (Mitigated) | 2026-09-10 |

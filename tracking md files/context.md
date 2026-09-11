@@ -4,6 +4,98 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-10 — Claude Code [Build with AI shipped + design kit (§BWAI / §UIK / §NP2) — v0.4.0]
+
+**Branch:** main · **Commits:** `71d7de4` → `027c64c` · **App:** v0.4.0
+
+### Done
+
+**§BWAI — Build with AI, from MVP to shipping feature (Pro).** The propose-&-approve
+implementation agent (`lib/features/implementation/`) got the interaction layer that
+makes it usable end-to-end:
+- **Real token streaming** across all LLM providers — new `LlmDelta{text,thinking}` +
+  `completeStream`. Reasoning models (glm-5.3, gpt-oss:120b) stream chain-of-thought
+  (Ollama `message.thinking`), shown live. (Previously only `content` was read →
+  reasoning models rendered nothing while thinking — see Fixed.)
+- **Console UX:** visible scrollbar + smart stick-to-bottom; reasoning rendered as real
+  scrollable lines; **internal thinking (dim) vs external presentation (green)**;
+  collapsible inline "thinking" block (auto-collapses on done); guaranteed green
+  **Summary**; ActiveModelChip + wait-heartbeat + elapsed timer.
+- **Two-pass read-then-edit loop:** scout picks files → we read them → plan edits
+  grounded in real code (no more blind full-file guesses). Agent is also grounded in
+  repo key docs (README/ARCHITECTURE/CLAUDE.md/agents.md).
+- **Live commands:** approved commands run with LIVE STREAMED output via `Process.start`
+  (first in the app); applied edits keep per-step Undo (`.forge/impl_backups/<runId>/`);
+  verified against the Handoff checklist.
+- **Modify the plan:** hand-edit a proposed file's content; hand-edit a command;
+  **Revise** (tell the AI what to change → re-plan); **Fix-on-failure** ("Fix it" feeds
+  command failures + failed checklist items back to the agent for a corrective plan).
+- **Runs survive navigation** (keepAlive) and re-attach on reopen; board status dots per
+  feature; tap an in-progress feature to open its run.
+- **Release tracking** (`§BWAI-REL`, shipped last session): `Releases` drift table
+  (schemaVersion 2→3), Releases view grouped by version, "Cut release" → deterministic
+  notes → CHANGELOG.md + optional git tag.
+- Pro-gated via an `entitlementProvider` stub (real gate = §MB managed backend).
+
+**§NP2 — New Project reduced to two vibecoder choices:** "Describe a new app"
+(Import→Spec, with a Paste/Guided sub-toggle) and "Bring in existing code" (onboarding).
+The audit-interview was retired from the picker.
+
+**§UIK — Forge design kit:** new `ForgeTheme` (navy + ember/brass "metals"), the
+**Hearth Dial** mark (`lib/core/widgets/hearth_dial.dart`), a **launch splash**
+(`/` → `/home`) driven by real boot steps, a **first-run onboarding** screen, and a
+**portfolio digest** ("what changed since you last looked", from `lastOpened` +
+`Features.updatedAt`) + `ForgeAppHeader`. Source kit lives in `UIUX/`. Design language v2:
+`rust (#7A3826)` now marks blocked/stuck.
+
+### Key Technical Findings
+- Providers are no longer blocking for the build console: `completeStream` yields
+  `LlmDelta`s so both text and reasoning arrive incrementally. The live feel is now real
+  model streaming, not just command output.
+- Reasoning models return their chain-of-thought on a **separate** channel (Ollama
+  `message.thinking`); reading only `content` shows nothing while the model thinks.
+- Grounding matters: the two-pass read-then-edit loop (read real files before planning)
+  plus repo-doc context is what stopped the agent from proposing edits against imagined
+  code.
+- The Pro gate is a stub today; the real entitlement needs the §MB managed backend.
+
+### INCIDENT
+A Build-with-AI run **on theforge itself** corrupted `app.dart` +
+`settings_notifier.dart` via a full-file rewrite that silently dropped code. Caught in
+review and reverted (uncommitted) — **never shipped**. Root lesson: full-file rewrites are
+lossy; move to **diff-based edits** (see Next / planner follow-ups).
+
+### Fixed (see bugtracker)
+- **BUG-LLM-001** — reasoning models showed nothing while streaming (only `content` read;
+  now reads the thinking channel too).
+- **BUG-IMPL-001** — Stop → Try again crashed (stale-stream race; fixed with a generation
+  counter).
+- **BUG-IMPL-002** — app quit on Apply & Run (unbounded console + unsafe/hung command);
+  fixed with console cap + command denylist + 3-min timeout + guarded run.
+- **BUG-IMPL-003** — full-file-rewrite corruption incident (above); mitigated by review;
+  real fix (diff-based edits) tracked as a follow-up.
+
+### Modified / New
+NEW (design kit): `lib/core/widgets/hearth_dial.dart`, `ForgeTheme`, launch splash,
+first-run onboarding, portfolio digest + `ForgeAppHeader`, `UIUX/` source kit.
+MODIFIED: `lib/features/implementation/**` (streaming console, two-pass loop,
+modify/revise/fix, run persistence + board dots), all LLM providers under
+`lib/services/llm/**` (`LlmDelta` + `completeStream`), New Project picker (`§NP2`),
+`lib/features/tracker/**` (board status dots, tap-to-open in-progress run).
+
+### Verification
+`dart analyze lib/` clean · `flutter test` green. Shipped as **v0.4.0** (commits
+`71d7de4` → `027c64c`, all on `main`).
+
+### Next
+Deploy v0.4.0 and exercise Build with AI on a linked repo end-to-end. Follow-ups:
+wire `entitlementProvider` to the **§MB managed backend** (real Pro gate); **diff-based
+edits** to prevent full-file-rewrite corruption; per-screen color migration onto
+`ForgeTheme`; bundle the **Unbounded / IBM Plex Mono** fonts. Agent commit-per-feature and
+LLM-polished release notes remain open.
+
+---
+
 ## Session: 2026-09-10 — Claude Code [Build with AI (§BWAI)]
 
 **Branch:** main · **Commit:** `71d7de4`

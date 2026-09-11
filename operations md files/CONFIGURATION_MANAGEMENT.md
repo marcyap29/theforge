@@ -140,12 +140,57 @@
 | deploy_ios.sh | tool/ | 2026-09-10 | ✅ Synced |
 | deploy_android.sh | tool/ | 2026-09-10 | ✅ Synced |
 | install_macos.sh | tool/ | 2026-09-10 | ✅ Synced |
+| run_session.dart | lib/features/implementation/models/ | 2026-09-10 | ✅ Synced (RunPhase, ConsoleLine, ProposedEdit/Command, AgentPlan, ImplRunState) |
+| command_runner.dart | lib/features/implementation/data/ | 2026-09-10 | ✅ Synced (streamed `Process.start` + denylist + 3-min timeout) |
+| impl_workspace.dart | lib/features/implementation/data/ | 2026-09-10 | ✅ Synced (file gather, edit apply + `.forge/impl_backups/` Undo, verify, `gatherKeyDocs`) |
+| impl_agent.dart | lib/features/implementation/data/ | 2026-09-10 | ✅ Synced (two-pass scout→plan + revision block) |
+| implementation_notifier.dart | lib/features/implementation/providers/ | 2026-09-10 | ✅ Synced (keepAlive run state machine; shared `_plan`; generation counter) |
+| implementation_providers.dart | lib/features/implementation/providers/ | 2026-09-10 | ✅ Synced (entitlement stub + `implActiveRunsProvider`) |
+| implementation_screen.dart | lib/features/implementation/screens/ | 2026-09-10 | ✅ Synced (build window: streamed console, collapsible thinking, approve/edit/revise) |
+| diff_view.dart | lib/features/implementation/widgets/ | 2026-09-10 | ✅ Synced (LCS diff) |
+| llm_provider.dart | lib/services/llm/ | 2026-09-10 | ✅ Synced (`completeStream` + `LlmDelta{text, thinking}`) |
+| llm_service.dart | lib/services/llm/ | 2026-09-10 | ✅ Synced (`completeStream` + `resolve(role)`) |
+| ollama_provider.dart | lib/services/llm/providers/ | 2026-09-10 | ✅ Synced (real streaming; surfaces `message.thinking`) |
+| claude_provider.dart | lib/services/llm/providers/ | 2026-09-10 | ✅ Synced (real streaming) |
+| openai_provider.dart | lib/services/llm/providers/ | 2026-09-10 | ✅ Synced (real streaming) |
+| forge_database.dart | lib/data/local_db/ | 2026-09-10 | ✅ Synced (schemaVersion 2→3 — `Releases` table, create-only migration) |
+| tracker_repository.dart | lib/features/tracker/data/ | 2026-09-10 | ✅ Synced (release CRUD + `.forge/tracker/releases.json` mirror) |
+| release_providers.dart | lib/features/tracker/releases/ | 2026-09-10 | ✅ Synced (group by version, cut release → notes → CHANGELOG + git tag) |
+| releases_screen.dart | lib/features/tracker/screens/ | 2026-09-10 | ✅ Synced (releases grouped by version) |
+| forge_theme.dart | lib/core/theme/ | 2026-09-10 | ✅ Synced (ForgeTheme/ForgeColors — navy + ember/brass; replaced AppTheme) |
+| hearth_dial.dart | lib/core/widgets/ | 2026-09-10 | ✅ Synced (CustomPainter brand mark) |
+| launch_screen.dart | lib/features/launch/ | 2026-09-10 | ✅ Synced (splash `/` → `/home`) |
+| first_run_screen.dart | lib/features/onboarding/ | 2026-09-10 | ✅ Synced (first-run onboarding) |
+| portfolio_digest.dart | lib/features/tracker/widgets/ | 2026-09-10 | ✅ Synced (`portfolioDigestProvider` + panel + `ForgeAppHeader`) |
+| active_model_chip.dart | lib/features/tracker/widgets/ | 2026-09-10 | ✅ Synced (active LLM model chip) |
+| new_project_screen.dart | lib/features/projects/screens/ | 2026-09-10 | ✅ Synced (reduced to two modes) |
+| release_logic_test.dart | test/ | 2026-09-10 | ✅ Synced |
+| build_with_ai_plan_v1.md | DOCS/forge/ | 2026-09-10 | ✅ Synced |
+| FOR_MARC_build-with-ai-agent.md | DOCS/Coding Lessons/ | 2026-09-10 | ✅ Synced |
+| Design kit (theme/dial/screens + Design-Language_v1 + WIRING) | UIUX/ | 2026-09-10 | ✅ Synced (source-of-truth design kit) |
 
 
 ---
 
 
 ## Change Log
+
+### 2026-09-10 — §BWAI Build with AI + §UIK Design Kit
+
+**Action:** Major release (v0.4.0). The Forge gains its first hands-on-keyboard mode — an in-app "Build with AI" implementation agent — plus a streaming LLM layer, release tracking with cut-release, and a full design-language v2 kit (ForgeTheme + Hearth Dial + launch/first-run/digest).
+
+**Key changes:**
+- `lib/features/implementation/**` — new module. `models/run_session.dart` (RunPhase, ConsoleLine incl. `thinking`/`presentation`, ProposedEdit/Command, AgentPlan, ImplRunState); `data/command_runner.dart` (streamed `Process.start` + denylist + 3-min timeout — first streamed subprocess in the app); `data/impl_workspace.dart` (file gather, edit apply + `.forge/impl_backups/` Undo, checklist verify, `gatherKeyDocs`); `data/impl_agent.dart` (two-pass scout→plan + revision block); `providers/implementation_notifier.dart` (keepAlive per-feature run state machine; shared `_plan` for start/revise/fix; generation counter for stale-stream safety); `providers/implementation_providers.dart` (entitlement stub + `implActiveRunsProvider`); `screens/implementation_screen.dart` (build window); `widgets/diff_view.dart` (LCS diff).
+- LLM streaming — `lib/services/llm/llm_provider.dart` (`completeStream` + `LlmDelta{text, thinking}`); `llm_service.dart` (`completeStream` + `resolve(role)`); `providers/{ollama,claude,openai}_provider.dart` real streaming (Ollama surfaces `message.thinking`).
+- Releases — `lib/data/local_db/forge_database.dart` (`Releases` table; `schemaVersion` 2→3, create-only migration); `lib/features/tracker/data/tracker_repository.dart` (release CRUD + `.forge/tracker/releases.json` mirror); `lib/features/tracker/releases/release_providers.dart` (group by version, cut release → notes → CHANGELOG + git tag); `lib/features/tracker/screens/releases_screen.dart`. Feature status auto-transitions on build/ship.
+- Design kit — `lib/core/theme/forge_theme.dart` (ForgeTheme/ForgeColors — navy + ember/brass; replaced AppTheme); `lib/core/widgets/hearth_dial.dart` (CustomPainter mark); `lib/features/launch/launch_screen.dart` (splash `/` → `/home`); `lib/features/onboarding/first_run_screen.dart`; `lib/features/tracker/widgets/portfolio_digest.dart` (`portfolioDigestProvider` + panel + `ForgeAppHeader`); `active_model_chip.dart`. Design language v2: `rust #7A3826` = blocked/stuck.
+- `lib/features/projects/screens/new_project_screen.dart` — reduced to two modes.
+
+**Tests:** `test/release_logic_test.dart` (new).
+
+**Docs:** `DOCS/forge/build_with_ai_plan_v1.md`; `DOCS/Coding Lessons/FOR_MARC_build-with-ai-agent.md`; `UIUX/` design kit (theme, dial, screens, `The-Forge_Design-Language_v1.md`, `WIRING.md`); ARCHITECTURE.md v4.0.0; FEATURES.md; CHANGELOG.md v0.4.0.
+
+---
 
 ### 2026-09-10 — §PT Portfolio Tracker + §DIST Deploy + §FORGEDIR + §IMPORT
 

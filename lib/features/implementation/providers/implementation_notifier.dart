@@ -39,8 +39,7 @@ class ImplBrief {
   final List<Map<String, dynamic>> checklist;
 }
 
-/// One implementation run per feature. AutoDispose so state resets and the
-/// backups/console are released when the window closes.
+/// One implementation run per feature.
 // KeepAlive (not autoDispose) so a build keeps running when the window is
 // closed and the user navigates back to the board — re-opening re-attaches to
 // the same live run instead of restarting it.

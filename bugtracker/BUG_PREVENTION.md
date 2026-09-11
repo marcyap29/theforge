@@ -105,6 +105,21 @@
 
 ---
 
+## Implementation Agent (Build with AI) Rules
+
+**Rules:**
+- **Live output buffers must be bounded.** The console (planning output, command output) must be capped — theforge caps at 5000 lines and trims the oldest. Appending to an unbounded list grows O(n^2) and can blow memory, which the OS then kills (looks like a silent app quit). See BUG-IMPL-002.
+- **User-approved shell commands still need a denylist + timeout.** Even an approved command must be blocked if it is destructive or self-harming (`rm -rf`, `sudo`, `kill`/`killall`/`pkill`, `shutdown`, `dd`, force-push, `git reset --hard`). Enforce a per-command timeout (3 minutes in theforge) that kills hangs so an interactive/long-running command can't freeze or kill the run. See BUG-IMPL-002.
+- **Long-running operations must be wrapped so they can never crash the app.** `applyAndRun` (and any run entry point) is wrapped so any error fails the run gracefully instead of taking down the whole app. See BUG-IMPL-002.
+- **Any async work that can be superseded must carry a generation token.** Streams you can't hard-cancel (in-flight HTTP) keep running after Stop; their continuations and `onDelta` callbacks race the restarted run and mutate newer state. Bump a generation counter (`_gen`) on start/stop/reset and ignore any delta or post-await continuation whose `gen != _gen`. Guard console mutations against an empty list (never `removeLast()` on empty). See BUG-IMPL-001.
+- **When streaming an LLM, surface BOTH content and reasoning/thinking deltas.** Reasoning models (glm-5.3, gpt-oss:120b) stream chain-of-thought in `message.thinking` with an empty `message.content` until reasoning finishes. Reading only `content` yields nothing during the (long) thinking phase and the UI looks stuck. Yield a typed `LlmDelta{text, thinking}` (Ollama `thinking`, Claude `thinking_delta`), buffer only content for parsing, and show reasoning live. Add a wait-heartbeat while awaiting the first token so it never looks frozen. See BUG-LLM-001.
+- **Always `dart analyze` (and prefer a build/test) before committing anything Build-with-AI produced; never commit AI edits unreviewed.** The agent returns complete full-file content per edit, which is reliable to apply but can silently drop code the model didn't mean to change (theforge once had ~345 lines dropped and a stray `-`, so the source wouldn't compile — caught in review, reverted). Two-pass read-then-edit + a "preserve everything you aren't intentionally changing" instruction + per-edit Undo reduce but do not eliminate this. Future: switch to diff/patch-based edits and add an automatic post-edit compile check. See BUG-IMPL-003.
+- **Sandbox every agent file read/write to the linked repo.** The edit path comes from the model and cannot be trusted — `p.join(repo, '/etc/x')` lets an absolute path replace the base, and `..` walks out of the repo. Validate with `ImplWorkspace.isPathSafe` (rejects absolute paths and anything not `p.isWithin(repo, …)`); filter unsafe paths out at parse time AND throw in `applyEdit` (defense in depth). Without this, a bad/adversarial model response could overwrite files anywhere the process can write.
+
+**Past bugs:** Sep 2026 — BUG-LLM-001: reasoning models streamed only `thinking` with empty `content`, console sat on "Planning…"; fixed with typed content+thinking deltas + wait-heartbeat. BUG-IMPL-001: Stop + Try again crashed the build window via a stale uncancellable stream continuation; fixed with a generation counter + empty-console guard. BUG-IMPL-002: "Apply & Run" quit the whole app (unbounded console, no denylist/timeout, unguarded run); fixed with a 5000-line cap, command denylist, 3-min timeout, and a graceful wrapper. BUG-IMPL-003 (Mitigated): full-file AI rewrite dropped code and broke compilation; mitigated with two-pass read-then-edit + preserve instruction + Undo — analyze/verify before committing AI output.
+
+---
+
 ## Common Anti-Patterns
 
 - **Catching too broadly** — catch specific types or let it bubble.

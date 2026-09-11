@@ -1,6 +1,6 @@
 # The Forge — Architecture
 
-**Version:** 3.0.0
+**Version:** 4.0.0
 **Last Updated:** 2026-09-10
 
 ---
@@ -240,6 +240,24 @@ abstract class LlmProvider {
 
 All implementations use `package:http` directly — no SDK dependencies. API keys live in `forge_config.json` (Application Support). Model IDs are validated on load; retired IDs fall back to first valid model for that provider.
 
+### Streaming LLM Layer (v0.4.0)
+
+`LlmProvider` now exposes a streaming path alongside `complete()`:
+
+```dart
+class LlmDelta {
+  final String text;      // incremental answer text
+  final String thinking;  // incremental reasoning text (may be empty)
+}
+
+Stream<LlmDelta> completeStream({ ...same params as complete()... });
+```
+
+- `LlmService.completeStream(role:)` resolves the role → provider exactly like `complete()`, then yields the provider's token stream.
+- Ollama, Claude, and OpenAI implement real streaming. Ollama surfaces reasoning models' `message.thinking` as a separate channel; Claude and OpenAI stream answer text (thinking is empty unless the model emits it).
+- `thinking` deltas drive the collapsible "thinking" console line in the Implementation Agent — reasoning is shown live, then collapsed once the answer arrives.
+- `complete()` remains for one-shot calls (spec/worksheet/scan). Streaming is used only where the UI renders progress token-by-token.
+
 ---
 
 ## Interview Engine
@@ -367,6 +385,78 @@ Lightweight project + feature tracking layered over the existing spec pipeline.
 
 ---
 
+## Implementation Agent — "Build with AI" (v0.4.0)
+
+The Forge's first hands-on-keyboard mode: an in-app agent that implements a tracked feature against the linked repo, streaming its work into a build window and pausing for approval before any change touches disk. Module lives in `lib/features/implementation/**`.
+
+### Layers — brains / hands / conductor
+
+| Layer | File | Responsibility |
+|---|---|---|
+| **Models** | `models/run_session.dart` | `RunPhase`, `ConsoleLine` (kinds incl. `thinking` / `presentation`), `ProposedEdit`, `ProposedCommand`, `AgentPlan`, `ImplRunState` |
+| **Brains** | `data/impl_agent.dart` | Two-pass scout → plan LLM pipeline; revision block for modify-plan / fix |
+| **Hands (repo)** | `data/impl_workspace.dart` | Gather repo files + `gatherKeyDocs`, apply edits with `.forge/impl_backups/` Undo, checklist verify |
+| **Hands (shell)** | `data/command_runner.dart` | `Process.start` streamed subprocess + denylist + 3-min timeout — the FIRST streamed subprocess in the app |
+| **Conductor** | `providers/implementation_notifier.dart` | keepAlive per-feature run state machine; `_plan` shared by start / revise / fix; generation counter for stale-stream safety |
+| **Registry** | `providers/implementation_providers.dart` | Entitlement stub + `implActiveRunsProvider` registry |
+| **Window** | `screens/implementation_screen.dart` | Streamed console, collapsible thinking, approval / edit / revise controls |
+| **Diff** | `widgets/diff_view.dart` | LCS line diff for proposed edits |
+
+### Propose → approve → verify loop
+
+1. **Scout** — pass one reads the repo (`gatherKeyDocs` + file gather) and the feature's tracker context; the agent narrates its understanding (streamed as `thinking` / `presentation` lines).
+2. **Plan** — pass two produces an `AgentPlan`: an ordered set of `ProposedEdit`s (full-file rewrites, shown as an LCS diff) and `ProposedCommand`s.
+3. **Approve** — nothing touches disk until the user approves. The user can approve, **edit** the plan, or **revise** it (free-text feedback → re-plan via the shared revision block).
+4. **Apply** — approved edits are written; the prior file contents are backed up to `.forge/impl_backups/` so any change is one-click **Undo**-able. Approved commands run through `command_runner` (streamed, denylisted, timed out).
+5. **Verify** — `impl_workspace` runs the checklist verify (e.g. `dart analyze`) against the result.
+6. **Fix-on-failure** — if verify fails, the same `_plan` path runs in fix mode, feeding the failure back to the agent for a corrective plan (subject to the same approval gate).
+
+### Grounding, streaming, run lifecycle
+
+- **Two-pass grounding** — scout-then-plan means the plan is written against files the agent actually read, not against guesses.
+- **Streaming** — the agent's reasoning and output stream token-by-token via `LlmService.completeStream`; `thinking` deltas render as a collapsible console line, answer deltas as `presentation` lines.
+- **keepAlive runs** — `implementation_notifier` keeps each per-feature run alive (`implActiveRunsProvider` registry) so navigating away and back resumes the live build; a **generation counter** discards deltas from a superseded stream (stale-stream safety).
+- **Feature status auto-transitions** on build / ship — starting a build and shipping move the tracked feature's status without manual edits.
+
+---
+
+## Releases & Cut-Release (v0.4.0)
+
+Release tracking layered onto the tracker, mirroring the Portfolio Tracker's DB + JSON pattern.
+
+- Drift schema bumped to `schemaVersion` **3** (was 2); `Releases` table added with a **create-only** migration (existing data untouched, never destructive).
+- `tracker_repository` gains release CRUD; every DB row is mirrored to `.forge/tracker/releases.json` so release history travels with the project folder and survives an index rebuild.
+- `release_providers.dart` (`lib/features/tracker/releases/`) groups features by version and drives **cut-release**: cutting a release generates notes → appends to `CHANGELOG` → creates a git tag.
+- `releases_screen.dart` presents releases grouped by version.
+- Feature status auto-transitions on **ship** (a shipped feature is folded into its release).
+
+---
+
+## Design System — Forge v2 (v0.4.0)
+
+A cohesive visual identity replacing the original monospace shell.
+
+- **`lib/core/theme/forge_theme.dart`** — `ForgeTheme` / `ForgeColors`: navy base with ember + brass accents. This is now the app theme (replaced `AppTheme`). Design language v2 adds `rust #7A3826` = blocked / stuck.
+- **`lib/core/widgets/hearth_dial.dart`** — `HearthDial` `CustomPainter` brand mark.
+- **`lib/features/launch/launch_screen.dart`** — splash at route `/`; routes on to `/home` (launch → home routing).
+- **`lib/features/onboarding/first_run_screen.dart`** — first-run onboarding.
+- **`lib/features/tracker/widgets/portfolio_digest.dart`** — `portfolioDigestProvider` + digest panel + `ForgeAppHeader`.
+- **`lib/features/tracker/widgets/active_model_chip.dart`** — shows the active LLM model in the app chrome.
+- The design kit is mirrored under `UIUX/` (theme, dial, screens, `The-Forge_Design-Language_v1.md`, `WIRING.md`) as the source-of-truth kit.
+
+### Routing (v0.4.0)
+
+- `/` → `LaunchScreen` (splash) → forwards to `/home` (the portfolio dashboard).
+- The portfolio dashboard, previously the `/` home, is now reached via `/home`; `/projects` remains the raw project list.
+
+---
+
+## New Project — Two Modes (v0.4.0)
+
+`new_project_screen.dart` reduced to **two** entry modes (down from the prior multi-card grid), simplifying the on-ramp.
+
+---
+
 ## Auto-scan & Virtual-PM Check-ins
 
 - `FeatureScanner` (`lib/features/tracker/scan/feature_scan.dart`) — proposes features from a project's own `.forge` docs AND/OR a linked repo
@@ -431,7 +521,13 @@ Lightweight project + feature tracking layered over the existing spec pipeline.
 - **Interview state persists to disk** on every LLM response (after §5 interview persistence work, 2026-06-18). App close during interview = seamless resume.
 - **All LLM list fields use safe `is List` check** before cast. Hard `as List<T>?` throws TypeError on non-list output and silently degrades the entire parse via outer try/catch.
 - **Model IDs validated on load** against the current catalog. Retired IDs fall back to the first valid model.
+- **Nothing touches disk without approval** (Implementation Agent). Proposed edits and commands are held until the user approves; every applied edit is backed up to `.forge/impl_backups/` for one-click Undo.
+- **Destructive commands are denylisted even if approved.** `command_runner`'s denylist blocks dangerous shell commands regardless of user approval; every command also has a 3-minute timeout.
+- **AI full-file rewrites must pass `dart analyze` before commit.** The verify step gates the loop; a failing checklist routes into fix-on-failure, never a silent commit.
+- **The Forge Projects root is fixed/canonical.** `~/Documents/The Forge Projects` is not user-configurable and is never a code repo — all destructive path operations are fenced to it.
+- **Stale streams are discarded** (Implementation Agent). A per-run generation counter drops deltas from any superseded stream so a re-planned/revised run never interleaves with the old one.
+- **Release schema migration is create-only.** `schemaVersion` 2→3 adds `Releases`; existing rows are never dropped or rewritten.
 
 ---
 
-_The Forge · Orbital AI — Architecture v3.0.0 · September 2026_
+_The Forge · Orbital AI — Architecture v4.0.0 · September 2026_

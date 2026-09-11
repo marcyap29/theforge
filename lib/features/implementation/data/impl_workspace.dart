@@ -94,8 +94,20 @@ class ImplWorkspace {
     return s.isEmpty ? null : s;
   }
 
-  /// Reads a repo-relative file, returning '' if it does not exist.
+  /// True only if [rel] resolves to a path INSIDE [repoPath]. Rejects absolute
+  /// paths (which `p.join` would let replace the base) and `..` escapes — the
+  /// sandbox guard for every agent file read/write, since the path comes from
+  /// the model and cannot be trusted.
+  static bool isPathSafe(String repoPath, String rel) {
+    if (rel.trim().isEmpty || p.isAbsolute(rel)) return false;
+    final root = p.normalize(p.absolute(repoPath));
+    final abs = p.normalize(p.join(root, rel));
+    return abs != root && p.isWithin(root, abs);
+  }
+
+  /// Reads a repo-relative file, returning '' if it is unsafe or absent.
   static Future<String> readRepoFile(String repoPath, String rel) async {
+    if (!isPathSafe(repoPath, rel)) return '';
     final f = File(p.join(repoPath, rel));
     if (!f.existsSync()) return '';
     try {
@@ -120,6 +132,9 @@ class ImplWorkspace {
     required String runId,
     required ProposedEdit edit,
   }) async {
+    if (!isPathSafe(repoPath, edit.path)) {
+      throw StateError('Refusing to write outside the repo: ${edit.path}');
+    }
     final backupDir = _backupDir(projectPath, runId);
     await backupDir.create(recursive: true);
     final target = File(p.join(repoPath, edit.path));

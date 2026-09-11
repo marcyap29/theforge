@@ -4,6 +4,32 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 
 ---
 
+## §BWAI / §UIK / §NP2 — Build with AI + design kit — COMPLETE ✅ (v0.4.0)
+
+**Completed:** 2026-09-10 · **Commits:** `71d7de4` → `027c64c`
+
+- [x] §BWAI Build with AI (Pro) — `lib/features/implementation/**`: propose-&-approve loop, approved edits with per-step Undo (`.forge/impl_backups/<runId>/`), commands with live streamed output (`Process.start`), verify against the Handoff checklist
+- [x] §BWAI Real token streaming across all providers — `LlmDelta{text,thinking}` + `completeStream`; reasoning models stream chain-of-thought (Ollama `message.thinking`)
+- [x] §BWAI Build console — visible scrollbar + smart stick-to-bottom; reasoning as scrollable lines; internal thinking (dim) vs external presentation (green); collapsible inline "thinking" block; guaranteed green Summary; active-model chip + wait-heartbeat + elapsed timer
+- [x] §BWAI Two-pass read-then-edit loop — scout picks files → read them → plan edits grounded in real code + repo docs (README/ARCHITECTURE/CLAUDE.md/agents.md)
+- [x] §BWAI Modify / Revise / Fix — hand-edit a proposed file's content or a command; Revise (steer → re-plan); Fix-on-failure (feed failures + failed checklist items back for a corrective plan)
+- [x] §BWAI Runs survive navigation (keepAlive) + re-attach on reopen; per-feature board status dots; tap an in-progress feature to open its run
+- [x] §BWAI-REL Release tracking — `Releases` drift table (schemaVersion 2→3), Releases view by version, "Cut release" → deterministic notes → CHANGELOG + optional git tag
+- [x] §NP2 New Project reduced to two vibecoder choices — "Describe a new app" (Import→Spec, Paste/Guided sub-toggle) + "Bring in existing code" (onboarding); audit-interview retired from picker
+- [x] §UIK Forge design kit — `ForgeTheme` (navy + ember/brass); Hearth Dial (`lib/core/widgets/hearth_dial.dart`); launch splash (real boot steps); first-run onboarding; portfolio digest + `ForgeAppHeader`; `UIUX/` source kit; design language v2 (`rust #7A3826` = blocked/stuck)
+- [x] Bug fixes: BUG-LLM-001, BUG-IMPL-001, BUG-IMPL-002, BUG-IMPL-003 (see bugtracker)
+
+**INCIDENT:** a Build-with-AI run on theforge corrupted `app.dart` + `settings_notifier.dart` via a full-file rewrite that dropped code — caught in review and reverted (uncommitted, never shipped).
+
+**Follow-ups (open):**
+- [ ] Wire `entitlementProvider` to the **§MB managed backend** — replace the Pro-gate stub with a real entitlement
+- [ ] **Diff-based edits** — replace lossy full-file rewrites to prevent the corruption above
+- [ ] Per-screen color migration onto `ForgeTheme` (screens still carry ad-hoc colors)
+- [ ] Bundle the **Unbounded / IBM Plex Mono** fonts (design kit assumes them)
+- [ ] Agent commit-per-feature; LLM-polished release notes
+
+---
+
 ## §PT — Portfolio Tracker era — COMPLETE ✅
 
 **Completed:** 2026-09-10

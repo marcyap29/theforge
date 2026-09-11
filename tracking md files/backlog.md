@@ -42,9 +42,11 @@ Long-term feature pool. Active sprint work lives in `planner.md`.
   → §DIST Direct-distribution deploy (unsandboxed + Developer ID + notarize) ✅ (2026-09-10)
   → §FORGEDIR `.forge/` per-project deliverables folder + fixed canonical root ✅ (2026-09-10)
   → §IMPORT Import-a-repo → gap form → spec (LLM extraction feeds the interview) ✅ (2026-09-10)
-  → §BWAI Build with AI — feature-driven in-app implementation agent + release tracking ✅ (2026-09-10)
+  → §BWAI Build with AI — feature-driven in-app implementation agent (streaming + modify/revise/fix) + release tracking ✅ (2026-09-10, v0.4.0)
+  → §NP2 New Project reduced to two vibecoder choices ✅ (2026-09-10, v0.4.0)
+  → §UIK Forge design kit — ForgeTheme, Hearth Dial, launch splash, onboarding, portfolio digest ✅ (2026-09-10, v0.4.0)
        ↓
-  → §MB Managed metered AI backend (gateway over Ollama Cloud) — freemium paid tier (not started; §BWAI is the hook)
+  → §MB Managed metered AI backend (gateway over Ollama Cloud) — freemium paid tier + the REAL Pro gate for §BWAI (not started; §BWAI ships behind an entitlement stub)
   → Configuration C pilot (Qualcomm) — Watch + Reverse on existing codebase
 ```
 
@@ -81,9 +83,31 @@ Every §N that brings The Forge closer to a working interview-to-spec run unbloc
 
 **Why it matters:** Turns The Forge from "writes the spec, hands off" into "builds the feature" without the user leaving the app or opening a terminal — the subscription hook for the vibecoder pivot.
 
-**Architecture:** New `lib/features/implementation/` module (models/run_session, data/command_runner [first `Process.start`], data/impl_workspace, data/impl_agent, providers, screens). `Releases` drift table (schemaVersion 2→3). Reuses `LlmService` (executor role, blocking), the Handoff verification checklist as a deterministic oracle, and `repoPath` linking.
+**Architecture:** New `lib/features/implementation/` module (models/run_session, data/command_runner [first `Process.start`, live streamed output], data/impl_workspace, data/impl_agent, providers, screens). `Releases` drift table (schemaVersion 2→3). Reuses `LlmService` (executor role) — now **token-streaming** via `LlmDelta{text,thinking}` + `completeStream` across all providers — the Handoff verification checklist as a deterministic oracle, and `repoPath` linking. Two-pass read-then-edit loop grounds edits in real code + repo docs.
 
-**Status:** ✅ MVP complete 2026-09-10 — `dart analyze` clean, 11/11 tests. Plan: `DOCS/forge/build_with_ai_plan_v1.md`. Phase-2: token-streaming providers, agent commit-per-feature, LLM-polished notes, managed-backend entitlement.
+**Status:** ✅ Shipped 2026-09-10 (v0.4.0) — MVP + streaming console (dim thinking / green presentation, collapsible inline thinking, active-model chip), two-pass read-then-edit loop, **modify/revise/fix** (hand-edit content or command, Revise to re-plan, Fix-on-failure), runs survive navigation + board status dots. `dart analyze` clean, tests green. Plan: `DOCS/forge/build_with_ai_plan_v1.md`. Pro-gated by an `entitlementProvider` stub — real gate = §MB. Phase-2 open: agent commit-per-feature, LLM-polished notes, **diff-based edits** (replace lossy full-file rewrites — see INCIDENT below), managed-backend entitlement.
+
+**INCIDENT (2026-09-10):** A Build-with-AI run on theforge corrupted `app.dart` + `settings_notifier.dart` via a full-file rewrite that dropped code — caught in review and reverted (uncommitted, never shipped). Motivates the diff-based-edits follow-up. Bugs fixed: BUG-LLM-001, BUG-IMPL-001/002/003.
+
+---
+
+### §UIK — Forge Design Kit
+**What it is:** The app's visual identity. A new `ForgeTheme` (navy base with ember/brass "metals"), the **Hearth Dial** brand mark (`lib/core/widgets/hearth_dial.dart`), a **launch splash** (`/` → `/home`) driven by real boot steps, a **first-run onboarding** screen, and a **portfolio digest** ("what changed since you last looked", computed from `lastOpened` + `Features.updatedAt`) surfaced via `ForgeAppHeader`. Source kit lives in `UIUX/`.
+
+**Why it matters:** Gives The Forge a coherent, ownable look for the vibecoder pivot — first impression (splash + onboarding) through everyday use (digest header).
+
+**Architecture:** `lib/core/widgets/hearth_dial.dart` + `ForgeTheme`; splash/onboarding/digest screens; `ForgeAppHeader`. Design language v2: `rust (#7A3826)` now marks blocked/stuck.
+
+**Status:** ✅ Shipped 2026-09-10 (v0.4.0). Follow-ups: per-screen color migration onto `ForgeTheme`; bundle the Unbounded / IBM Plex Mono fonts.
+
+---
+
+### §NP2 — New Project Reduced to Two (Vibecoder-First Picker)
+**What it is:** The "How to start" picker collapsed to two vibecoder choices — "Describe a new app" (Import→Spec, with a Paste/Guided sub-toggle) and "Bring in existing code" (onboarding). The audit-interview was retired from the picker.
+
+**Why it matters:** Fewer, clearer front doors for non-technical builders — matches the two things a vibecoder actually does.
+
+**Status:** ✅ Shipped 2026-09-10 (v0.4.0).
 
 ---
 
@@ -101,11 +125,11 @@ Every §N that brings The Forge closer to a working interview-to-spec run unbloc
 ### §MB — Managed Metered AI Backend (Freemium Paid Tier)
 **What it is:** A managed backend gateway (metered over Ollama Cloud) so non-technical users get AI features without bringing their own key. Free tier = manual board + BYOK; paid tier = managed metered AI. This is the monetization path for the vibecoder pivot.
 
-**Why it matters:** BYOK is a hard wall for non-technical builders. A managed metered backend is what makes a paid tier viable.
+**Why it matters:** BYOK is a hard wall for non-technical builders. A managed metered backend is what makes a paid tier viable. It is also **the real backend behind §BWAI's Pro gate** — Build with AI ships behind an `entitlementProvider` stub today; §MB is what turns that stub into a real entitlement.
 
 **Reference:** `~/Desktop/CLAUDE OUTPUTS/The Forge/The-Forge_Monetization-Plan_v1.md`, `The-Forge_Managed-Backend-Architecture_v1.md` (strategy — open business decision, not built).
 
-**Status:** Not started — open business decision.
+**Status:** Not started — open business decision. Now has a concrete consumer: §BWAI's Pro entitlement.
 
 ---
 

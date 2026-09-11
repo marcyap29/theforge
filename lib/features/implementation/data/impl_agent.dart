@@ -278,6 +278,8 @@ it). The JSON must be a single top-level object with no code fences:
       final path = (e['path'] ?? '').toString().trim();
       final content = e['content']?.toString();
       if (path.isEmpty || content == null) continue;
+      // Never let the model write outside the linked repo.
+      if (!ImplWorkspace.isPathSafe(repoPath, path)) continue;
       final oldContent = await ImplWorkspace.readRepoFile(repoPath, path);
       edits.add(ProposedEdit(
         path: path,

@@ -40,6 +40,44 @@
 
 ---
 
+## Build with AI — Implementation Agent
+
+| Feature | Status | Notes |
+|---|---|---|
+| Build with AI (implementation agent) | Shipped v0.4.0 | `lib/features/implementation/**`; two-pass scout→plan, propose-approve-verify, streamed build window |
+| Live reasoning streaming | Shipped v0.4.0 | `LlmService.completeStream` + `LlmDelta{text, thinking}`; Ollama/Claude/OpenAI real streaming; reasoning shown in collapsible `thinking` console line |
+| Modify-plan (edit / revise) | Shipped v0.4.0 | Edit the proposed plan inline or revise via free-text feedback → re-plan through shared revision block |
+| Fix-on-failure | Shipped v0.4.0 | Verify failure (e.g. `dart analyze`) routes back through `_plan` in fix mode for a corrective plan |
+| Undo (edit backups) | Shipped v0.4.0 | Applied edits backed up to `.forge/impl_backups/`; one-click revert |
+| Streamed command runner | Shipped v0.4.0 | `Process.start` streaming + denylist + 3-min timeout; first streamed subprocess in the app |
+| keepAlive per-feature runs | Shipped v0.4.0 | Live build resumes on navigate-back; generation counter discards stale streams |
+| Entitlement gate | Stub v0.4.0 | Entitlement check present as a stub in `implementation_providers.dart`; not yet enforced/monetized |
+
+---
+
+## Releases
+
+| Feature | Status | Notes |
+|---|---|---|
+| Release tracking | Shipped v0.4.0 | `Releases` drift table (schemaVersion 2→3, create-only); mirrored to `.forge/tracker/releases.json` |
+| Cut release | Shipped v0.4.0 | `release_providers.dart` — group features by version → notes → CHANGELOG + git tag; feature status auto-transitions on ship |
+
+---
+
+## Design System & Onboarding (v0.4.0)
+
+| Feature | Status | Notes |
+|---|---|---|
+| ForgeTheme (design language v2) | Shipped v0.4.0 | `lib/core/theme/forge_theme.dart` — navy + ember/brass; replaced `AppTheme`; `rust #7A3826` = blocked/stuck |
+| Hearth Dial brand mark | Shipped v0.4.0 | `lib/core/widgets/hearth_dial.dart` — `CustomPainter` |
+| Launch splash + launch→home routing | Shipped v0.4.0 | `lib/features/launch/launch_screen.dart`; `/` splash → `/home` |
+| First-run onboarding | Shipped v0.4.0 | `lib/features/onboarding/first_run_screen.dart` |
+| Portfolio digest | Shipped v0.4.0 | `lib/features/tracker/widgets/portfolio_digest.dart` — `portfolioDigestProvider` + panel + `ForgeAppHeader` |
+| Active model chip | Shipped v0.4.0 | `lib/features/tracker/widgets/active_model_chip.dart` |
+| New Project 2-up | Shipped v0.4.0 | `new_project_screen.dart` reduced to two modes |
+
+---
+
 ## Interview Modes
 
 | Mode | Use case | Output |
