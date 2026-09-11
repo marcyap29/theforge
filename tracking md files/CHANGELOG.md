@@ -2,6 +2,13 @@
 
 ---
 
+## v0.4.1 — 2026-09-10
+
+- Create a code folder from inside The Forge — the "Link Repo" row and the Build-with-AI "no repo" prompt now offer **"Create a new code folder"**, which makes `~/Development/<name>`, `git init`s it, and links it automatically (or **"Link an existing folder"**). Closes the onboarding gap where a non-technical user had no repo for Build with AI to write into. New helpers `ProjectFileRepository.createCodeRepo` / `defaultCodeRoot`.
+- Hardening — the sandbox guard for agent writes (`ImplWorkspace.isPathSafe`) rejects absolute/`..` paths so a model-supplied edit can never escape the linked repo; folder pickers now pass `lockParentWindow` (BUG-UI-003).
+
+---
+
 ## v0.4.0 — 2026-09-10
 
 - Build with AI (§BWAI, Pro) — from a tracked feature, The Forge itself calls the LLM to implement it: a propose-&-approve loop that applies approved edits with per-step Undo (`.forge/impl_backups/<runId>/`), runs approved commands with live streamed output (`Process.start`), and verifies against the Handoff checklist; new `lib/features/implementation/` module

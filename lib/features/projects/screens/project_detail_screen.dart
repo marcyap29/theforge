@@ -2466,9 +2466,66 @@ class _RepoPathRowState extends State<_RepoPathRow> {
     if (mounted) setState(() => _repoPath = config['repoPath'] as String?);
   }
 
+  /// Offers two ways to give the project a code repo: create a fresh one, or
+  /// point at an existing folder.
+  Future<void> _chooseLink() async {
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Code repo'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'create'),
+            child: const ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.create_new_folder_outlined),
+              title: Text('Create a new code folder'),
+              subtitle: Text('Makes ~/Development/<name> and git-inits it'),
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'existing'),
+            child: const ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.folder_open_outlined),
+              title: Text('Link an existing folder'),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (choice == 'create') {
+      await _createNew();
+    } else if (choice == 'existing') {
+      await _pick();
+    }
+  }
+
+  Future<void> _createNew() async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final path =
+          await ProjectFileRepository.createCodeRepo(widget.projectName);
+      await ProjectFileRepository.writeProjectConfig(
+          widget.projectPath, {'repoPath': path});
+      if (mounted) {
+        setState(() => _repoPath = path);
+        messenger.showSnackBar(SnackBar(content: Text('Created and linked $path')));
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(
+          content: Text('Could not create folder: $e'),
+          backgroundColor: const Color(0xFF3F0A0A),
+        ));
+      }
+    }
+  }
+
   Future<void> _pick() async {
     final picked = await FilePicker.platform.getDirectoryPath(
       dialogTitle: 'Select implementation repo for ${widget.projectName}',
+      lockParentWindow: true,
     );
     if (picked == null) return;
     await ProjectFileRepository.writeProjectConfig(widget.projectPath, {'repoPath': picked});
@@ -2481,7 +2538,7 @@ class _RepoPathRowState extends State<_RepoPathRow> {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
-        onTap: _pick,
+        onTap: _chooseLink,
         child: Container(
           decoration: BoxDecoration(
             color: const Color(0xFF0F0F10),

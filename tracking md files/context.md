@@ -4,6 +4,22 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-10 — Claude Code [Onboarding: create-a-code-folder + review hardening — v0.4.1]
+
+**Branch:** main · **App:** v0.4.1
+
+### Done
+- **Create a code folder from inside The Forge** (§ONB): the project-detail "Link Repo" row and the Build-with-AI "no repo" prompt now offer **Create a new code folder** (makes `~/Development/<name>`, `git init`, seeds README, links it) or **Link an existing folder**. Closes the vibecoder onboarding gap where there was no repo for the agent to write into (The Forge never creates/clones repos otherwise; the fixed project root `~/Documents/The Forge Projects/` is only for `.forge` deliverables). New: `ProjectFileRepository.createCodeRepo` / `defaultCodeRoot`. Files: `project_file_repository.dart`, `project_detail_screen.dart` (`_RepoPathRow`), `project_tracker_screen.dart` (`_ensureRepoPath`).
+- **Review hardening (from the v0.4.0 code review):** sandboxed agent writes with `ImplWorkspace.isPathSafe` (rejects absolute/`..` so a model edit can't escape the repo) + `test/impl_workspace_test.dart`; folder pickers pass `lockParentWindow`; fixed a stale keepAlive docstring.
+
+### Verification
+`dart analyze lib/` clean · `flutter test` 15/15.
+
+### Next
+Real §MB entitlement backend; diff/patch-based edits + post-edit compile check (BUG-IMPL-003); cancel in-flight model call on Stop; per-screen ForgeTheme color migration; bundle Unbounded/IBM Plex Mono fonts.
+
+---
+
 ## Session: 2026-09-10 — Claude Code [Build with AI shipped + design kit (§BWAI / §UIK / §NP2) — v0.4.0]
 
 **Branch:** main · **Commits:** `71d7de4` → `027c64c` · **App:** v0.4.0

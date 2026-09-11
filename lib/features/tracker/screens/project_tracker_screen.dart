@@ -222,6 +222,72 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
 
   /// "Build with AI" (Pro): assemble the brief (feature + spec/handoff as
   /// context), open the implementation window, and update tracking on ship.
+  /// Returns a valid linked repo path, offering to create a fresh code folder
+  /// or link an existing one if the project has none yet. Null = cancelled.
+  Future<String?> _ensureRepoPath() async {
+    final config = await ProjectFileRepository.readProjectConfig(project.path);
+    final existing = config['repoPath'] as String?;
+    if (existing != null && Directory(existing).existsSync()) return existing;
+    if (!mounted) return null;
+
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('This project has no code repo'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'create'),
+            child: const ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.create_new_folder_outlined),
+              title: Text('Create a new code folder'),
+              subtitle: Text('Makes ~/Development/<name> and git-inits it'),
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'existing'),
+            child: const ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.folder_open_outlined),
+              title: Text('Link an existing folder'),
+            ),
+          ),
+        ],
+      ),
+    );
+    final messenger = ScaffoldMessenger.of(context);
+    if (choice == 'create') {
+      try {
+        final path = await ProjectFileRepository.createCodeRepo(project.name);
+        await ProjectFileRepository.writeProjectConfig(
+            project.path, {'repoPath': path});
+        if (mounted) {
+          messenger.showSnackBar(
+              SnackBar(content: Text('Created and linked $path')));
+        }
+        return path;
+      } catch (e) {
+        if (mounted) {
+          messenger.showSnackBar(SnackBar(
+            content: Text('Could not create folder: $e'),
+            backgroundColor: const Color(0xFF3F0A0A),
+          ));
+        }
+        return null;
+      }
+    } else if (choice == 'existing') {
+      final picked = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: 'Select code repo for ${project.name}',
+        lockParentWindow: true,
+      );
+      if (picked == null) return null;
+      await ProjectFileRepository.writeProjectConfig(
+          project.path, {'repoPath': picked});
+      return picked;
+    }
+    return null;
+  }
+
   Future<void> _buildFeature(Feature feature) async {
     final messenger = ScaffoldMessenger.of(context);
     if (!ref.read(entitlementProvider)) {
@@ -249,13 +315,8 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
       ));
       return;
     }
-    final config = await ProjectFileRepository.readProjectConfig(project.path);
-    final repoPath = config['repoPath'] as String?;
-    if (repoPath == null || !Directory(repoPath).existsSync()) {
-      messenger.showSnackBar(const SnackBar(
-          content: Text('Link a code repo first (Repo Path) to build.')));
-      return;
-    }
+    final repoPath = await _ensureRepoPath();
+    if (repoPath == null) return; // user cancelled the create/link prompt
 
     // Load spec/handoff context if a spec has been generated.
     String? lockedSpec;

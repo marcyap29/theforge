@@ -480,6 +480,44 @@ class ProjectFileRepository {
     }
   }
 
+  /// The default place a user's code lives (`~/Development`). New code folders
+  /// created from within The Forge go here, so a non-technical user never has
+  /// to make or find a repo folder themselves.
+  static String defaultCodeRoot() {
+    final home = Platform.environment['HOME'] ??
+        Platform.environment['USERPROFILE'] ??
+        '';
+    return p.join(home, 'Development');
+  }
+
+  /// Creates a fresh code folder for [projectName] under [defaultCodeRoot],
+  /// `git init`s it, and seeds a README so it's a valid, non-empty repo that
+  /// Build with AI can write into. Never overwrites — appends `-2`, `-3`… if a
+  /// folder of that name already exists. Returns the created absolute path.
+  static Future<String> createCodeRepo(String projectName) async {
+    final root = Directory(defaultCodeRoot());
+    await root.create(recursive: true);
+
+    final safe = projectName.trim().replaceAll(RegExp(r'[^\w.\-]+'), '-');
+    final base = safe.isEmpty ? 'project' : safe;
+    var dest = Directory(p.join(root.path, base));
+    var n = 2;
+    while (dest.existsSync()) {
+      dest = Directory(p.join(root.path, '$base-$n'));
+      n++;
+    }
+    await dest.create(recursive: true);
+
+    await File(p.join(dest.path, 'README.md'))
+        .writeAsString('# $projectName\n\nCreated by The Forge.\n');
+    // git init is best-effort — a machine without git still gets a usable
+    // folder that a user can init later.
+    try {
+      await Process.run('git', ['init'], workingDirectory: dest.path);
+    } catch (_) {}
+    return dest.path;
+  }
+
   /// Stages all changes and commits them in the linked repo. Returns true on
   /// success. Never throws — a non-repo or a failed commit returns false.
   static Future<bool> gitCommitAll(String repoPath, String message) async {

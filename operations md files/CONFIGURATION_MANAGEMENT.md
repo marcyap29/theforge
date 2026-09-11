@@ -175,6 +175,14 @@
 
 ## Change Log
 
+### 2026-09-10 — §ONB Create-a-code-folder + review hardening (v0.4.1)
+
+**Action:** Close the onboarding gap where a project had no code repo for Build with AI to write into. Added `ProjectFileRepository.createCodeRepo`/`defaultCodeRoot` (make `~/Development/<name>`, `git init`, seed README, link). Wired into `project_detail_screen.dart` (`_RepoPathRow` → create/link menu) and `project_tracker_screen.dart` (`_ensureRepoPath` — offered when Building a feature with no repo). Also from the v0.4.0 code review: sandboxed agent writes via `ImplWorkspace.isPathSafe` (+ `test/impl_workspace_test.dart`), `lockParentWindow` on folder pickers, stale-docstring fix.
+
+**Files modified:** `lib/data/filesystem/project_file_repository.dart`, `lib/features/projects/screens/project_detail_screen.dart`, `lib/features/tracker/screens/project_tracker_screen.dart`, `lib/features/implementation/data/impl_workspace.dart`, `lib/features/implementation/data/impl_agent.dart`, `lib/features/implementation/providers/implementation_notifier.dart`. **New:** `test/impl_workspace_test.dart`.
+
+**Verification:** `dart analyze lib/` clean; `flutter test` 15/15.
+
 ### 2026-09-10 — §BWAI Build with AI + §UIK Design Kit
 
 **Action:** Major release (v0.4.0). The Forge gains its first hands-on-keyboard mode — an in-app "Build with AI" implementation agent — plus a streaming LLM layer, release tracking with cut-release, and a full design-language v2 kit (ForgeTheme + Hearth Dial + launch/first-run/digest).

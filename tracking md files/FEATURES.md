@@ -75,6 +75,7 @@
 | Portfolio digest | Shipped v0.4.0 | `lib/features/tracker/widgets/portfolio_digest.dart` — `portfolioDigestProvider` + panel + `ForgeAppHeader` |
 | Active model chip | Shipped v0.4.0 | `lib/features/tracker/widgets/active_model_chip.dart` |
 | New Project 2-up | Shipped v0.4.0 | `new_project_screen.dart` reduced to two modes |
+| Create a code folder | Shipped v0.4.1 | `ProjectFileRepository.createCodeRepo` — makes `~/Development/<name>`, `git init`, links it; offered in the Link-Repo row and the Build-with-AI no-repo prompt |
 
 ---
 
