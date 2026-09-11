@@ -2,6 +2,13 @@
 
 ---
 
+## v0.4.5 — 2026-09-11
+
+- **Copy from the build console** — the console is now selectable (`SelectionArea`: drag-select + ⌘C) and there's a **Copy-all** button in the header, so you can grab an error/output and paste it back for a fix.
+- **See why planning failed** — on a "did not return valid JSON" failure the console now prints the model's **raw output** (selectable/copyable) instead of just a generic error, so the actual cause is visible. Plan token ceiling raised to 16000 so heavy reasoning can't starve the answer.
+
+---
+
 ## v0.4.4 — 2026-09-11
 
 - **Vibecode in the app** — the Build window now has a **persistent prompt box** at the bottom (like Claude Code): type an instruction any time the agent is idle (awaiting approval, or after a run finished/failed) and it re-plans with your message. Replaces the phase-limited "Revise" box.

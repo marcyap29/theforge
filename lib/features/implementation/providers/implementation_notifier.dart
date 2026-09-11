@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../services/llm/llm_provider.dart';
 import '../../../services/llm/llm_service_provider.dart';
 import '../data/command_runner.dart';
+import '../data/impl_agent.dart';
 import '../data/impl_workspace.dart';
 import '../models/run_session.dart';
 import 'implementation_providers.dart';
@@ -228,12 +229,30 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
       _phase(RunPhase.awaitingApproval);
     } catch (e) {
       if (gen != _gen || state.phase == RunPhase.stopped) return;
+      // Surface the model's raw output so the user can see (and copy) exactly
+      // what it returned — invaluable for diagnosing a bad-JSON failure.
+      if (e is ImplAgentException && (e.raw?.trim().isNotEmpty ?? false)) {
+        _log(ConsoleLineKind.info,
+            '— the model returned this (select to copy) —');
+        for (final line in _rawTail(e.raw!)) {
+          _log(ConsoleLineKind.stderr, line);
+        }
+      }
       _log(ConsoleLineKind.error, 'Planning failed: $e');
       state = state.copyWith(error: e.toString());
       _phase(RunPhase.failed);
     } finally {
       if (gen == _gen) _waitTimer?.cancel();
     }
+  }
+
+  /// The tail of a raw model response, split into console lines (bounded).
+  static List<String> _rawTail(String raw) {
+    var s = raw.trim();
+    const cap = 4000;
+    if (s.length > cap) s = '…${s.substring(s.length - cap)}';
+    final lines = s.split('\n');
+    return lines.length > 80 ? lines.sublist(lines.length - 80) : lines;
   }
 
   /// Hand-edit: replace the proposed content of one edit with the user's own.

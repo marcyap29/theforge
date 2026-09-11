@@ -77,6 +77,7 @@
 | New Project 2-up | Shipped v0.4.0 | `new_project_screen.dart` reduced to two modes |
 | Create a code folder | Shipped v0.4.1 | `ProjectFileRepository.createCodeRepo` — makes `~/Development/<name>`, `git init`, links it; offered in the Link-Repo row and the Build-with-AI no-repo prompt |
 | Vibecode prompt + Esc interrupt | Shipped v0.4.4 | Persistent input in the Build window (`notifier.steer`); Escape stops the running task |
+| Copyable build console + raw-output on failure | Shipped v0.4.5 | `SelectionArea` + Copy-all; failed planning prints the model's raw output for diagnosis |
 | Re-edit shipped features | Shipped v0.4.4 | "Build with AI" available on non-archived features, incl. shipped ("Re-build / edit with AI") |
 
 ---

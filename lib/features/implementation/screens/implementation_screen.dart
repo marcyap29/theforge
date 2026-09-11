@@ -118,6 +118,19 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
           style: const TextStyle(fontSize: 15),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.copy_all_outlined, size: 18),
+            tooltip: 'Copy the whole console',
+            onPressed: state.console.isEmpty
+                ? null
+                : () {
+                    Clipboard.setData(ClipboardData(
+                        text: state.console.map((l) => l.text).join('\n')));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Console copied to clipboard')),
+                    );
+                  },
+          ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 14, horizontal: 4),
             child: ActiveModelChip(),
@@ -404,28 +417,32 @@ class _Console extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = _items();
-    return Scrollbar(
-      controller: controller,
-      thumbVisibility: true,
-      interactive: true,
-      child: ListView.builder(
+    // SelectionArea makes the whole transcript drag-selectable and ⌘C-copyable,
+    // so the user can grab an error and paste it back for a fix.
+    return SelectionArea(
+      child: Scrollbar(
         controller: controller,
-        primary: false,
-        padding: const EdgeInsets.fromLTRB(14, 12, 22, 12),
-        itemCount: items.length,
-        itemBuilder: (_, idx) {
-          final item = items[idx];
-          if (item.isThinking) {
-            return _ThinkingBlock(
-              lines: item.think!,
-              collapsed: collapsed.contains(item.startIndex),
-              // The trailing block while a run is going is the one streaming.
-              active: running && idx == items.length - 1,
-              onToggle: () => onToggleBlock(item.startIndex),
-            );
-          }
-          return _lineWidget(item.line!);
-        },
+        thumbVisibility: true,
+        interactive: true,
+        child: ListView.builder(
+          controller: controller,
+          primary: false,
+          padding: const EdgeInsets.fromLTRB(14, 12, 22, 12),
+          itemCount: items.length,
+          itemBuilder: (_, idx) {
+            final item = items[idx];
+            if (item.isThinking) {
+              return _ThinkingBlock(
+                lines: item.think!,
+                collapsed: collapsed.contains(item.startIndex),
+                // The trailing block while a run is going is the one streaming.
+                active: running && idx == items.length - 1,
+                onToggle: () => onToggleBlock(item.startIndex),
+              );
+            }
+            return _lineWidget(item.line!);
+          },
+        ),
       ),
     );
   }

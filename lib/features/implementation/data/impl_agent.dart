@@ -6,8 +6,13 @@ import '../models/run_session.dart';
 import 'impl_workspace.dart';
 
 class ImplAgentException implements Exception {
-  ImplAgentException(this.message);
+  ImplAgentException(this.message, {this.raw});
   final String message;
+
+  /// The raw model output that couldn't be parsed — surfaced to the console so
+  /// the user can see (and copy) exactly what the model returned.
+  final String? raw;
+
   @override
   String toString() => message;
 }
@@ -106,7 +111,7 @@ class ImplAgent {
       system: _systemPrompt,
       user: planUserStr,
       temperature: 0.2,
-      maxTokens: 8000,
+      maxTokens: 16000,
       onDelta: onDelta,
     );
     try {
@@ -121,7 +126,7 @@ class ImplAgent {
             'valid JSON object. Output ONLY the JSON object now — no prose, no '
             'code fences, and do not ask to open more files. Use what you have.',
         temperature: 0.1,
-        maxTokens: 8000,
+        maxTokens: 16000,
         onDelta: onDelta,
       );
       return _parse(retry, repoPath);
@@ -298,10 +303,11 @@ it). The JSON must be a single top-level object with no code fences:
     try {
       decoded = jsonDecode(jsonText);
     } catch (_) {
-      throw ImplAgentException('The agent did not return valid JSON.');
+      throw ImplAgentException('The agent did not return valid JSON.', raw: raw);
     }
     if (decoded is! Map) {
-      throw ImplAgentException('The agent response was not a JSON object.');
+      throw ImplAgentException('The agent response was not a JSON object.',
+          raw: raw);
     }
 
     final rationale = (decoded['rationale'] ?? '').toString().trim();
@@ -373,7 +379,8 @@ it). The JSON must be a single top-level object with no code fences:
 
     if (edits.isEmpty && commands.isEmpty) {
       throw ImplAgentException(
-          'The agent proposed no changes. Try refining the feature description.');
+          'The agent proposed no changes. Try refining the feature description.',
+          raw: raw);
     }
     return AgentPlan(
       summary: summary.isNotEmpty ? summary : rationale,
