@@ -78,6 +78,8 @@
 | Create a code folder | Shipped v0.4.1 | `ProjectFileRepository.createCodeRepo` — makes `~/Development/<name>`, `git init`, links it; offered in the Link-Repo row and the Build-with-AI no-repo prompt |
 | Vibecode prompt + Esc interrupt | Shipped v0.4.4 | Persistent input in the Build window (`notifier.steer`); Escape stops the running task |
 | Copyable build console + raw-output on failure | Shipped v0.4.5 | `SelectionArea` + Copy-all; failed planning prints the model's raw output for diagnosis |
+| Build-with-AI compose screen | Shipped v0.4.7 | No auto-run; on-screen hints + prompt box; nothing sent until the user acts |
+| Build action buttons | Shipped v0.4.7 | Right-side: Build this feature / Run checks / Fix errors / Commit & push (git) |
 | Re-edit shipped features | Shipped v0.4.4 | "Build with AI" available on non-archived features, incl. shipped ("Re-build / edit with AI") |
 
 ---

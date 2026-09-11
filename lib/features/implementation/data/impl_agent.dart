@@ -52,10 +52,12 @@ class ImplAgent {
       files: files,
       keyDocs: keyDocs,
     );
-    // Revision: fold the previous plan + the user's steering into the context
-    // so both passes take it into account.
+    // Fold the user's instruction into the context. A first build frames it as
+    // "what the user asked for"; a later one as a revision of the prior plan.
     if (feedback != null && feedback.trim().isNotEmpty) {
-      context += _revisionBlock(previousPlan, feedback.trim());
+      context += previousPlan != null
+          ? _revisionBlock(previousPlan, feedback.trim())
+          : '\n\n## What the user asked you to build\n${feedback.trim()}\n';
     }
 
     // --- Pass 1 — Scout: which existing files does it need to read? ---

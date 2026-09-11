@@ -536,6 +536,18 @@ class ProjectFileRepository {
     }
   }
 
+  /// Pushes the linked repo's current branch to its remote. Returns true on
+  /// success; false (never throws) if there's no remote / auth fails.
+  static Future<bool> gitPush(String repoPath) async {
+    try {
+      final res =
+          await Process.run('git', ['push'], workingDirectory: repoPath);
+      return res.exitCode == 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Creates an annotated git tag in the linked repo. Returns true on success.
   static Future<bool> gitTag(String repoPath, String tag,
       {String? message}) async {

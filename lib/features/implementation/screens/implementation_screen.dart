@@ -29,17 +29,22 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
   /// Start-line indices of internal-thinking blocks the user has collapsed.
   final Set<int> _collapsedThinking = {};
 
+  /// Shared prompt/compose text — used by the bottom box AND the right-side
+  /// "Build this feature" button.
+  late final TextEditingController _input =
+      TextEditingController(text: widget.brief.featureDescription ?? '');
+
   String get _featureId => widget.brief.featureId;
+
+  ImplRunNotifier get _notifier =>
+      ref.read(implRunProvider(_featureId).notifier);
 
   @override
   void initState() {
     super.initState();
-    // start() is idempotent (guards on idle), so re-entering an in-flight or
-    // finished run re-attaches rather than restarting.
-    Future.microtask(
-      () => ref.read(implRunProvider(_featureId).notifier).start(widget.brief),
-    );
-    // Tick once a second so the header's elapsed time advances.
+    // NOTE: no auto-start. Opening the window shows a compose screen; the agent
+    // only runs when the user chooses an action or sends a prompt. Tick the
+    // elapsed clock while a run is active.
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
@@ -49,7 +54,37 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
   void dispose() {
     _ticker?.cancel();
     _scroll.dispose();
+    _input.dispose();
     super.dispose();
+  }
+
+  /// Send the prompt box: builds (with the typed instruction) when idle,
+  /// otherwise steers the current plan.
+  void _sendInput() {
+    final phase = ref.read(implRunProvider(_featureId)).phase;
+    final text = _input.text.trim();
+    if (phase == RunPhase.idle) {
+      _notifier.start(widget.brief, instruction: text.isEmpty ? null : text);
+      _input.clear();
+    } else if (text.isNotEmpty) {
+      _notifier.steer(text);
+      _input.clear();
+    }
+  }
+
+  /// Run a preset action (idle → build with it; else → steer).
+  void _action(String instruction) => _notifier.action(instruction);
+
+  void _buildFromInput() {
+    final phase = ref.read(implRunProvider(_featureId)).phase;
+    final text = _input.text.trim();
+    if (phase == RunPhase.idle) {
+      _notifier.start(widget.brief, instruction: text.isEmpty ? null : text);
+    } else {
+      // Already ran once — treat "Build" as a re-plan.
+      _notifier.action(text.isEmpty ? 'Continue building this feature.' : text);
+    }
+    _input.clear();
   }
 
   String _fmt(Duration d) {
@@ -178,17 +213,20 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
                 child: Column(
                   children: [
                     Expanded(
-                      child: _Console(
-                        lines: state.console,
-                        controller: _scroll,
-                        running: !state.phase.isTerminal,
-                        collapsed: _collapsedThinking,
-                        onToggleBlock: (i) => setState(() {
-                          _collapsedThinking.contains(i)
-                              ? _collapsedThinking.remove(i)
-                              : _collapsedThinking.add(i);
-                        }),
-                      ),
+                      child: (state.phase == RunPhase.idle &&
+                              state.console.isEmpty)
+                          ? _ComposeHints(featureTitle: widget.brief.featureTitle)
+                          : _Console(
+                              lines: state.console,
+                              controller: _scroll,
+                              running: !state.phase.isTerminal,
+                              collapsed: _collapsedThinking,
+                              onToggleBlock: (i) => setState(() {
+                                _collapsedThinking.contains(i)
+                                    ? _collapsedThinking.remove(i)
+                                    : _collapsedThinking.add(i);
+                              }),
+                            ),
                     ),
                     if (state.phase == RunPhase.awaitingApproval &&
                         state.plan != null)
@@ -223,10 +261,13 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
                         },
                         onClose: () => Navigator.of(context).pop(false),
                       ),
-                    // Always-available vibecode prompt.
-                    _VibeInput(
+                    // Always-available prompt box (shared controller with the
+                    // right-side "Build this feature" button).
+                    _PromptBox(
+                      controller: _input,
+                      idle: state.phase == RunPhase.idle,
                       busy: state.phase.isBusy,
-                      onSend: notifier.steer,
+                      onSend: _sendInput,
                     ),
                   ],
                 ),
@@ -234,7 +275,27 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
               Container(width: 1, color: const Color(0xFF1C1C1E)),
               SizedBox(
                 width: 260,
-                child: _Timeline(state: state, onUndo: notifier.undo),
+                child: Column(
+                  children: [
+                    _ActionsPanel(
+                      busy: state.phase.isBusy,
+                      hasRepo: widget.brief.repoPath.isNotEmpty,
+                      onBuild: _buildFromInput,
+                      onRunChecks: () => _action(
+                          'Run the project\'s analyzer and full test suite, '
+                          'report the results, and fix any failures.'),
+                      onFix: () => _action(
+                          'Find and fix build, analyzer, and test errors in the '
+                          'code for this feature.'),
+                      onCommitPush: () => notifier.commitAndPush(
+                          widget.brief.repoPath,
+                          'Implement ${widget.brief.featureTitle}'),
+                    ),
+                    Expanded(
+                      child: _Timeline(state: state, onUndo: notifier.undo),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -244,33 +305,140 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
   }
 }
 
-/// The persistent "vibecode" prompt at the bottom of the build window — type an
-/// instruction any time the agent is idle and it re-plans. Like Claude Code's
-/// input box.
-class _VibeInput extends StatefulWidget {
-  const _VibeInput({required this.busy, required this.onSend});
-  final bool busy;
-  final ValueChanged<String> onSend;
+/// Empty-state hints shown when the build window opens — nothing has run yet.
+class _ComposeHints extends StatelessWidget {
+  const _ComposeHints({required this.featureTitle});
+  final String featureTitle;
 
   @override
-  State<_VibeInput> createState() => _VibeInputState();
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.auto_awesome, size: 28, color: Color(0xFFE8A04C)),
+            const SizedBox(height: 14),
+            Text('Ready to build "$featureTitle".',
+                style: const TextStyle(
+                    fontSize: 16,
+                    color: Color(0xFFE5E5E7),
+                    fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            const Text(
+              'Nothing runs until you choose. You can:',
+              style: TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)),
+            ),
+            const SizedBox(height: 10),
+            _hint('Type what you want done in the box below, then press ↑ (or '
+                'just press "Build this feature" to use the feature\'s '
+                'description).'),
+            _hint('Use an action on the right → Build, Run checks, Fix errors, '
+                'or Commit & push.'),
+            _hint('While it works, press Esc to stop.'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _hint(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('•  ',
+                style: TextStyle(color: Color(0xFF6B7280), fontSize: 13)),
+            Expanded(
+              child: Text(text,
+                  style: const TextStyle(
+                      fontSize: 13, height: 1.4, color: Color(0xFF9CA3AF))),
+            ),
+          ],
+        ),
+      );
 }
 
-class _VibeInputState extends State<_VibeInput> {
-  final _c = TextEditingController();
+/// The right-side action buttons — the repeatable things you do over and over.
+class _ActionsPanel extends StatelessWidget {
+  const _ActionsPanel({
+    required this.busy,
+    required this.hasRepo,
+    required this.onBuild,
+    required this.onRunChecks,
+    required this.onFix,
+    required this.onCommitPush,
+  });
+
+  final bool busy;
+  final bool hasRepo;
+  final VoidCallback onBuild;
+  final VoidCallback onRunChecks;
+  final VoidCallback onFix;
+  final VoidCallback onCommitPush;
 
   @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: Color(0xFF1C1C1E))),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('ACTIONS',
+              style: TextStyle(
+                  fontSize: 11, letterSpacing: 1, color: Color(0xFF6B7280))),
+          const SizedBox(height: 10),
+          FilledButton.icon(
+            onPressed: busy ? null : onBuild,
+            icon: const Icon(Icons.play_arrow, size: 18),
+            label: const Text('Build this feature'),
+          ),
+          const SizedBox(height: 8),
+          _secondary(Icons.fact_check_outlined, 'Run checks',
+              busy ? null : onRunChecks),
+          const SizedBox(height: 6),
+          _secondary(
+              Icons.healing_outlined, 'Fix errors', busy ? null : onFix),
+          const SizedBox(height: 6),
+          _secondary(Icons.ios_share, 'Commit & push',
+              (busy || !hasRepo) ? null : onCommitPush),
+        ],
+      ),
+    );
   }
 
-  void _send() {
-    final t = _c.text.trim();
-    if (t.isEmpty || widget.busy) return;
-    widget.onSend(t);
-    _c.clear();
-  }
+  Widget _secondary(IconData icon, String label, VoidCallback? onTap) =>
+      OutlinedButton.icon(
+        onPressed: onTap,
+        icon: Icon(icon, size: 15),
+        label: Align(
+            alignment: Alignment.centerLeft, child: Text(label)),
+        style: OutlinedButton.styleFrom(
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        ),
+      );
+}
+
+/// The persistent prompt box at the bottom of the build window. Uses a shared
+/// controller (owned by the screen) so the right-side "Build this feature"
+/// button and this box read the same text. Sends on ↑ / Enter.
+class _PromptBox extends StatelessWidget {
+  const _PromptBox({
+    required this.controller,
+    required this.idle,
+    required this.busy,
+    required this.onSend,
+  });
+  final TextEditingController controller;
+  final bool idle;
+  final bool busy;
+  final VoidCallback onSend;
 
   @override
   Widget build(BuildContext context) {
@@ -284,16 +452,20 @@ class _VibeInputState extends State<_VibeInput> {
         children: [
           Expanded(
             child: TextField(
-              controller: _c,
-              enabled: !widget.busy,
-              onSubmitted: (_) => _send(),
+              controller: controller,
+              enabled: !busy,
+              minLines: 1,
+              maxLines: 4,
+              onSubmitted: (_) => onSend(),
               style:
                   const TextStyle(fontSize: 12.5, color: Color(0xFFE5E5E7)),
               decoration: InputDecoration(
                 isDense: true,
-                hintText: widget.busy
+                hintText: busy
                     ? 'Working… press Esc to stop'
-                    : 'Message the AI — what should it build or change next?',
+                    : idle
+                        ? 'Describe what to build (or press Build to use the feature\'s description)…'
+                        : 'Message the AI — what should it build or change next?',
                 hintStyle: const TextStyle(
                     color: Color(0xFF6B7280), fontSize: 12.5),
                 filled: true,
@@ -311,7 +483,7 @@ class _VibeInputState extends State<_VibeInput> {
           ),
           const SizedBox(width: 8),
           FilledButton(
-            onPressed: widget.busy ? null : _send,
+            onPressed: busy ? null : onSend,
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             ),

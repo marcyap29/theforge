@@ -2,6 +2,13 @@
 
 ---
 
+## v0.4.7 — 2026-09-11
+
+- **Build with AI no longer auto-runs.** Opening the window now shows a **compose screen** with on-screen hints — nothing is sent to the AI until you choose. Type what you want done in the prompt box (pre-filled with the feature's description) and press ↑, or use the new right-side **action buttons**.
+- **Right-side action buttons** for the things you do over and over: **Build this feature**, **Run checks** (analyze + tests), **Fix errors**, and **Commit & push** (stages/commits the linked repo and pushes to origin — deterministic git, no AI). Buttons + the manual prompt box share one input.
+
+---
+
 ## v0.4.6 — 2026-09-11
 
 - Fixed "Mark shipped" doing nothing in the build window (BUG-IMPL-005) — when a run was re-attached (the common case for a finished run), the shipped result was discarded, so you had to exit and ship from the board. Shipping is now applied from the persistent run state on both the fresh and re-attach paths.

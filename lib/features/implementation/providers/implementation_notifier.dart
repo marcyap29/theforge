@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../data/filesystem/project_file_repository.dart';
 import '../../../services/llm/llm_provider.dart';
 import '../../../services/llm/llm_service_provider.dart';
 import '../data/command_runner.dart';
@@ -137,19 +138,51 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     if (thinking) _appendStream(text, ConsoleLineKind.thinking);
   }
 
-  /// Kicks off the run: streams the agent's plan, then waits for approval.
-  Future<void> start(ImplBrief brief) async {
+  /// Kicks off the run: streams the agent's plan, then waits for approval. The
+  /// window no longer auto-starts — the user triggers this from the compose
+  /// screen (a Build action or the prompt box), optionally with an [instruction]
+  /// describing what to build.
+  Future<void> start(ImplBrief brief, {String? instruction}) async {
     if (state.phase != RunPhase.idle) return;
     _brief = brief;
     state = state.copyWith(startedAt: DateTime.now(), error: null);
-    _log(ConsoleLineKind.narration, 'Planning: "${brief.featureTitle}"');
+    _log(ConsoleLineKind.narration, 'Building: "${brief.featureTitle}"');
     _log(ConsoleLineKind.info, 'Repo: ${brief.repoPath}');
     final resolved = ref.read(llmServiceProvider).resolve(LlmRole.executor);
     if (resolved != null) {
       _log(ConsoleLineKind.info,
           'Model: ${resolved.provider.name} · ${resolved.modelId}');
     }
-    await _plan();
+    await _plan(feedback: instruction);
+  }
+
+  /// A quick preset action (Run checks, Fix errors, …) or the prompt box:
+  /// starts a fresh build with [instruction] when idle, otherwise steers the
+  /// current plan with it.
+  Future<void> action(String instruction) async {
+    if (state.phase.isBusy) return;
+    if (state.phase == RunPhase.idle) {
+      if (_brief != null) await start(_brief!, instruction: instruction);
+      return;
+    }
+    await steer(instruction);
+  }
+
+  /// Deterministic "Commit & push" — the action done most across sessions.
+  /// Stages + commits the linked repo with [message] and pushes to origin.
+  Future<void> commitAndPush(String repoPath, String message) async {
+    final path = repoPath.isNotEmpty ? repoPath : (_brief?.repoPath ?? '');
+    if (path.isEmpty || state.phase.isBusy) return;
+    _log(ConsoleLineKind.command, '\$ git add -A && git commit -m "$message" && git push');
+    final committed = await ProjectFileRepository.gitCommitAll(path, message);
+    if (!committed) {
+      _log(ConsoleLineKind.info, 'Nothing to commit (or not a git repo).');
+      return;
+    }
+    _log(ConsoleLineKind.success, '✓ committed: $message');
+    final pushed = await ProjectFileRepository.gitPush(path);
+    _log(pushed ? ConsoleLineKind.success : ConsoleLineKind.stderr,
+        pushed ? '✓ pushed to origin' : '✗ push failed (no remote / auth?)');
   }
 
   /// The always-available "vibecode" input: steer the AI with a free-text

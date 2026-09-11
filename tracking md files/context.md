@@ -4,6 +4,22 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-11 — Claude Code [Build-with-AI compose screen + action buttons — v0.4.7]
+
+**Branch:** main · **App:** v0.4.7
+
+### Done
+- **No auto-run on open.** Removed the auto-`start()` in `ImplementationScreen.initState`; the window opens to a compose state (`_ComposeHints`) — nothing is sent until the user acts.
+- **Compose prompt box** (`_PromptBox`) bound to a screen-owned controller pre-filled with the feature description; sends via `_sendInput` (idle → `notifier.start(instruction:)`, else → `steer`).
+- **Right-side action buttons** (`_ActionsPanel`) for repeatable actions chosen from our session history: **Build this feature**, **Run checks**, **Fix errors** (AI prompts via `notifier.action`), and **Commit & push** (deterministic git via `notifier.commitAndPush` → `gitCommitAll` + new `gitPush`).
+- Notifier: `start(brief, {instruction})`, `action(instruction)`, `commitAndPush(repoPath, message)`; first-build framing in `impl_agent` ("What the user asked you to build") vs the revision block.
+- **Also codified standing rules** into `CLAUDE.md` v1.1.0 (docs-ship-with-code; feature not done until docs+commit+push; use `templates/`) and pulled the doc/config scaffold into `templates/` (commit `c1a1971`).
+
+### Verification
+`dart analyze lib/` clean · `flutter test` 15/15.
+
+---
+
 ## Session: 2026-09-11 — Claude Code [Fix Mark-shipped on reattach — v0.4.6]
 
 **Branch:** main · **App:** v0.4.6
