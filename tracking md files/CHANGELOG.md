@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.2 — 2026-09-10
+
+- Fixed Build with AI "Planning failed: did not return valid JSON" (BUG-IMPL-004) on heavy reasoning models — the model spent its turn thinking and never emitted JSON. Ollama now sends `num_predict` (generous ceiling so thinking can't starve the answer), the plan pass budget is larger (8000; scout 4000), the prompt forbids "asking for more files" and forces JSON-only output, and the agent auto-retries once before failing. Tip: prefer an instruction-following/coder model for Build with AI.
+
+---
+
 ## v0.4.1 — 2026-09-10
 
 - Create a code folder from inside The Forge — the "Link Repo" row and the Build-with-AI "no repo" prompt now offer **"Create a new code folder"**, which makes `~/Development/<name>`, `git init`s it, and links it automatically (or **"Link an existing folder"**). Closes the onboarding gap where a non-technical user had no repo for Build with AI to write into. New helpers `ProjectFileRepository.createCodeRepo` / `defaultCodeRoot`.

@@ -9,6 +9,7 @@ Newest session first. Each block is prepended.
 **Branch:** main · **App:** v0.4.1
 
 ### Done
+- **Fixed Build-with-AI planning failure on reasoning models** (BUG-IMPL-004, v0.4.2): glm-5.3 spent the whole turn thinking and returned no valid JSON. Ollama now sends `num_predict` (generous ceiling), plan budget 8000 / scout 4000, prompt forbids asking for more files + forces JSON-only, and the agent auto-retries once. Files: `ollama_provider.dart`, `impl_agent.dart`.
 - **Create a code folder from inside The Forge** (§ONB): the project-detail "Link Repo" row and the Build-with-AI "no repo" prompt now offer **Create a new code folder** (makes `~/Development/<name>`, `git init`, seeds README, links it) or **Link an existing folder**. Closes the vibecoder onboarding gap where there was no repo for the agent to write into (The Forge never creates/clones repos otherwise; the fixed project root `~/Documents/The Forge Projects/` is only for `.forge` deliverables). New: `ProjectFileRepository.createCodeRepo` / `defaultCodeRoot`. Files: `project_file_repository.dart`, `project_detail_screen.dart` (`_RepoPathRow`), `project_tracker_screen.dart` (`_ensureRepoPath`).
 - **Review hardening (from the v0.4.0 code review):** sandboxed agent writes with `ImplWorkspace.isPathSafe` (rejects absolute/`..` so a model edit can't escape the repo) + `test/impl_workspace_test.dart`; folder pickers pass `lockParentWindow`; fixed a stale keepAlive docstring.
 

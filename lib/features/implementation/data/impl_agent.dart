@@ -58,9 +58,11 @@ class ImplAgent {
     final scoutRaw = await _stream(
       system: _scoutSystemPrompt,
       user: '$context\n\nReturn ONLY: '
-          '{"files": ["repo/relative/path", …]} (at most 12 files).',
+          '{"files": ["repo/relative/path", …]} (at most 12 files). Always '
+          'include any data-model / schema / drift database file the feature '
+          'touches.',
       temperature: 0.1,
-      maxTokens: 1200,
+      maxTokens: 4000,
       onDelta: onDelta,
     );
     final wanted = _parseFileList(scoutRaw);
@@ -96,14 +98,31 @@ class ImplAgent {
           ..writeln();
       });
     }
+    final planUserStr = planUser.toString();
     final planRaw = await _stream(
       system: _systemPrompt,
-      user: planUser.toString(),
+      user: planUserStr,
       temperature: 0.2,
-      maxTokens: 4000,
+      maxTokens: 8000,
       onDelta: onDelta,
     );
-    return _parse(planRaw, repoPath);
+    try {
+      return _parse(planRaw, repoPath);
+    } on ImplAgentException {
+      // Reasoning models sometimes spend the turn thinking and never emit a
+      // clean JSON object. Ask once more, firmly, for JSON only.
+      onStatus?.call('Tidying the plan into valid JSON…');
+      final retry = await _stream(
+        system: _systemPrompt,
+        user: '$planUserStr\n\nIMPORTANT: your previous reply was NOT a single '
+            'valid JSON object. Output ONLY the JSON object now — no prose, no '
+            'code fences, and do not ask to open more files. Use what you have.',
+        temperature: 0.1,
+        maxTokens: 8000,
+        onDelta: onDelta,
+      );
+      return _parse(retry, repoPath);
+    }
   }
 
   /// Streams one completion, forwarding deltas for live display and returning
@@ -195,6 +214,10 @@ the SPEC to follow the codebase's existing structure and conventions. When
 CURRENT FILE CONTENTS are provided, base your edits on that exact code —
 preserve everything you are not intentionally changing (do not drop imports,
 methods, or unrelated code); return the COMPLETE updated file.
+
+You already have all the files you are going to get. Do NOT ask to open more
+files and do NOT stop to explain — if a detail is uncertain, make your best
+reasonable choice and proceed. Your entire final answer MUST be the JSON object.
 
 First, briefly narrate your plan in 1-3 short sentences of plain English so the
 user can follow your thinking. THEN output the JSON object (and nothing after

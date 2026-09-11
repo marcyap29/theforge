@@ -33,7 +33,12 @@ class OllamaProvider extends LlmProvider {
       body: jsonEncode({
         'model': modelId,
         'stream': false,
-        'options': {'temperature': temperature},
+        'options': {
+          'temperature': temperature,
+          // Ensure the model has room to finish (thinking + answer); without
+          // this a long reasoning phase can starve the actual response.
+          if (maxTokens != null) 'num_predict': maxTokens,
+        },
         'messages': [
           {'role': 'system', 'content': systemPrompt},
           {'role': 'user', 'content': userPrompt},
@@ -69,7 +74,12 @@ class OllamaProvider extends LlmProvider {
         ..body = jsonEncode({
           'model': modelId,
           'stream': true,
-          'options': {'temperature': temperature},
+          'options': {
+          'temperature': temperature,
+          // Ensure the model has room to finish (thinking + answer); without
+          // this a long reasoning phase can starve the actual response.
+          if (maxTokens != null) 'num_predict': maxTokens,
+        },
           'messages': [
             {'role': 'system', 'content': systemPrompt},
             {'role': 'user', 'content': userPrompt},
