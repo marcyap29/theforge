@@ -4,6 +4,18 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-11 — Claude Code [Fix Mark-shipped on reattach — v0.4.6]
+
+**Branch:** main · **App:** v0.4.6
+
+### Done
+- **Fixed BUG-IMPL-005:** "Mark shipped" in the build window did nothing when the run was re-attached (`_buildFeature`'s reattach path `await push; return;` discarded the result; only the fresh path handled shipping). Extracted `_handleBuildResult(feature)` that reads the keepAlive run state's `featureShipped` and applies status+release; called on BOTH nav paths. File: `project_tracker_screen.dart`.
+
+### Verification
+`dart analyze lib/` clean · `flutter test` 15/15.
+
+---
+
 ## Session: 2026-09-11 — Claude Code [Copy console + diagnose planning failure — v0.4.5]
 
 **Branch:** main · **App:** v0.4.5

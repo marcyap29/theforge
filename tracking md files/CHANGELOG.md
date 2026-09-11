@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.6 — 2026-09-11
+
+- Fixed "Mark shipped" doing nothing in the build window (BUG-IMPL-005) — when a run was re-attached (the common case for a finished run), the shipped result was discarded, so you had to exit and ship from the board. Shipping is now applied from the persistent run state on both the fresh and re-attach paths.
+
+---
+
 ## v0.4.5 — 2026-09-11
 
 - **Copy from the build console** — the console is now selectable (`SelectionArea`: drag-select + ⌘C) and there's a **Copy-all** button in the header, so you can grab an error/output and paste it back for a fix.

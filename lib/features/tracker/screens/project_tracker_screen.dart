@@ -313,6 +313,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
           ),
         ),
       ));
+      if (mounted) await _handleBuildResult(feature);
       return;
     }
     final repoPath = await _ensureRepoPath();
@@ -364,22 +365,28 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     ref.invalidate(portfolioProvider);
 
     if (!mounted) return;
-    final shipped = await Navigator.of(context).push<bool>(
+    await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => ImplementationScreen(brief: brief)),
     );
+    if (mounted) await _handleBuildResult(feature);
+  }
 
-    if (shipped == true) {
+  /// After the build window closes, reflect a "Mark shipped" into the tracker —
+  /// set the feature shipped and ensure a release row for its version. Reads the
+  /// keepAlive run state so it works whether the window was freshly launched or
+  /// re-attached (the reattach path previously dropped this).
+  Future<void> _handleBuildResult(Feature feature) async {
+    if (!ref.read(implRunProvider(feature.id)).featureShipped) return;
+    await ref
+        .read(featureListProvider(project.id).notifier)
+        .setStatus(feature, FeatureStatus.shipped);
+    final v = feature.targetVersion?.trim();
+    if (v != null && v.isNotEmpty) {
       await ref
-          .read(featureListProvider(project.id).notifier)
-          .setStatus(feature, FeatureStatus.shipped);
-      final v = feature.targetVersion?.trim();
-      if (v != null && v.isNotEmpty) {
-        await ref
-            .read(releaseListProvider(project.id).notifier)
-            .ensureForVersion(v, projectPath: project.path);
-      }
-      ref.invalidate(portfolioProvider);
+          .read(releaseListProvider(project.id).notifier)
+          .ensureForVersion(v, projectPath: project.path);
     }
+    ref.invalidate(portfolioProvider);
   }
 
   Future<void> _scanRepo() async {

@@ -88,8 +88,9 @@
 - **`FutureBuilder(future: _scan())` in a `StatefulWidget` only refreshes on `build()`.** Popping a route does not automatically trigger `build()` on the widget beneath. Use `RouteAware.didPopNext()` to call `setState` and create a new future when the parent route becomes visible again.
 - **Never use `vv1` double-prefix.** If a version string already contains `v` (e.g., `'v1'`), don't prepend another: use `${version}` not `v${version}` in filenames.
 - **`InkWell` on macOS Flutter desktop requires an immediate `Material` ancestor.** A `Scaffold` or any other `Material` widget higher in the tree is NOT sufficient — Flutter's ink system requires a local `Material` in the subtree. Wrap with `Material(color: Colors.transparent)` around the `InkWell`. Match the `_FileRow` pattern in `project_detail_screen.dart`.
+- **Don't rely on one nav path's `pop()` result for state reachable via multiple paths.** If a screen can be opened more than one way (e.g. a fresh launch vs a keepAlive re-attach), handle its result on EVERY path — or read the persistent (keepAlive) state after it closes rather than trusting the pop value. The Build window's "Mark shipped" was handled only on the fresh path; the re-attach path discarded it. See BUG-IMPL-005.
 
-**Past bugs:** June 2026 — HandoffPackage named `_vv1` due to `v$version` where `version = 'v1'`. June 2026 — `_ReferenceDocsRow` Manage button unresponsive on macOS until wrapped with `Material(color: Colors.transparent)`.
+**Past bugs:** June 2026 — HandoffPackage named `_vv1` due to `v$version` where `version = 'v1'`. June 2026 — `_ReferenceDocsRow` Manage button unresponsive on macOS until wrapped with `Material(color: Colors.transparent)`. Sep 2026 — BUG-IMPL-005: "Mark shipped" ignored on the re-attach nav path.
 
 ---
 

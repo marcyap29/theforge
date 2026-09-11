@@ -32,3 +32,4 @@ Records go in `bugtracker/records/` — one file per bug.
 | BUG-IMPL-002 | IMPL | "Apply & Run" quit the whole app — unbounded console growth, no command denylist/timeout, unguarded `applyAndRun`; capped 5000 lines + denylist + 3-min timeout + wrap | 2026-09-10 |
 | BUG-IMPL-003 | IMPL | "Build with AI" full-file rewrite dropped ~345 lines / wouldn't compile — root-fixed in v0.4.3 by switching to find/replace hunks (untouched code never re-emitted) | 2026-09-10 |
 | BUG-IMPL-004 | IMPL | Build with AI "Planning failed: did not return valid JSON" — reasoning model spent the turn thinking; unmanaged Ollama generation; forced JSON-only + num_predict + bigger budget + auto-retry | 2026-09-10 |
+| BUG-IMPL-005 | IMPL | "Mark shipped" in the build window did nothing when the run was re-attached — the reattach nav path discarded the pop result; now reads keepAlive `featureShipped` on both paths | 2026-09-11 |
