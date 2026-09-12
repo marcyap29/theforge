@@ -47,7 +47,7 @@ Long-term feature pool. Active sprint work lives in `planner.md`.
   → §UIK Forge design kit — ForgeTheme, Hearth Dial, launch splash, onboarding, portfolio digest ✅ (2026-09-10, v0.4.0)
        ↓
   → §CTX1 Wire ingested reference context into Build-with-AI (always-on slot + visible trim) ✅ (2026-09-11, v0.4.8)
-  → §CTX2 Feature-build memory — write a "what we built + why" record back into the pool after each ship, so future builds retrieve it ("gained + remains") (not started)
+  → §CTX2 Feature-build memory — write a "what we built + why" record back into the pool after each ship, so future builds retrieve it ("gained + remains") ✅ (2026-09-11, v0.4.9)
   → §CTX3 Unified context manifest (specs + handoffs + past features) + doc-aware scout (scout selects doc-pool entries, not just code files) (not started)
   → §CTX4 Optional embeddings/vector retrieval — only when a project's pool outgrows an LLM-readable index; drop-in behind the scout interface (not started)
        ↓

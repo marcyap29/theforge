@@ -2,6 +2,14 @@
 
 ---
 
+## v0.4.9 — 2026-09-11
+
+- **Builds now remember what you built before.** When you **ship** a feature, The Forge saves a durable record — what was built, why, and which files changed — into a per-project **build-memory** pool (`.forge/build_memory/`). Every later build reads that pool back, so the AI follows the patterns and file layout it already established instead of starting cold. This is the "context that's gained and remains" — the same way a human (or Claude Code) carries forward what it learned earlier in a project.
+- **Re-shipping updates, never duplicates.** Each feature keeps one record (overwritten on re-build), so the memory stays clean as you iterate.
+- **Visible in the console.** A build now logs `Loaded build memory (N prior features)` when planning, and `Saved to build memory…` when you ship — so you can see context accumulating.
+
+---
+
 ## v0.4.8 — 2026-09-11
 
 - **Builds now start with your reference docs, not just code.** The Build-with-AI agent reads the project's **ingested reference context** — the same document pool the interview and spec stages already use — on every planning round. Previously the builder only saw the locked spec (silently cut at 6k chars), a fixed doc whitelist, and the code file list; the intake docs never reached it. Add docs on the project and they now ground every feature build.

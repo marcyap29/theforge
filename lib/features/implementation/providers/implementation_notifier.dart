@@ -212,11 +212,10 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     // interview and spec stages already read — so the build starts with the
     // intake docs, not just code. Re-read each round so docs added mid-session
     // are picked up, and surface a line so the user can SEE context was loaded.
+    final repo = ref.read(projectFileRepositoryProvider);
     String? ingestedContext;
     try {
-      ingestedContext = await ref
-          .read(projectFileRepositoryProvider)
-          .readIngestedSummary(brief.projectPath);
+      ingestedContext = await repo.readIngestedSummary(brief.projectPath);
     } catch (_) {}
     if (ingestedContext != null && ingestedContext.trim().isNotEmpty) {
       final words = ingestedContext.trim().split(RegExp(r'\s+')).length;
@@ -224,6 +223,18 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     } else {
       _log(ConsoleLineKind.info,
           'No reference context yet — add docs on the project to ground builds.');
+    }
+
+    // Load prior-build memory — what already shipped on this project — so the
+    // build accumulates context across features instead of starting cold.
+    String? buildMemory;
+    try {
+      buildMemory = await repo.readBuildMemory(brief.projectPath);
+    } catch (_) {}
+    if (buildMemory != null && buildMemory.trim().isNotEmpty) {
+      final n = RegExp(r'(?:^|\n)### ').allMatches(buildMemory).length;
+      _log(ConsoleLineKind.info,
+          'Loaded build memory ($n prior feature${n == 1 ? '' : 's'})');
     }
 
     _log(ConsoleLineKind.info, 'Waiting for the model to respond…');
@@ -251,6 +262,7 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
         lockedSpec: brief.lockedSpec,
         goalStatement: brief.goalStatement,
         ingestedContext: ingestedContext,
+        buildMemory: buildMemory,
         components: brief.components,
         previousPlan: previousPlan,
         feedback: feedback,
@@ -495,8 +507,48 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     _log(ConsoleLineKind.info, 'Reverted $path');
   }
 
-  void markFeatureShipped() =>
-      state = state.copyWith(featureShipped: true);
+  /// Ships the feature: first records a durable "what we built + why" memory
+  /// into the project's build-memory pool (so future builds on this project
+  /// read it back in [_plan] — context that's gained and remains), then flags
+  /// the run shipped. Safe with no plan (nothing to record — just flags).
+  Future<void> shipFeature() async {
+    final brief = _brief;
+    final plan = state.plan;
+    if (brief != null && plan != null) {
+      final paths = state.appliedEditPaths.isNotEmpty
+          ? state.appliedEditPaths.toList()
+          : plan.edits.map((e) => e.path).toList();
+      try {
+        await ref.read(projectFileRepositoryProvider).writeBuildMemory(
+            brief.projectPath, brief.featureId, buildMemoryRecord(brief, plan, paths));
+        _log(ConsoleLineKind.success,
+            'Saved to build memory — future features on this project will see this.');
+      } catch (e) {
+        _log(ConsoleLineKind.info, 'Could not save build memory: $e');
+      }
+    }
+    state = state.copyWith(featureShipped: true);
+  }
+
+  /// One concise markdown record of a shipped feature for the build-memory pool.
+  /// Public + static so it can be unit-tested without a filesystem or notifier.
+  static String buildMemoryRecord(
+      ImplBrief brief, AgentPlan plan, List<String> paths) {
+    final version = brief.targetVersion?.trim();
+    final b = StringBuffer()
+      ..writeln('### ${brief.featureTitle}'
+          '${version != null && version.isNotEmpty ? ' ($version)' : ''}');
+    if (plan.summary.isNotEmpty) {
+      b.writeln('**What was built:** ${plan.summary}');
+    }
+    if (plan.rationale.isNotEmpty) {
+      b.writeln('**Why / approach:** ${plan.rationale}');
+    }
+    if (paths.isNotEmpty) {
+      b.writeln('**Files changed:** ${paths.join(', ')}');
+    }
+    return b.toString().trim();
+  }
 
   void stop() {
     _gen++; // invalidate any in-flight planning stream

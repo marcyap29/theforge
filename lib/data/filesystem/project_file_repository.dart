@@ -319,6 +319,42 @@ class ProjectFileRepository {
     return summaryFile.readAsString();
   }
 
+  /// Writes/overwrites the durable build-memory record for one feature into
+  /// `.forge/build_memory/<featureId>.md`. One file per feature (overwritten on
+  /// re-ship) so re-building a feature updates its record instead of appending a
+  /// duplicate. This is the "gained" half of accumulating project context.
+  Future<void> writeBuildMemory(
+      String projectPath, String featureId, String content) async {
+    final dir = Directory(p.join(projectPath, forgeDirName, 'build_memory'));
+    await dir.create(recursive: true);
+    final safe = featureId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+    await File(p.join(dir.path, '$safe.md')).writeAsString(content);
+  }
+
+  /// Concatenates every shipped feature's build-memory record into one block for
+  /// the build agent to read back — this is how context "remains" and grows
+  /// across features instead of every build starting cold. Returns null if no
+  /// features have shipped yet.
+  Future<String?> readBuildMemory(String projectPath) async {
+    final dir = Directory(p.join(projectPath, forgeDirName, 'build_memory'));
+    if (!dir.existsSync()) return null;
+    final files = dir
+        .listSync()
+        .whereType<File>()
+        .where((f) => p.extension(f.path) == '.md')
+        .toList()
+      ..sort((a, b) => a.path.compareTo(b.path));
+    if (files.isEmpty) return null;
+    final buf = StringBuffer();
+    for (final f in files) {
+      final c = (await f.readAsString()).trim();
+      if (c.isEmpty) continue;
+      buf..writeln(c)..writeln();
+    }
+    final s = buf.toString().trim();
+    return s.isEmpty ? null : s;
+  }
+
   Future<void> deleteProject(String projectPath) async {
     final dir = Directory(projectPath);
     if (dir.existsSync()) {

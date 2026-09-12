@@ -201,6 +201,8 @@ Every Forge project is a folder on the user's machine. Default root: `~/Document
     ├── ingested/
     │   ├── reference_context.md                   — extracted facts from reference docs
     │   └── {ProjectName}_V2Seeds.md               — deferred capabilities list (written at L3)
+    ├── build_memory/
+    │   └── <featureId>.md                         — per-shipped-feature "what/why/files" record (§CTX2); read back into every build
     └── audit/
         └── {ProjectName}_AuditLog.md              — append-only
 ```
@@ -397,14 +399,14 @@ The Forge's first hands-on-keyboard mode: an in-app agent that implements a trac
 | **Brains** | `data/impl_agent.dart` | Two-pass scout → plan LLM pipeline; revision block for modify-plan / fix; `buildUserContext` (public/static) assembles the always-on block incl. the ingested reference-context slot, with visible over-budget trim markers |
 | **Hands (repo)** | `data/impl_workspace.dart` | Gather repo files + `gatherKeyDocs`, apply edits with `.forge/impl_backups/` Undo, checklist verify |
 | **Hands (shell)** | `data/command_runner.dart` | `Process.start` streamed subprocess + denylist + 3-min timeout — the FIRST streamed subprocess in the app |
-| **Conductor** | `providers/implementation_notifier.dart` | keepAlive per-feature run state machine; `_plan` shared by start / revise / fix; generation counter for stale-stream safety |
+| **Conductor** | `providers/implementation_notifier.dart` | keepAlive per-feature run state machine; `_plan` shared by start / revise / fix (loads ingested + build-memory pools each round); `shipFeature` writes a build-memory record via `buildMemoryRecord`; generation counter for stale-stream safety |
 | **Registry** | `providers/implementation_providers.dart` | Entitlement stub + `implActiveRunsProvider` registry |
 | **Window** | `screens/implementation_screen.dart` | Streamed console, collapsible thinking, approval / edit / revise controls |
 | **Diff** | `widgets/diff_view.dart` | LCS line diff for proposed edits |
 
 ### Propose → approve → verify loop
 
-1. **Scout** — pass one reads the repo (`gatherKeyDocs` + file gather), the feature's tracker context, and the project's **ingested reference context** (`.forge/ingested/reference_context.md`, re-read each round by `_plan` — the same pool the interview/spec use); the agent narrates its understanding (streamed as `thinking` / `presentation` lines).
+1. **Scout** — pass one reads the repo (`gatherKeyDocs` + file gather), the feature's tracker context, the project's **ingested reference context** (`.forge/ingested/reference_context.md`), and **prior-build memory** (`.forge/build_memory/`, records of what earlier features shipped) — all re-read each round by `_plan`; the agent narrates its understanding (streamed as `thinking` / `presentation` lines).
 2. **Plan** — pass two produces an `AgentPlan`: an ordered set of `ProposedEdit`s and `ProposedCommand`s. The model returns targeted **find/replace hunks** for existing files (full `content` only for brand-new files); the parser applies the hunks to the current file to compute the new content, so untouched code is never re-emitted (roots out the whole-file-rewrite drop, BUG-IMPL-003). Edits are shown as an LCS diff.
 3. **Approve** — nothing touches disk until the user approves. The user can approve, **edit** the plan, or **revise** it (free-text feedback → re-plan via the shared revision block).
 4. **Apply** — approved edits are written; the prior file contents are backed up to `.forge/impl_backups/` so any change is one-click **Undo**-able. Approved commands run through `command_runner` (streamed, denylisted, timed out).
@@ -479,7 +481,7 @@ A cohesive visual identity replacing the original monospace shell.
 
 ## Deliverable Layout (.forge)
 
-- Every generated artifact for a project lives under a hidden `.forge/` folder (subfolders: `specs` / `worksheets` / `handoffs` / `audit` / `forge` / `ingested` / `exports` / `tracker`)
+- Every generated artifact for a project lives under a hidden `.forge/` folder (subfolders: `specs` / `worksheets` / `handoffs` / `audit` / `forge` / `ingested` / `build_memory` / `exports` / `tracker`)
 - `README.md` and `user_notes.md` stay at the project root
 - Central constant `ProjectFileRepository.forgeDirName`
 - Canonical projects root is a FIXED home (`~/Documents/The Forge Projects`) — NOT user-configurable, and never a code repo

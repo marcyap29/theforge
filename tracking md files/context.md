@@ -4,6 +4,32 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-11 — Claude Code [Feature-build memory — "gained + remains" — v0.4.9]
+
+**Branch:** main · **App:** v0.4.9 · **Backlog:** §CTX2 ✅
+
+### Why
+Second step of the context roadmap agreed with Marc. v0.4.8 wired the *ingested* pool into builds (context "started"); §CTX2 adds the *accumulating* half: every build was still amnesiac about what earlier features on the same project had built.
+
+### Design
+The ship action (`markFeatureShipped` → renamed `shipFeature`) is the single choke point where the user declares a build the kept outcome, and the run state still holds the `plan` (summary/rationale/edits) + `appliedEditPaths`. So we capture the memory there. Storage mirrors the existing ingestion pattern: **one file per feature** under `.forge/build_memory/<featureId>.md` (overwritten on re-ship → no duplicates), concatenated on read. A distinct build-prompt slot (`## Prior builds on this project`) keeps internal history separate from external reference docs so the model treats them differently.
+
+### Done
+- `ProjectFileRepository`: `writeBuildMemory(projectPath, featureId, content)` (per-feature file, overwrite) + `readBuildMemory(projectPath)` (concatenate all, null if none).
+- `impl_agent.dart`: `proposePlan`/`buildUserContext` gain `buildMemory`; new capped (8k) `## Prior builds on this project (reuse these patterns and files)` slot.
+- `implementation_notifier.dart`: `_plan` reads `readBuildMemory` each round (reusing one repo handle for both pools) and logs `Loaded build memory (N prior features)`; `shipFeature()` writes the record via new public-static `buildMemoryRecord(brief, plan, paths)` then flags shipped, logging `Saved to build memory…`.
+- `implementation_screen.dart`: ship button now `await notifier.shipFeature()` (with `context.mounted` guard) before pop.
+- Tests: `test/build_memory_test.dart` (record format; write/read round-trip; re-ship overwrites; multi-feature accumulation) + 2 new slot cases in `test/impl_agent_test.dart`.
+
+### Verification
+`dart analyze lib/` clean · `flutter test` **26/26** green.
+
+### Next
+- §CTX3: unify specs/handoffs/build-memory into one manifest + extend the scout to select doc-pool entries (not just code files).
+- §CTX4: optional embeddings, only when a pool outgrows an LLM-readable index.
+
+---
+
 ## Session: 2026-09-11 — Claude Code [Wire ingested reference context into Build-with-AI — v0.4.8]
 
 **Branch:** main · **App:** v0.4.8

@@ -24,6 +24,24 @@ void main() {
       expect(out, isNot(contains('Reference context')));
     });
 
+    test('includes prior-build memory when provided', () {
+      final out = ImplAgent.buildUserContext(
+        featureTitle: 'Add logout',
+        files: const ['lib/main.dart'],
+        buildMemory: '### Add login\n**Files changed:** lib/auth.dart',
+      );
+      expect(out, contains('## Prior builds on this project'));
+      expect(out, contains('lib/auth.dart'));
+    });
+
+    test('omits the prior-builds block when no memory exists', () {
+      final out = ImplAgent.buildUserContext(
+        featureTitle: 'Add login',
+        files: const ['lib/main.dart'],
+      );
+      expect(out, isNot(contains('Prior builds')));
+    });
+
     test('marks over-budget reference context visibly instead of cutting silently',
         () {
       final huge = 'x' * 20000;

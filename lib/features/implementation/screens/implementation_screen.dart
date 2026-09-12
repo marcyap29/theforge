@@ -242,9 +242,9 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
                       _DoneBar(
                         alreadyShipped: state.featureShipped,
                         canFix: state.canFix,
-                        onShip: () {
-                          notifier.markFeatureShipped();
-                          Navigator.of(context).pop(true);
+                        onShip: () async {
+                          await notifier.shipFeature();
+                          if (context.mounted) Navigator.of(context).pop(true);
                         },
                         onFix: notifier.fix,
                         onClose: () =>

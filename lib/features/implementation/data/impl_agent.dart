@@ -35,6 +35,7 @@ class ImplAgent {
     String? lockedSpec,
     String? goalStatement,
     String? ingestedContext,
+    String? buildMemory,
     List<String> components = const [],
     AgentPlan? previousPlan,
     String? feedback,
@@ -50,6 +51,7 @@ class ImplAgent {
       lockedSpec: lockedSpec,
       goalStatement: goalStatement,
       ingestedContext: ingestedContext,
+      buildMemory: buildMemory,
       components: components,
       files: files,
       keyDocs: keyDocs,
@@ -276,6 +278,7 @@ it). The JSON must be a single top-level object with no code fences:
     String? lockedSpec,
     String? goalStatement,
     String? ingestedContext,
+    String? buildMemory,
     List<String> components = const [],
     required List<String> files,
     String? keyDocs,
@@ -312,6 +315,16 @@ it). The JSON must be a single top-level object with no code fences:
       b
         ..writeln('## Reference context (ingested documents)')
         ..writeln(_cap(ingestedContext.trim(), 12000, what: 'reference context'))
+        ..writeln();
+    }
+    // Durable memory of what already shipped on this project — so the model
+    // follows established patterns and file layout instead of reinventing them.
+    // Grows one record per shipped feature (ProjectFileRepository.writeBuildMemory).
+    if (buildMemory != null && buildMemory.trim().isNotEmpty) {
+      b
+        ..writeln('## Prior builds on this project '
+            '(what shipped before — reuse these patterns and files)')
+        ..writeln(_cap(buildMemory.trim(), 8000, what: 'build memory'))
         ..writeln();
     }
     if (keyDocs != null && keyDocs.trim().isNotEmpty) {
