@@ -163,17 +163,23 @@ class FeatureDeduplicator {
   }
 
   static const _systemPrompt = '''
-You are deduplicating a product feature list. Some entries describe the SAME
-capability in different words (e.g. "Multi-Part Highlighting" and "Highlighting
-of Parts & Motion", or "Settings Screen" and "Simple Settings Panel"). Group the
-entries that are the same feature.
+You are deduplicating a product feature list. Re-scans often add the SAME
+feature worded differently. Group entries that describe the same core capability
+or that heavily overlap — even if one is phrased more broadly or specifically.
+
+Examples of duplicates to group:
+- "Multi-Part Highlighting" ~ "Highlighting of Parts & Motion"
+- "Settings Screen" ~ "Simple Settings Panel"
+- "Camera Permission & Live Feed" ~ "Camera Permission Management"
+  (both are the camera-permission feature)
 
 Rules:
 - Use the entry NUMBERS shown in the list.
 - Only include groups with 2 or more members; omit features that are unique.
-- Be conservative: only group entries you are confident are the same feature.
-  Related-but-distinct features (e.g. "Oil Cap Detection" vs "Bounding Box
-  Overlay") are NOT duplicates.
+- A human REVIEWS and confirms every deletion, so prefer surfacing a likely
+  duplicate over missing one. When two entries clearly overlap, group them.
+- Do NOT group features that address genuinely different capabilities (e.g.
+  "Oil Cap Detection" vs "AR Bounding Box Overlay").
 
 Respond with ONLY this JSON, no prose, no code fences:
 {"groups": [[1,4],[7,9,12]]}
