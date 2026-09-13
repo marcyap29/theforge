@@ -156,6 +156,14 @@ class ImplAgent {
     // --- Pass 2 — Plan: propose edits/commands grounded in the file bodies. ---
     onStatus?.call('Writing the plan…');
     final planUser = StringBuffer(context);
+    if (readFiles.isEmpty) {
+      // Be explicit that no file bodies were included, so the model doesn't
+      // assume contents are present and spiral trying to reconcile the gap.
+      planUser.writeln('\n\n## No existing file contents were included\n'
+          'No repository files were read for this task. Base your plan on the '
+          'documentation/spec above; create anything you need as NEW files (full '
+          '"content"), and use commands where appropriate. Do not ask for files.');
+    }
     if (readFiles.isNotEmpty) {
       planUser.writeln('\n\n## Current file contents (edit these accurately)');
       readFiles.forEach((path, content) {
@@ -205,6 +213,12 @@ class ImplAgent {
 
   /// Streams one completion, forwarding deltas for live display and returning
   /// the accumulated CONTENT (reasoning is shown but not part of the answer).
+  ///
+  /// Guards against model degeneration: a model can get stuck reprinting the
+  /// same block of reasoning forever (BUG-IMPL-007). We watch ALL emitted text
+  /// (thinking + content) and, if a long recent passage has already appeared
+  /// verbatim earlier, abort the stream and fail fast instead of burning the
+  /// whole token budget on a loop.
   Future<String> _stream({
     required String system,
     required String user,
@@ -212,7 +226,10 @@ class ImplAgent {
     required int maxTokens,
     void Function(String text, bool thinking)? onDelta,
   }) async {
-    final buffer = StringBuffer();
+    final buffer = StringBuffer(); // content only (the answer)
+    final all = StringBuffer(); // thinking + content, for loop detection
+    var lastCheck = 0;
+    var looping = false;
     await for (final delta in _llm.completeStream(
       role: LlmRole.executor,
       temperature: temperature,
@@ -222,8 +239,39 @@ class ImplAgent {
     )) {
       if (!delta.thinking) buffer.write(delta.text);
       onDelta?.call(delta.text, delta.thinking);
+      all.write(delta.text);
+      // Check periodically (not every token) to keep it cheap.
+      if (all.length - lastCheck >= 400) {
+        lastCheck = all.length;
+        if (_looksLooping(all.toString())) {
+          looping = true;
+          break; // breaking the await-for cancels the underlying stream
+        }
+      }
+    }
+    if (looping) {
+      throw ImplAgentException(
+        'The model got stuck repeating itself and was stopped. Try a different '
+        'model (an instruction-following / coder model works best for Build), '
+        'or simplify the request.',
+        raw: buffer.toString(),
+      );
     }
     return buffer.toString();
+  }
+
+  /// True if the last ~500 chars of [s] already appear earlier in it — an exact
+  /// long repeat that only happens when the model is looping (normal generation
+  /// never repeats 500 chars verbatim). Bounded to the last 8000 chars so the
+  /// scan stays cheap.
+  static bool _looksLooping(String s) {
+    if (s.length < 3000) return false;
+    final window = s.length > 12000 ? s.substring(s.length - 12000) : s;
+    const probeLen = 500;
+    final probe = window.substring(window.length - probeLen);
+    // Search only the part before the probe so it can't match itself.
+    final hay = window.substring(0, window.length - probeLen);
+    return hay.contains(probe);
   }
 
   String _revisionBlock(AgentPlan? prev, String feedback) {
@@ -303,8 +351,10 @@ the file); "replace" is the new text that should take its place. Change only
 what is needed. For a brand-NEW file, return "content" (the whole file) instead
 of hunks. Never return whole-file "content" for a file that already exists.
 
-You already have all the files you are going to get (their CURRENT contents are
-provided below). Do NOT ask to open more files and do NOT stop to explain — if a
+Work ONLY with the files and context included in THIS message. If a file's
+current contents are shown below, edit it with hunks. If a file you need is NOT
+shown, create it as a NEW file (return full "content") or use a command — do NOT
+ask for more files, do NOT stop to explain, and do NOT repeat yourself. If a
 detail is uncertain, make your best reasonable choice and proceed. Your entire
 final answer MUST be the JSON object.
 

@@ -4,6 +4,24 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-12 — Claude Code [Fix planning repetition loop — v0.4.14, BUG-IMPL-007]
+
+**Branch:** main · **App:** v0.4.14
+
+### Why
+AR Mechanic "Fix errors" run: model reprinted the same ~1.5k-char reasoning paragraph hundreds of times, never emitted a plan (pasted console). Cause: plan system prompt asserted "CURRENT contents are provided below" but the user prompt only appends file contents when the scout read files — when it read none, the model spiralled on the contradiction. No guard stopped the loop.
+
+### Done (`impl_agent.dart`)
+- System prompt: dropped the always-"contents below" claim → "work only with what's in this message; create missing files as NEW / use commands; do NOT repeat yourself."
+- Plan user prompt: when `readFiles` empty, append `## No existing file contents were included` note (no contradiction).
+- `_stream`: accumulates thinking+content; every ~400 chars runs `_looksLooping` (last 500 chars already appearing verbatim within last 12k) → aborts stream (break cancels sub) → throws `ImplAgentException` with a use-a-coder-model tip. First-stream throw propagates to `_plan` catch (no retry loop).
+- Docs: CHANGELOG v0.4.14, BUG-IMPL-007 + index + BUG_PREVENTION.
+
+### Verify
+`dart analyze lib` clean.
+
+---
+
 ## Session: 2026-09-12 — Claude Code [Standalone build actions + active highlight — v0.4.13]
 
 **Branch:** main · **App:** v0.4.13
