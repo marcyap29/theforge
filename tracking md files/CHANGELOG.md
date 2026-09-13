@@ -8,6 +8,7 @@
 - **Relocate moves the code for you.** Creating a fresh folder under `~/Development` or picking an existing one **moves the existing code across** and repoints the project. The Forge deliverables (`.forge/` and the project-state `README.md`) stay in the workspace.
 - **Guard: a Forge project workspace can no longer be used as a code repo.** Linking/relocating now rejects any folder inside `~/Documents/The Forge Projects/`. Root fix for **BUG-IMPL-006**: AR Mechanic's `repoPath` had been pointed at its own Forge workspace, so Build-with-AI wrote `lib/`, `pubspec.yaml`, `android/`, `ios/` in among the specs/handoffs — and a separate agent looking under `~/Development/ar_mechanic` couldn't find the generated code. (AR Mechanic's code has been moved to `~/Development/ar_mechanic` and its config repointed.)
 - New repository helpers: `relocateRepo` (safe move, never touches `.forge`), `createEmptyCodeFolder`, and `isInsideProjectsRoot`.
+- **Re-scanning no longer doubles features (BUG-TRACKER-001).** A scan (and check-in) now dedups proposed features against what's already tracked — matched on a normalized title (case-/punctuation-insensitive) — so running the scan repeatedly can't re-add the same planned/idea items. The import toast now reports how many were skipped as already tracked. (AR Mechanic's existing duplicates — 34 rows down to 19 — were cleaned up, keeping the most-recently-updated copy of each so manual status changes survived.)
 
 ---
 

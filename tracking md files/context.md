@@ -4,6 +4,27 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-12 — Claude Code [Code-location bar + scan dedup — v0.4.11, BUG-TRACKER-001]
+
+**Branch:** main · **App:** v0.4.11
+
+### Why
+Follow-ups to the relocate work: (1) the relocate action was undiscoverable (buried in the Build toolbar / detail row); (2) re-scanning doubled planned/idea features.
+
+### Done
+- **Code-location bar** on the feature board (`_CodeLocationBar`): always-visible `Code:` row showing the linked repo, with **Set code location** (none) or **Change** + **Scan** (linked). Loads `repoPath` from config in `initState`; `_changeCodeLocation` runs `relocateRepoFlow`.
+- **Scan/check-in dedup (BUG-TRACKER-001):** `_normTitle` (lowercase, non-alphanumerics→space, trim); `_scanRepo` filters proposals against tracked titles + within-batch before the review sheet, reports skipped; check-in new-features loop guarded the same way.
+- **Data cleanup:** AR Mechanic `features.json` deduped 34→19 (kept newest `updatedAt` per title; preserved Camera Permission = in_progress); backup at `features.json.bak`.
+- **Docs:** CHANGELOG v0.4.11, BUG-TRACKER-001 record + index + BUG_PREVENTION rule.
+
+### Known limitation
+Dedup is by title; the scanner's re-phrasings of the same feature (different words) still slip through. Fuzzy/semantic merge intentionally out of scope.
+
+### Caveat for next run
+If the app had AR Mechanic open during the data cleanup, restart it so the in-memory (34-row) list doesn't re-save over the deduped file.
+
+---
+
 ## Session: 2026-09-12 — Claude Code [Relocate code repo + fix code-in-workspace bug — v0.4.11, BUG-IMPL-006]
 
 **Branch:** main · **App:** v0.4.11

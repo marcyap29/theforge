@@ -464,7 +464,29 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     if (!mounted) return;
     Navigator.of(context, rootNavigator: true).pop(); // close spinner
 
-    final accepted = await showScanReviewSheet(context, proposals);
+    // Dedup against features already tracked (and within the scan itself) so a
+    // re-scan can't double planned/idea items. Match on a normalized title.
+    final existing =
+        ref.read(featureListProvider(project.id)).valueOrNull ?? const [];
+    final seen = existing.map((f) => _normTitle(f.title)).toSet();
+    final fresh = <ProposedFeature>[];
+    for (final pf in proposals) {
+      final key = _normTitle(pf.title);
+      if (key.isEmpty || seen.contains(key)) continue;
+      seen.add(key);
+      fresh.add(pf);
+    }
+    final skipped = proposals.length - fresh.length;
+    if (fresh.isEmpty) {
+      messenger.showSnackBar(SnackBar(
+        content: Text(skipped > 0
+            ? 'No new features — all $skipped already tracked.'
+            : 'No features found to import.'),
+      ));
+      return;
+    }
+
+    final accepted = await showScanReviewSheet(context, fresh);
     if (accepted == null || accepted.isEmpty) return;
 
     final notifier = ref.read(featureListProvider(project.id).notifier);
@@ -478,10 +500,16 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
       );
     }
     ref.invalidate(portfolioProvider);
-    messenger.showSnackBar(
-      SnackBar(content: Text('Imported ${accepted.length} features from scan')),
-    );
+    messenger.showSnackBar(SnackBar(
+      content: Text('Imported ${accepted.length} feature(s) from scan'
+          '${skipped > 0 ? ' · skipped $skipped already tracked' : ''}'),
+    ));
   }
+
+  /// Normalized feature title for dedup — case-insensitive and punctuation-/
+  /// whitespace-insensitive, so "V2: Multi‑Part" and "v2 multi part" collide.
+  static String _normTitle(String s) =>
+      s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
 
   Future<void> _runCheckin() async {
     final messenger = ScaffoldMessenger.of(context);
@@ -521,7 +549,15 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     for (final c in proposal.changes.where((c) => c.accepted)) {
       await featureNotifier.setStatus(c.feature, c.proposed);
     }
+    // Dedup new check-in features against what's already tracked, same as scan.
+    final tracked = (ref.read(featureListProvider(project.id)).valueOrNull ??
+            const [])
+        .map((f) => _normTitle(f.title))
+        .toSet();
     for (final nf in proposal.newFeatures.where((f) => f.selected)) {
+      final key = _normTitle(nf.title);
+      if (key.isEmpty || tracked.contains(key)) continue;
+      tracked.add(key);
       await featureNotifier.addFeature(
         title: nf.title,
         description: nf.description,
