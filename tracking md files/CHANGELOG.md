@@ -2,6 +2,14 @@
 
 ---
 
+## v0.4.11 — 2026-09-12
+
+- **Relocate a project's code anywhere, any time.** A new **Change code location** action (the folder-move icon in the Build-with-AI window's toolbar, and the repo row's **Change →** on the project screen) moves the linked code repo to a new folder — create a fresh one under `~/Development` or pick an existing one — and The Forge **moves the existing code across** for you, then repoints the project. The Forge deliverables (`.forge/` and the project-state `README.md`) stay in the workspace.
+- **Guard: a Forge project workspace can no longer be used as a code repo.** Linking/relocating now rejects any folder inside `~/Documents/The Forge Projects/`. Root fix for **BUG-IMPL-006**: AR Mechanic's `repoPath` had been pointed at its own Forge workspace, so Build-with-AI wrote `lib/`, `pubspec.yaml`, `android/`, `ios/` in among the specs/handoffs — and a separate agent looking under `~/Development/ar_mechanic` couldn't find the generated code. (AR Mechanic's code has been moved to `~/Development/ar_mechanic` and its config repointed.)
+- New repository helpers: `relocateRepo` (safe move, never touches `.forge`), `createEmptyCodeFolder`, and `isInsideProjectsRoot`.
+
+---
+
 ## v0.4.10 — 2026-09-12
 
 - **The build AI can now pull the right docs on demand.** As a project accumulates reference documents and prior-build records, they can outgrow what fits in every prompt. The build agent's "scout" pass now sees a compact **manifest** of the whole document pool and requests, by name, the specific reference doc or prior feature it needs for the task — the same way it already picks which code files to read. Retrieved material is fed into the plan and de-duplicated against what's already shown.

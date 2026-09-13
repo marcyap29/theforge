@@ -84,6 +84,7 @@
 | Build-with-AI compose screen | Shipped v0.4.7 | No auto-run; on-screen hints + prompt box; nothing sent until the user acts |
 | Build action buttons | Shipped v0.4.7 | Right-side: Build this feature / Run checks / Fix errors / Commit & push (git) |
 | Re-edit shipped features | Shipped v0.4.4 | "Build with AI" available on non-archived features, incl. shipped ("Re-build / edit with AI") |
+| Relocate code repo (any time) | Shipped v0.4.11 | `relocateRepoFlow` + `ProjectFileRepository.relocateRepo`/`createEmptyCodeFolder`; "Change code location" in the Build window toolbar and the detail-screen repo row moves code to a new folder + repoints config; `isInsideProjectsRoot` guard blocks using a Forge workspace as a repo (BUG-IMPL-006) |
 
 ---
 

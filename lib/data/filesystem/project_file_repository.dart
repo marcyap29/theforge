@@ -7,6 +7,19 @@ import '../../features/projects/models/pull_ingestion_summary.dart';
 
 enum ProjectMode { build, audit, pull }
 
+/// The outcome of [ProjectFileRepository.relocateRepo] — which top-level
+/// entries were moved, deliberately skipped, or failed to move.
+class RepoRelocation {
+  RepoRelocation({
+    required this.moved,
+    required this.skipped,
+    required this.failed,
+  });
+  final List<String> moved;
+  final List<String> skipped;
+  final List<String> failed;
+}
+
 class ProjectAlreadyExistsException implements Exception {
   final String path;
   const ProjectAlreadyExistsException(this.path);
@@ -663,6 +676,111 @@ class ProjectFileRepository {
       await Process.run('git', ['init'], workingDirectory: dest.path);
     } catch (_) {}
     return dest.path;
+  }
+
+  /// Like [createCodeRepo] but does NOT seed a README — used as a *relocation*
+  /// destination so the moved code lands in a clean, empty folder. git-inits it.
+  static Future<String> createEmptyCodeFolder(String projectName) async {
+    final root = Directory(defaultCodeRoot());
+    await root.create(recursive: true);
+    final safe = projectName.trim().replaceAll(RegExp(r'[^\w.\-]+'), '-');
+    final base = safe.isEmpty ? 'project' : safe;
+    var dest = Directory(p.join(root.path, base));
+    var n = 2;
+    while (dest.existsSync()) {
+      dest = Directory(p.join(root.path, '$base-$n'));
+      n++;
+    }
+    await dest.create(recursive: true);
+    try {
+      await Process.run('git', ['init'], workingDirectory: dest.path);
+    } catch (_) {}
+    return dest.path;
+  }
+
+  /// True if [path] is the canonical Forge projects root or lives inside it.
+  /// Such a folder is a Forge *workspace* (docs/specs/tracker) and must never be
+  /// used as a code repo — pointing the repo there scatters generated code in
+  /// among the deliverables (the AR Mechanic bug). Used to guard repo linking.
+  static Future<bool> isInsideProjectsRoot(String path) async {
+    try {
+      final root = await canonicalRootPath();
+      return p.equals(path, root) || p.isWithin(root, path);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Moves the code in [fromPath] into [toPath] (creating it), so a project's
+  /// linked repo can be relocated at any time. The Forge deliverables folder
+  /// (`.forge`) is never moved — it stays with the project workspace — and when
+  /// moving OUT of a workspace the project-state `README.md` is left behind too.
+  /// Existing entries at [toPath] are not overwritten (skipped) so nothing is
+  /// clobbered. Never throws; per-item failures are reported in the result.
+  static Future<RepoRelocation> relocateRepo({
+    required String fromPath,
+    required String toPath,
+  }) async {
+    final moved = <String>[];
+    final skipped = <String>[];
+    final failed = <String>[];
+    if (p.equals(fromPath, toPath)) {
+      return RepoRelocation(moved: moved, skipped: skipped, failed: failed);
+    }
+    await Directory(toPath).create(recursive: true);
+    final from = Directory(fromPath);
+    final fromIsWorkspace = await isInsideProjectsRoot(fromPath);
+    if (from.existsSync()) {
+      for (final entity in from.listSync()) {
+        final name = p.basename(entity.path);
+        if (name == forgeDirName) {
+          skipped.add(name);
+          continue;
+        }
+        if (fromIsWorkspace && name == 'README.md') {
+          skipped.add('README.md (project-state doc)');
+          continue;
+        }
+        final dest = p.join(toPath, name);
+        if (FileSystemEntity.typeSync(dest) !=
+            FileSystemEntityType.notFound) {
+          skipped.add('$name (already exists at destination)');
+          continue;
+        }
+        try {
+          await _moveEntity(entity, dest);
+          moved.add(name);
+        } catch (e) {
+          failed.add('$name ($e)');
+        }
+      }
+    }
+    return RepoRelocation(moved: moved, skipped: skipped, failed: failed);
+  }
+
+  /// Moves one filesystem entity, falling back to a recursive copy+delete when
+  /// a plain rename fails (e.g. across volumes).
+  static Future<void> _moveEntity(FileSystemEntity src, String destPath) async {
+    try {
+      await src.rename(destPath);
+    } catch (_) {
+      await _copyEntity(src, destPath);
+      await src.delete(recursive: true);
+    }
+  }
+
+  static Future<void> _copyEntity(FileSystemEntity src, String destPath) async {
+    if (src is Directory) {
+      await Directory(destPath).create(recursive: true);
+      for (final child in src.listSync()) {
+        await _copyEntity(child, p.join(destPath, p.basename(child.path)));
+      }
+    } else if (src is File) {
+      await File(destPath).parent.create(recursive: true);
+      await src.copy(destPath);
+    } else if (src is Link) {
+      await Link(destPath).create(await src.target());
+    }
   }
 
   /// Stages all changes and commits them in the linked repo. Returns true on

@@ -4,6 +4,27 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-12 — Claude Code [Relocate code repo + fix code-in-workspace bug — v0.4.11, BUG-IMPL-006]
+
+**Branch:** main · **App:** v0.4.11
+
+### Why
+AR Mechanic's Build-with-AI output (`lib/main.dart`, `pubspec.yaml`, `android/`, `ios/`) was written **inside the Forge project workspace** (`~/Documents/The Forge Projects/AR Mechanic/`), not the user's code folder — because the project's `repoPath` pointed at the workspace itself. A separate agent looking under `~/Development/ar_mechanic` found it empty. The user asked to (a) move the source to the user-created location and (b) be able to reroute/relocate the repo — moving the code — **at any time**.
+
+### Done
+- **Data repair (AR Mechanic):** moved app source (`lib`, `pubspec.yaml`, `pubspec.lock`, `android`, `ios`, `.flutter-plugins-dependencies`, `.dart_tool`) → `~/Development/ar_mechanic`, `git init`ed it + seeded `.gitignore`; left `.forge/` + project-state `README.md` in the workspace; repointed `project_config.json` → `/Users/mymac/Development/ar_mechanic`.
+- **Feature — relocate any time:** `ProjectFileRepository.relocateRepo` (moves repo contents, never touches `.forge`; rename with copy+delete fallback), `createEmptyCodeFolder`, `isInsideProjectsRoot`, `RepoRelocation` result; shared `relocateRepoFlow` UI (`lib/features/tracker/widgets/relocate_repo.dart`); wired into the Build-with-AI window toolbar ("Change code location") and the detail-screen repo row ("Change →" now relocates-with-move when a repo is linked).
+- **Guard:** link/relocate pickers (tracker `_ensureRepoPath`, detail `_pick`, relocate flow) reject any folder inside `~/Documents/The Forge Projects/`.
+- **Docs:** CHANGELOG v0.4.11, FEATURES row, BUG-IMPL-006 record + master index + BUG_PREVENTION rule.
+
+### Verification
+`dart analyze lib` clean · `flutter test test/impl_workspace_test.dart` green. (Relocate/guard logic depends on platform dirs — verified via analyze + manual data repair, not a new unit test.)
+
+### Note
+A parallel session shipped v0.4.9 (build-memory) and v0.4.10 (doc-aware scout) during this work; my changes are the 5 files for relocate only — no overlap.
+
+---
+
 ## Session: 2026-09-12 — Claude Code [Doc-aware scout — unified manifest + on-demand retrieval — v0.4.10]
 
 **Branch:** main · **App:** v0.4.10 · **Backlog:** §CTX3 ✅

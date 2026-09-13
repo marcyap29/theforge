@@ -23,6 +23,7 @@ import '../../spec_generation/compliance/spec_compliance_screen.dart';
 import '../../spec_generation/executor_timeline_notifier.dart';
 import '../../spec_generation/worksheet_generation_screen.dart';
 import '../../tracker/screens/project_tracker_screen.dart';
+import '../../tracker/widgets/relocate_repo.dart';
 import '../doc_export.dart';
 import '../ingestion/ingestion_notifier.dart';
 import '../ingestion/pull_ingestion_notifier.dart';
@@ -2523,13 +2524,36 @@ class _RepoPathRowState extends State<_RepoPathRow> {
   }
 
   Future<void> _pick() async {
+    final messenger = ScaffoldMessenger.of(context);
     final picked = await FilePicker.platform.getDirectoryPath(
       dialogTitle: 'Select implementation repo for ${widget.projectName}',
       lockParentWindow: true,
     );
     if (picked == null) return;
+    // Never let the Forge project workspace be used as a code repo.
+    if (await ProjectFileRepository.isInsideProjectsRoot(picked)) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text(
+            "That folder is inside The Forge's project workspace. Pick a code "
+            'folder outside it (e.g. under ~/Development).'),
+        backgroundColor: Color(0xFF3F0A0A),
+      ));
+      return;
+    }
     await ProjectFileRepository.writeProjectConfig(widget.projectPath, {'repoPath': picked});
     if (mounted) setState(() => _repoPath = picked);
+  }
+
+  /// Relocates the linked repo (moving the code) — available once a repo is
+  /// linked, so the user can move it anywhere at any time.
+  Future<void> _relocate() async {
+    final newPath = await relocateRepoFlow(
+      context: context,
+      projectPath: widget.projectPath,
+      projectName: widget.projectName,
+      currentRepoPath: _repoPath,
+    );
+    if (newPath != null && mounted) setState(() => _repoPath = newPath);
   }
 
   @override
@@ -2538,7 +2562,7 @@ class _RepoPathRowState extends State<_RepoPathRow> {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
-        onTap: _chooseLink,
+        onTap: _repoPath == null ? _chooseLink : _relocate,
         child: Container(
           decoration: BoxDecoration(
             color: const Color(0xFF0F0F10),

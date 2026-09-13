@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../data/filesystem/project_file_repository.dart';
 import '../../tracker/widgets/active_model_chip.dart';
+import '../../tracker/widgets/relocate_repo.dart';
 import '../models/run_session.dart';
 import '../providers/implementation_notifier.dart';
 import '../widgets/diff_view.dart';
@@ -87,6 +89,28 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
     _input.clear();
   }
 
+  /// Relocate the project's code repo at any time (moving the existing code).
+  /// Reads the current linked path from config so it works even when this
+  /// window was opened via the re-attach path (which passes an empty repoPath).
+  Future<void> _changeCodeLocation() async {
+    final config =
+        await ProjectFileRepository.readProjectConfig(widget.brief.projectPath);
+    final current = (config['repoPath'] as String?) ??
+        (widget.brief.repoPath.isEmpty ? null : widget.brief.repoPath);
+    if (!mounted) return;
+    final newPath = await relocateRepoFlow(
+      context: context,
+      projectPath: widget.brief.projectPath,
+      projectName: widget.brief.projectName,
+      currentRepoPath: current,
+    );
+    if (newPath != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Reopen Build with AI to build into the new location.'),
+      ));
+    }
+  }
+
   String _fmt(Duration d) {
     final s = d.inSeconds;
     final m = s ~/ 60;
@@ -153,6 +177,11 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
           style: const TextStyle(fontSize: 15),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.drive_file_move_outlined, size: 18),
+            tooltip: 'Change code location (move the code)',
+            onPressed: state.phase.isBusy ? null : _changeCodeLocation,
+          ),
           IconButton(
             icon: const Icon(Icons.copy_all_outlined, size: 18),
             tooltip: 'Copy the whole console',

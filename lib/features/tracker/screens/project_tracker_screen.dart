@@ -281,6 +281,19 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
         lockParentWindow: true,
       );
       if (picked == null) return null;
+      // Never let the Forge project workspace be used as a code repo — that
+      // scatters generated code among the deliverables (the AR Mechanic bug).
+      if (await ProjectFileRepository.isInsideProjectsRoot(picked)) {
+        if (mounted) {
+          messenger.showSnackBar(const SnackBar(
+            content: Text(
+                "That folder is inside The Forge's project workspace. Pick a "
+                'code folder outside it (e.g. under ~/Development).'),
+            backgroundColor: Color(0xFF3F0A0A),
+          ));
+        }
+        return null;
+      }
       await ProjectFileRepository.writeProjectConfig(
           project.path, {'repoPath': picked});
       return picked;
