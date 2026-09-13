@@ -16,8 +16,10 @@ import '../checkin/checkin_service.dart';
 import '../models/tracker_enums.dart';
 import '../providers/tracker_providers.dart';
 import '../releases/release_providers.dart';
+import '../scan/feature_dedup.dart';
 import '../scan/feature_scan.dart';
 import '../widgets/active_model_chip.dart';
+import '../widgets/dedup_review_sheet.dart';
 import '../widgets/feature_edit_dialog.dart';
 import '../widgets/relocate_repo.dart';
 import '../widgets/scan_review_sheet.dart';
@@ -133,6 +135,11 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             icon: const Icon(Icons.radar),
             tooltip: 'Scan Repo and Documents',
             onPressed: _scanRepo,
+          ),
+          IconButton(
+            icon: const Icon(Icons.cleaning_services_outlined),
+            tooltip: 'Remove duplicate features',
+            onPressed: _removeDuplicates,
           ),
           IconButton(
             icon: const Icon(Icons.rocket_launch_outlined),
@@ -510,6 +517,56 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
   /// whitespace-insensitive, so "V2: Multi‑Part" and "v2 multi part" collide.
   static String _normTitle(String s) =>
       s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
+
+  /// Cleans out duplicate features already on the board — exact title matches
+  /// plus same-feature entries the scanner worded differently across runs.
+  /// Finds groups (LLM + exact), lets the user review, then deletes the extras.
+  Future<void> _removeDuplicates() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final features =
+        ref.read(featureListProvider(project.id)).valueOrNull ?? const [];
+    if (features.length < 2) {
+      messenger.showSnackBar(
+          const SnackBar(content: Text('Nothing to deduplicate yet.')));
+      return;
+    }
+
+    _showBlockingSpinner('Finding duplicates…');
+    List<DuplicateGroup> groups;
+    try {
+      groups =
+          await ref.read(featureDeduplicatorProvider).findDuplicates(features);
+    } catch (e) {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      messenger.showSnackBar(SnackBar(
+        content: Text('Duplicate check failed: $e'),
+        backgroundColor: const Color(0xFF3F0A0A),
+      ));
+      return;
+    }
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop(); // close spinner
+
+    if (groups.isEmpty) {
+      messenger
+          .showSnackBar(const SnackBar(content: Text('No duplicates found.')));
+      return;
+    }
+
+    final toDelete = await showDedupReviewSheet(context, groups);
+    if (toDelete == null || toDelete.isEmpty) return;
+
+    final notifier = ref.read(featureListProvider(project.id).notifier);
+    final byId = {for (final f in features) f.id: f};
+    for (final id in toDelete) {
+      final f = byId[id];
+      if (f != null) await notifier.deleteFeature(f);
+    }
+    ref.invalidate(portfolioProvider);
+    messenger.showSnackBar(
+      SnackBar(content: Text('Removed ${toDelete.length} duplicate(s)')),
+    );
+  }
 
   Future<void> _runCheckin() async {
     final messenger = ScaffoldMessenger.of(context);

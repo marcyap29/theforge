@@ -36,13 +36,17 @@ Dedup at import time in `project_tracker_screen.dart` on a normalized title
   changes (e.g. Camera Permission → in_progress) survived. Backed up to
   `features.json.bak`.
 
-## Known limitation
+## Cleaning existing / reworded duplicates
 
-Dedup is by *title*. The scanner sometimes re-phrases the same feature across
-runs ("V2: Multi‑Part Highlighting" vs "Part Highlighting & Motion Guidance"),
-which exact/punctuation-normalized matching won't catch. Fuzzy/semantic merging
-is intentionally out of scope (false merges are worse than a visible dup the
-user can delete).
+The import-time guard is by *title*, so it can't catch the same feature the
+scanner **reworded** across runs ("V2: Multi‑Part Highlighting" vs "Part
+Highlighting & Motion Guidance"). For those, a **Remove duplicates** tool (broom
+icon on the board) runs a conservative LLM pass (`FeatureDeduplicator`,
+`feature_dedup.dart`) that clusters same-capability entries, plus the exact
+pass, and lets the user review each group (`showDedupReviewSheet`) before
+deleting — keeping the most-progressed / most-recently-updated copy. Deletion is
+always user-reviewed, never automatic, so a wrong cluster can't silently drop a
+real feature.
 
 ## Prevention Rule
 

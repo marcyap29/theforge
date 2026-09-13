@@ -4,6 +4,24 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-12 — Claude Code [Remove-duplicates tool (semantic) — v0.4.11]
+
+**Branch:** main · **App:** v0.4.11
+
+### Why
+Import-time dedup (BUG-TRACKER-001) only matches titles; the scanner also *rewords* the same feature across runs (AR Mechanic still had V2 items in 3 phrasings). The Forge needed a way to clean those out.
+
+### Done
+- `FeatureDeduplicator` (`feature_dedup.dart`): exact normalized-title pass + conservative LLM semantic pass (numbered entries → `{"groups":[[n,…]]}`), union-find merge, `pickKeeper` (status rank shipped>in_progress>blocked>planned>idea>archived, tiebreak newest `updatedAt`). Returns resolved `DuplicateGroup`s.
+- `showDedupReviewSheet` (`dedup_review_sheet.dart`): per-group opt-in review (keep vs remove), returns ids to delete.
+- Board toolbar: broom icon → `_removeDuplicates` (spinner → find → review → `deleteFeature` extras → toast).
+- Docs: CHANGELOG bullet, FEATURES row, BUG-TRACKER-001 updated.
+
+### Note
+Deletion is always user-reviewed, never automatic (guards against a wrong LLM cluster dropping a real feature). AR Mechanic's remaining reworded V2 dupes are left for the in-app tool to clean on review.
+
+---
+
 ## Session: 2026-09-12 — Claude Code [Code-location bar + scan dedup — v0.4.11, BUG-TRACKER-001]
 
 **Branch:** main · **App:** v0.4.11
