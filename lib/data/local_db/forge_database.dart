@@ -1,7 +1,27 @@
+import 'dart:io';
+
 import 'package:drift/drift.dart';
-import 'package:drift_flutter/drift_flutter.dart';
+import 'package:drift/native.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 part 'forge_database.g.dart';
+
+/// Opens the local index on the MAIN isolate (not a background isolate).
+///
+/// drift_flutter's `driftDatabase()` runs the DB on a background isolate; on
+/// close it tears down `sqlite3`'s FFI callbacks on that worker, which trips a
+/// Dart FFI-callback assertion and aborts the whole app (SIGABRT — BUG-IMPL-008).
+/// This index is tiny, so we open the SAME file (`~/Documents/forge_index.sqlite`,
+/// where drift_flutter placed it) directly on the main isolate — same data, no
+/// cross-isolate FFI teardown, no abort.
+QueryExecutor _openForgeIndex() {
+  return LazyDatabase(() async {
+    final dir = await getApplicationDocumentsDirectory();
+    final file = File(p.join(dir.path, 'forge_index.sqlite'));
+    return NativeDatabase(file);
+  });
+}
 
 class Projects extends Table {
   TextColumn get id => text()();
@@ -93,7 +113,7 @@ class ProjectTracking extends Table {
 
 @DriftDatabase(tables: [Projects, Features, ProjectTracking, Releases])
 class ForgeDatabase extends _$ForgeDatabase {
-  ForgeDatabase() : super(driftDatabase(name: 'forge_index'));
+  ForgeDatabase() : super(_openForgeIndex());
 
   @override
   int get schemaVersion => 3;

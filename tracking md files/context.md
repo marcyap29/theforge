@@ -4,6 +4,28 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-12 — Claude Code [Fix app SIGABRT (drift bg-isolate) — v0.4.16, BUG-IMPL-008]
+
+**Branch:** main · **App:** v0.4.16
+
+### Why
+User: "app quitting when I try to build features." macOS `.ips` showed SIGABRT on a `DartWorker`: `dart::Assert::Fail → DLRT_GetFfiCallbackMetadata` under `sqlite3 functionDestroy → sqlite3Close`. drift ran on a background isolate (`drift_flutter` `driftDatabase`), and sqlite3's isolateLocal FFI destructors abort when torn down cross-isolate on close.
+
+### Done (`forge_database.dart`)
+- Replaced `super(driftDatabase(name: 'forge_index'))` with `super(_openForgeIndex())` = `LazyDatabase(() async => NativeDatabase(File(<AppDocuments>/forge_index.sqlite)))` — MAIN isolate, SAME file (drift_flutter's location, confirmed at `~/Documents/forge_index.sqlite`), so no data move / no migration. Imports: dart:io, drift/native, path, path_provider; dropped drift_flutter import (no other usages).
+- Docs: CHANGELOG v0.4.16, BUG-IMPL-008 + index + BUG_PREVENTION rule.
+
+### Verify
+`dart analyze lib` clean · `flutter test` 33/33 green.
+
+### Caveat
+Couldn't reproduce the SIGABRT live after the v0.4.15 build (build→analyze→fix loop ran clean; terminal-launched instance exited 141/SIGPIPE = harness pipe close, not an app crash, no new `.ips`). This is the fix indicated by the crash stack + removes the known abort class. If SIGABRT recurs, grab a fresh `.ips` and re-open BUG-IMPL-008.
+
+### Also this session
+AR Mechanic via gpt-oss:120b: analyze-gate (v0.4.15) caught the stray-brace corruption and the model fixed main.dart; remaining blocker is app-side — `test/permission_settings_test.dart` lines 7/20 still reference the old private `_CameraFeedScreenState` (main.dart's state class is now public `CameraFeedScreenState`). 2-ref rename; left for the user's next "Fix it".
+
+---
+
 ## Session: 2026-09-12 — Claude Code [Analyze-gate after apply — v0.4.15]
 
 **Branch:** main · **App:** v0.4.15

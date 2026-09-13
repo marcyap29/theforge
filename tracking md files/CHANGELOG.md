@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.16 — 2026-09-12
+
+- **Fixed the app hard-quitting (SIGABRT) during builds (BUG-IMPL-008).** The local index ran on a background isolate (via `drift_flutter`); on close, `sqlite3`'s FFI-callback destructors tripped a Dart runtime assertion on that worker and aborted the whole app. The index now opens on the **main isolate** against the same database file (`~/Documents/forge_index.sqlite`) — same data, no migration — which removes the cross-isolate FFI teardown and that crash class. The index is tiny, so there's no noticeable cost.
+
+---
+
 ## v0.4.15 — 2026-09-12
 
 - **Builds now verify the code compiles before calling it done.** After applying edits, The Forge runs the project's analyzer (`flutter analyze` / `dart analyze`) automatically. If an edit doesn't compile — e.g. a find/replace hunk lands a stray brace or drops a symbol (the BUG-IMPL-003 class) — the errors are shown in the console and the run is marked fixable, so **Fix it** feeds them straight back to the AI instead of a broken edit silently landing. Warning/info-level lints don't block; an unavailable analyzer is skipped, not treated as failure. This catches exactly the kind of syntax break a model produced on AR Mechanic (a stray `}` that closed the class early).
