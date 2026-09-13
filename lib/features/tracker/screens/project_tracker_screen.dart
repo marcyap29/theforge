@@ -19,6 +19,7 @@ import '../releases/release_providers.dart';
 import '../scan/feature_scan.dart';
 import '../widgets/active_model_chip.dart';
 import '../widgets/feature_edit_dialog.dart';
+import '../widgets/relocate_repo.dart';
 import '../widgets/scan_review_sheet.dart';
 import '../widgets/status_chip.dart';
 import 'releases_screen.dart';
@@ -41,11 +42,40 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
 
   StalenessInfo? _staleness;
   bool _bannerDismissed = false;
+  String? _repoPath;
+  bool _repoLoaded = false;
 
   @override
   void initState() {
     super.initState();
     Future.microtask(_loadStaleness);
+    Future.microtask(_loadRepoPath);
+  }
+
+  Future<void> _loadRepoPath() async {
+    final config = await ProjectFileRepository.readProjectConfig(project.path);
+    if (mounted) {
+      setState(() {
+        _repoPath = config['repoPath'] as String?;
+        _repoLoaded = true;
+      });
+    }
+  }
+
+  /// Set or move where this project's code lives — the linked repo used to scan
+  /// existing code and to generate new source into. Reachable right from the
+  /// board header so it's the first thing you can do on a project.
+  Future<void> _changeCodeLocation() async {
+    final config = await ProjectFileRepository.readProjectConfig(project.path);
+    final current = config['repoPath'] as String?;
+    if (!mounted) return;
+    final newPath = await relocateRepoFlow(
+      context: context,
+      projectPath: project.path,
+      projectName: project.name,
+      currentRepoPath: (current != null && current.isNotEmpty) ? current : null,
+    );
+    if (newPath != null && mounted) setState(() => _repoPath = newPath);
   }
 
   /// On open, check whether the repo has advanced since the last review so we
@@ -123,6 +153,12 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
       ),
       body: Column(
         children: [
+          if (_repoLoaded)
+            _CodeLocationBar(
+              repoPath: _repoPath,
+              onChange: _changeCodeLocation,
+              onScan: _scanRepo,
+            ),
           if (_showStalenessBanner) _StalenessBanner(
             info: _staleness!,
             onRun: _runCheckin,
@@ -904,6 +940,84 @@ class _StalenessBanner extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Always-visible bar showing where this project's code lives, with one tap to
+/// set/move it (relocate flow) and — once linked — to scan it. This is the
+/// entry point for "choose the repo location" so a scan or a code-generating
+/// build has somewhere to point immediately.
+class _CodeLocationBar extends StatelessWidget {
+  const _CodeLocationBar({
+    required this.repoPath,
+    required this.onChange,
+    required this.onScan,
+  });
+  final String? repoPath;
+  final VoidCallback onChange;
+  final VoidCallback onScan;
+
+  @override
+  Widget build(BuildContext context) {
+    final linked = repoPath != null && repoPath!.isNotEmpty;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0F0F10),
+        border: Border(bottom: BorderSide(color: Color(0xFF1C1C1E))),
+      ),
+      child: Row(
+        children: [
+          Icon(linked ? Icons.code : Icons.folder_off_outlined,
+              size: 15,
+              color: linked ? const Color(0xFF64B5F6) : const Color(0xFFE8A04C)),
+          const SizedBox(width: 8),
+          Text('Code:',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              linked ? repoPath! : 'No code location set',
+              style: TextStyle(
+                fontFamily: 'Menlo',
+                fontSize: 12,
+                color: linked
+                    ? const Color(0xFFE5E5E7)
+                    : const Color(0xFF9CA3AF),
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (linked)
+            TextButton.icon(
+              onPressed: onScan,
+              icon: const Icon(Icons.radar, size: 15),
+              label: const Text('Scan'),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF64B5F6),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          if (linked)
+            TextButton(
+              onPressed: onChange,
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+              child: const Text('Change', style: TextStyle(fontSize: 12)),
+            )
+          else
+            FilledButton.icon(
+              onPressed: onChange,
+              icon: const Icon(Icons.create_new_folder_outlined, size: 15),
+              label: const Text('Set code location'),
+              style: FilledButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+            ),
+        ],
       ),
     );
   }
