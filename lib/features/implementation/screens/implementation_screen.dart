@@ -31,6 +31,11 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
   /// Start-line indices of internal-thinking blocks the user has collapsed.
   final Set<int> _collapsedThinking = {};
 
+  /// Which right-side action the user last triggered ('build' | 'checks' |
+  /// 'fix' | 'improve' | 'commit'), so its button stays highlighted while it
+  /// runs — cleared when the run reaches a terminal/idle phase.
+  String? _activeAction;
+
   /// Shared prompt/compose text — used by the bottom box AND the right-side
   /// "Build this feature" button.
   late final TextEditingController _input =
@@ -74,8 +79,16 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
     }
   }
 
-  /// Run a preset action (idle → build with it; else → steer).
-  void _action(String instruction) => _notifier.action(instruction);
+  /// Run a preset action as a standalone entry point (idle → start a run with
+  /// it; else → steer). No need to press "Build this feature" first.
+  void _action(String instruction) =>
+      _notifier.action(widget.brief, instruction);
+
+  /// Trigger a right-side action and highlight its button while it runs.
+  void _startAction(String key, String instruction) {
+    setState(() => _activeAction = key);
+    _action(instruction);
+  }
 
   /// A follow-up round after a run: the AI reviews what it just did and proposes
   /// concrete improvements (goes through the normal approve/apply loop, so you
@@ -90,13 +103,15 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
   void _followUp() => _action(_reviewInstruction);
 
   void _buildFromInput() {
+    setState(() => _activeAction = 'build');
     final phase = ref.read(implRunProvider(_featureId)).phase;
     final text = _input.text.trim();
     if (phase == RunPhase.idle) {
       _notifier.start(widget.brief, instruction: text.isEmpty ? null : text);
     } else {
       // Already ran once — treat "Build" as a re-plan.
-      _notifier.action(text.isEmpty ? 'Continue building this feature.' : text);
+      _notifier.action(
+          widget.brief, text.isEmpty ? 'Continue building this feature.' : text);
     }
     _input.clear();
   }
@@ -178,6 +193,11 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
         if (starts.isNotEmpty) {
           setState(() => _collapsedThinking.addAll(starts));
         }
+      }
+      // Drop the action highlight once the run settles (terminal or back to idle).
+      if (_activeAction != null &&
+          (next.phase == RunPhase.idle || next.phase.isTerminal)) {
+        setState(() => _activeAction = null);
       }
     });
 
@@ -322,17 +342,23 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
                     _ActionsPanel(
                       busy: state.phase.isBusy,
                       hasRepo: widget.brief.repoPath.isNotEmpty,
+                      activeAction: _activeAction,
                       onBuild: _buildFromInput,
-                      onRunChecks: () => _action(
+                      onRunChecks: () => _startAction(
+                          'checks',
                           'Run the project\'s analyzer and full test suite, '
                           'report the results, and fix any failures.'),
-                      onFix: () => _action(
+                      onFix: () => _startAction(
+                          'fix',
                           'Find and fix build, analyzer, and test errors in the '
                           'code for this feature.'),
-                      onImprove: _followUp,
-                      onCommitPush: () => notifier.commitAndPush(
-                          widget.brief.repoPath,
-                          'Implement ${widget.brief.featureTitle}'),
+                      onImprove: () => _startAction('improve', _reviewInstruction),
+                      onCommitPush: () async {
+                        setState(() => _activeAction = 'commit');
+                        await notifier.commitAndPush(widget.brief.repoPath,
+                            'Implement ${widget.brief.featureTitle}');
+                        if (mounted) setState(() => _activeAction = null);
+                      },
                     ),
                     Expanded(
                       child: _Timeline(state: state, onUndo: notifier.undo),
@@ -409,6 +435,7 @@ class _ActionsPanel extends StatelessWidget {
   const _ActionsPanel({
     required this.busy,
     required this.hasRepo,
+    required this.activeAction,
     required this.onBuild,
     required this.onRunChecks,
     required this.onFix,
@@ -418,6 +445,7 @@ class _ActionsPanel extends StatelessWidget {
 
   final bool busy;
   final bool hasRepo;
+  final String? activeAction;
   final VoidCallback onBuild;
   final VoidCallback onRunChecks;
   final VoidCallback onFix;
@@ -438,39 +466,80 @@ class _ActionsPanel extends StatelessWidget {
               style: TextStyle(
                   fontSize: 11, letterSpacing: 1, color: Color(0xFF6B7280))),
           const SizedBox(height: 10),
-          FilledButton.icon(
-            onPressed: busy ? null : onBuild,
-            icon: const Icon(Icons.play_arrow, size: 18),
-            label: const Text('Build this feature'),
-          ),
+          _button(Icons.play_arrow, 'Build this feature',
+              busy ? null : onBuild, 'build', primary: true),
           const SizedBox(height: 8),
-          _secondary(Icons.fact_check_outlined, 'Run checks',
-              busy ? null : onRunChecks),
+          _button(Icons.fact_check_outlined, 'Run checks',
+              busy ? null : onRunChecks, 'checks'),
           const SizedBox(height: 6),
-          _secondary(
-              Icons.healing_outlined, 'Fix errors', busy ? null : onFix),
+          _button(Icons.healing_outlined, 'Fix errors',
+              busy ? null : onFix, 'fix'),
           const SizedBox(height: 6),
-          _secondary(Icons.reviews_outlined, 'Suggest improvements',
-              busy ? null : onImprove),
+          _button(Icons.reviews_outlined, 'Suggest improvements',
+              busy ? null : onImprove, 'improve'),
           const SizedBox(height: 6),
-          _secondary(Icons.ios_share, 'Commit & push',
-              (busy || !hasRepo) ? null : onCommitPush),
+          _button(Icons.ios_share, 'Commit & push',
+              (busy || !hasRepo) ? null : onCommitPush, 'commit'),
         ],
       ),
     );
   }
 
-  Widget _secondary(IconData icon, String label, VoidCallback? onTap) =>
-      OutlinedButton.icon(
+  /// One action button. The [key]'d action that's currently running is filled in
+  /// the ember accent (and shows a spinner) so it's clearly highlighted — the
+  /// same weight as the primary "Build" button — instead of looking untouched.
+  Widget _button(IconData icon, String label, VoidCallback? onTap, String key,
+      {bool primary = false}) {
+    final active = activeAction == key;
+    const hi = Color(0xFFE8A04C); // ember accent
+    final leading = (active && busy)
+        ? SizedBox(
+            width: 15,
+            height: 15,
+            child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: active ? Colors.black : const Color(0xFFE8A04C)),
+          )
+        : Icon(icon, size: primary ? 18 : 15);
+    final labelWidget =
+        Align(alignment: Alignment.centerLeft, child: Text(label));
+
+    if (active) {
+      return FilledButton.icon(
         onPressed: onTap,
-        icon: Icon(icon, size: 15),
-        label: Align(
-            alignment: Alignment.centerLeft, child: Text(label)),
-        style: OutlinedButton.styleFrom(
+        icon: leading,
+        label: labelWidget,
+        style: FilledButton.styleFrom(
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          backgroundColor: hi,
+          foregroundColor: Colors.black,
+          disabledBackgroundColor: hi.withValues(alpha: 0.85),
+          disabledForegroundColor: Colors.black,
+        ),
+      );
+    }
+    if (primary) {
+      return FilledButton.icon(
+        onPressed: onTap,
+        icon: leading,
+        label: labelWidget,
+        style: FilledButton.styleFrom(
           alignment: Alignment.centerLeft,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         ),
       );
+    }
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: leading,
+      label: labelWidget,
+      style: OutlinedButton.styleFrom(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      ),
+    );
+  }
 }
 
 /// The persistent prompt box at the bottom of the build window. Uses a shared

@@ -4,6 +4,23 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-12 — Claude Code [Standalone build actions + active highlight — v0.4.13]
+
+**Branch:** main · **App:** v0.4.13
+
+### Why
+(1) Run checks / Fix errors / Suggest improvements did nothing unless "Build this feature" ran first — `notifier.action` at idle needed `_brief`, only set by `start()`. (2) Non-primary action buttons gave no visual feedback when clicked.
+
+### Done
+- `implementation_notifier.dart`: `action(ImplBrief brief, String instruction)` — takes the brief, `_brief ??= brief`, so any action starts a run from idle (was `action(instruction)` guarded on a null `_brief`).
+- `implementation_screen.dart`: `_action`/`_buildFromInput` pass `widget.brief`; added `_activeAction` + `_startAction(key,instr)`; `_ActionsPanel` gains `activeAction` and a unified `_button(...)` that renders the running action filled in ember (accent) with a spinner (persists while disabled via `disabledBackgroundColor`), others outlined; highlight cleared in `ref.listen` on idle/terminal (commit clears after its await).
+- Docs: CHANGELOG v0.4.13, context.
+
+### Verify
+`dart analyze lib` clean.
+
+---
+
 ## Session: 2026-09-12 — Claude Code [Follow-up-after-run loop — v0.4.12]
 
 **Branch:** main · **App:** v0.4.12

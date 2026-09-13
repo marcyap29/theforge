@@ -2,6 +2,13 @@
 
 ---
 
+## v0.4.13 — 2026-09-12
+
+- **Every build action is now a standalone entry point.** You can click **Run checks**, **Fix errors**, **Suggest improvements**, or **Commit & push** directly, without pressing **Build this feature** first. Previously those did nothing until a build had run (they needed the run's brief); now each starts its own run from idle.
+- **The action you clicked is highlighted.** The active action lights up in the ember accent with a spinner while it runs (the same visual weight as "Build this feature"), so it's obvious your click registered and which action is in progress — clearing when the run settles.
+
+---
+
 ## v0.4.12 — 2026-09-12
 
 - **Follow up on a build before you ship it.** When a run finishes, the "Run complete" bar now has a **Follow up** button next to Mark shipped, and the right-side actions have **Suggest improvements**. Either one asks the AI to review the code it just wrote and propose concrete follow-up fixes — missing error/permission handling, lifecycle and edge cases, platform/config completeness (scaffolding, manifests, min SDK), and tests — then implement them through the normal approve/apply loop. So you can keep hardening a feature in rounds and be thorough about what the code actually does, instead of shipping after one pass.

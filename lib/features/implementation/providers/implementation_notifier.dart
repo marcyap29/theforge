@@ -157,13 +157,16 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     await _plan(feedback: instruction);
   }
 
-  /// A quick preset action (Run checks, Fix errors, …) or the prompt box:
-  /// starts a fresh build with [instruction] when idle, otherwise steers the
-  /// current plan with it.
-  Future<void> action(String instruction) async {
+  /// A quick preset action (Run checks, Fix errors, Suggest improvements, …) or
+  /// the prompt box. Each is a standalone entry point: when idle it starts a
+  /// fresh run with [instruction] (no need to press "Build this feature" first);
+  /// otherwise it steers the current plan. [brief] is required so the first
+  /// action can start a run even before any build has set the notifier's brief.
+  Future<void> action(ImplBrief brief, String instruction) async {
     if (state.phase.isBusy) return;
+    _brief ??= brief;
     if (state.phase == RunPhase.idle) {
-      if (_brief != null) await start(_brief!, instruction: instruction);
+      await start(brief, instruction: instruction);
       return;
     }
     await steer(instruction);
