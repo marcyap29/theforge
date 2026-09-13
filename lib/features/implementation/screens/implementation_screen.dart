@@ -77,6 +77,18 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
   /// Run a preset action (idle → build with it; else → steer).
   void _action(String instruction) => _notifier.action(instruction);
 
+  /// A follow-up round after a run: the AI reviews what it just did and proposes
+  /// concrete improvements (goes through the normal approve/apply loop, so you
+  /// stay in control). Lets you keep hardening the code before shipping.
+  static const _reviewInstruction =
+      'Review the code you just changed for this feature and propose concrete '
+      'follow-up improvements — missing error/permission handling, lifecycle '
+      'and edge cases, platform/config completeness (e.g. project scaffolding, '
+      'manifests, min SDK), and tests. Then implement the ones that clearly '
+      'strengthen it. Do not repeat changes already applied.';
+
+  void _followUp() => _action(_reviewInstruction);
+
   void _buildFromInput() {
     final phase = ref.read(implRunProvider(_featureId)).phase;
     final text = _input.text.trim();
@@ -276,6 +288,7 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
                           if (context.mounted) Navigator.of(context).pop(true);
                         },
                         onFix: notifier.fix,
+                        onFollowUp: _followUp,
                         onClose: () =>
                             Navigator.of(context).pop(state.featureShipped),
                       ),
@@ -316,6 +329,7 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
                       onFix: () => _action(
                           'Find and fix build, analyzer, and test errors in the '
                           'code for this feature.'),
+                      onImprove: _followUp,
                       onCommitPush: () => notifier.commitAndPush(
                           widget.brief.repoPath,
                           'Implement ${widget.brief.featureTitle}'),
@@ -398,6 +412,7 @@ class _ActionsPanel extends StatelessWidget {
     required this.onBuild,
     required this.onRunChecks,
     required this.onFix,
+    required this.onImprove,
     required this.onCommitPush,
   });
 
@@ -406,6 +421,7 @@ class _ActionsPanel extends StatelessWidget {
   final VoidCallback onBuild;
   final VoidCallback onRunChecks;
   final VoidCallback onFix;
+  final VoidCallback onImprove;
   final VoidCallback onCommitPush;
 
   @override
@@ -433,6 +449,9 @@ class _ActionsPanel extends StatelessWidget {
           const SizedBox(height: 6),
           _secondary(
               Icons.healing_outlined, 'Fix errors', busy ? null : onFix),
+          const SizedBox(height: 6),
+          _secondary(Icons.reviews_outlined, 'Suggest improvements',
+              busy ? null : onImprove),
           const SizedBox(height: 6),
           _secondary(Icons.ios_share, 'Commit & push',
               (busy || !hasRepo) ? null : onCommitPush),
@@ -1297,12 +1316,14 @@ class _DoneBar extends StatelessWidget {
     required this.canFix,
     required this.onShip,
     required this.onFix,
+    required this.onFollowUp,
     required this.onClose,
   });
   final bool alreadyShipped;
   final bool canFix;
   final VoidCallback onShip;
   final VoidCallback onFix;
+  final VoidCallback onFollowUp;
   final VoidCallback onClose;
 
   @override
@@ -1338,6 +1359,14 @@ class _DoneBar extends StatelessWidget {
             ),
             const SizedBox(width: 8),
           ],
+          // Keep improving before you ship: the AI reviews what it just did and
+          // proposes follow-up fixes, which run through the normal approval loop.
+          OutlinedButton.icon(
+            onPressed: onFollowUp,
+            icon: const Icon(Icons.reviews_outlined, size: 16),
+            label: const Text('Follow up'),
+          ),
+          const SizedBox(width: 8),
           TextButton(onPressed: onClose, child: const Text('Close')),
           const SizedBox(width: 8),
           if (trouble)

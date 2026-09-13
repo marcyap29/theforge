@@ -4,6 +4,25 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-12 — Claude Code [Follow-up-after-run loop — v0.4.12]
+
+**Branch:** main · **App:** v0.4.12
+
+### Why
+Reviewing AR Mechanic's generated camera code showed correct logic + permissions but real gaps (no platform scaffold → not buildable; no camera lifecycle handling; denied-permission dead end). The user wanted to keep hardening a feature *after* a run — a follow-up loop before shipping — with the AI proposing the kind of fixes flagged in review.
+
+### Done
+- `implementation_screen.dart`: shared `_reviewInstruction` + `_followUp()` (routes through `_notifier.action` → `steer` → `_plan`, so it reuses the normal approve/apply loop and sees the prior plan as context).
+- **Done bar:** new **Follow up** button (next to Mark shipped / alongside Fix it).
+- **Actions panel:** new **Suggest improvements** button.
+- Both send the review-and-harden instruction (error/permission handling, lifecycle, platform/config completeness, tests).
+- Docs: CHANGELOG v0.4.12, FEATURES row.
+
+### Note (AR Mechanic review findings, for reference)
+Dart camera code is B+ (clean init/error/dispose, CameraPreview + prompt overlay); iOS `NSCameraUsageDescription` + Android `CAMERA` present. Blocker: platform scaffold is fragments only (no gradle/xcodeproj/MainActivity/AppDelegate/Podfile) → not runnable; fix is `flutter create .` preserving the permission edits. Gaps: no `WidgetsBindingObserver` camera lifecycle; denied-permission has no Settings path. User will drive these via the new follow-up loop in-app.
+
+---
+
 ## Session: 2026-09-12 — Claude Code [Remove-duplicates tool (semantic) — v0.4.11]
 
 **Branch:** main · **App:** v0.4.11

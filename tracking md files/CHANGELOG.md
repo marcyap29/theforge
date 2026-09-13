@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.12 — 2026-09-12
+
+- **Follow up on a build before you ship it.** When a run finishes, the "Run complete" bar now has a **Follow up** button next to Mark shipped, and the right-side actions have **Suggest improvements**. Either one asks the AI to review the code it just wrote and propose concrete follow-up fixes — missing error/permission handling, lifecycle and edge cases, platform/config completeness (scaffolding, manifests, min SDK), and tests — then implement them through the normal approve/apply loop. So you can keep hardening a feature in rounds and be thorough about what the code actually does, instead of shipping after one pass.
+
+---
+
 ## v0.4.11 — 2026-09-12
 
 - **Set / move a project's code location, front and centre.** The feature board now has an always-visible **Code:** bar at the top showing where the project's code lives, with **Set code location** (when none is linked) or **Change** + **Scan** (when it is). This is the entry point for pointing a project at a repo — so you can immediately scan an existing codebase or set where new source gets generated. The same **Change code location** action is also in the Build-with-AI window's toolbar and the project detail screen's repo row.
