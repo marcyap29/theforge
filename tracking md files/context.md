@@ -19,6 +19,9 @@ Newest session first. Each block is prepended.
 ### Verify
 `dart analyze lib` clean.
 
+### Fix (same day)
+Highlight didn't show: `start()` mutates state (startedAt/console) while phase is still `idle`, so the "clear on idle/terminal" listener wiped `_activeAction` the instant it was set. Now clears only on an actual phase TRANSITION into terminal/idle (`prev.phase != next.phase && …`), so the highlight survives the start and a done→follow-up re-plan.
+
 ---
 
 ## Session: 2026-09-12 — Claude Code [Follow-up-after-run loop — v0.4.12]

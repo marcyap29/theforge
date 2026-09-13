@@ -194,9 +194,13 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
           setState(() => _collapsedThinking.addAll(starts));
         }
       }
-      // Drop the action highlight once the run settles (terminal or back to idle).
+      // Drop the action highlight only when the phase actually TRANSITIONS into
+      // a terminal/idle state — not while a starting run is still logging in the
+      // idle phase (that was clearing the highlight the instant it was set), and
+      // not while a follow-up logs in the done phase before re-planning.
       if (_activeAction != null &&
-          (next.phase == RunPhase.idle || next.phase.isTerminal)) {
+          prev?.phase != next.phase &&
+          (next.phase.isTerminal || next.phase == RunPhase.idle)) {
         setState(() => _activeAction = null);
       }
     });
