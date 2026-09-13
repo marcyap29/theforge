@@ -4,6 +4,26 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-12 — Claude Code [Analyze-gate after apply — v0.4.15]
+
+**Branch:** main · **App:** v0.4.15
+
+### Why
+Reviewed AR Mechanic after the user ran Build-with-AI on gpt-oss:120b. The model's reasoning was good (added permission_handler flow, WidgetsBindingObserver lifecycle, Open Settings, @visibleForTesting helpers, new tests, pubspec deps) but the applied hunk left a **stray `}`** after `_openAppSettings` that closed the class early → 18 cascading analyzer errors; the run wasn't caught because The Forge never analyzed after applying. (BUG-IMPL-003 class recurring.)
+
+### Done (`implementation_notifier.dart`)
+- `_analyzeGate(brief, failures)`: after edits applied (`applied.isNotEmpty`), detect Dart/Flutter via `pubspec.yaml` (`ImplWorkspace.readRepoFile`), run `flutter analyze` (or `dart analyze`) via `CommandRunner`, treat exit -1/-2 as "analyzer unavailable → skip", fold `error •` lines into `failures` (→ canFix/"Fix it"). Warning/info lints don't block.
+- Called between the edit loop and command loop in `_applyAndRun`.
+- Docs: CHANGELOG v0.4.15, FEATURES row, BUG_PREVENTION update.
+
+### AR Mechanic state (uncommitted, in ~/Development/ar_mechanic)
+Does NOT compile: stray `}` at lib/main.dart ~line140 (+ orphaned comment); `test/permission_settings_test.dart` references private `_CameraFeedScreenState`. Left for the user to fix via The Forge (now that the analyze-gate will surface it). Not hand-edited (per user's "fix through The Forge" preference).
+
+### Verify
+`dart analyze lib` clean.
+
+---
+
 ## Session: 2026-09-12 — Claude Code [Fix planning repetition loop — v0.4.14, BUG-IMPL-007]
 
 **Branch:** main · **App:** v0.4.14

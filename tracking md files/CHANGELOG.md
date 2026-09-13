@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.15 — 2026-09-12
+
+- **Builds now verify the code compiles before calling it done.** After applying edits, The Forge runs the project's analyzer (`flutter analyze` / `dart analyze`) automatically. If an edit doesn't compile — e.g. a find/replace hunk lands a stray brace or drops a symbol (the BUG-IMPL-003 class) — the errors are shown in the console and the run is marked fixable, so **Fix it** feeds them straight back to the AI instead of a broken edit silently landing. Warning/info-level lints don't block; an unavailable analyzer is skipped, not treated as failure. This catches exactly the kind of syntax break a model produced on AR Mechanic (a stray `}` that closed the class early).
+
+---
+
 ## v0.4.14 — 2026-09-12
 
 - **Build planning no longer hangs in a repetition loop (BUG-IMPL-007).** A run could get stuck with the model reprinting the same reasoning paragraph hundreds of times and never producing a plan. Three fixes: (1) the planning prompt no longer claims "the file contents are provided below" when the scout read none — it now says so explicitly and tells the model to create new files or use commands, removing the contradiction that sent the model spiralling; (2) a new **repetition guard** watches the stream and, if a long passage repeats verbatim, stops it and fails fast with a clear message (tip: use an instruction-following/coder model) instead of burning the whole token budget; (3) Ollama calls now send a stronger `repeat_penalty` (1.3) so weaker models are less likely to loop in the first place. Note: a small/fast model can still be too weak for a hard fix — switch the Build model to a coder/instruction-following one when it struggles.

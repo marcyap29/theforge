@@ -410,6 +410,14 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     // Accumulate a failure report so "Fix it" can feed it back to the agent.
     final failures = StringBuffer();
 
+    // --- Analyze gate: catch edits that don't compile (BUG-IMPL-003 class) ---
+    // A find/replace hunk can land a stray brace or drop a symbol. Right after
+    // applying edits, run the project's analyzer so a broken edit is surfaced
+    // (and routed to "Fix it") in THIS run instead of silently landing.
+    if (applied.isNotEmpty) {
+      await _analyzeGate(brief, failures);
+    }
+
     // --- Run commands (streamed) ---
     _phase(RunPhase.running);
     for (var i = 0; i < plan.commands.length; i++) {
@@ -467,6 +475,49 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
             : 'Run finished with issues — you can ask the AI to fix them.');
     state = state.copyWith(canFix: report.isNotEmpty);
     _phase(RunPhase.done);
+  }
+
+  /// Runs the project's static analyzer after edits and folds any compile-level
+  /// errors into [failures] (which drives canFix / "Fix it"). Only gates
+  /// Dart/Flutter repos; treats analyzer-unavailable/timeout as "skip", and
+  /// ignores warning/info-level lints so it fails only on real errors.
+  Future<void> _analyzeGate(ImplBrief brief, StringBuffer failures) async {
+    final pubspec =
+        await ImplWorkspace.readRepoFile(brief.repoPath, 'pubspec.yaml');
+    if (pubspec.trim().isEmpty) return; // only gate Dart/Flutter repos
+    final isFlutter =
+        pubspec.contains('sdk: flutter') || pubspec.contains('\nflutter:');
+    final cmd = isFlutter ? 'flutter analyze' : 'dart analyze';
+    _phase(RunPhase.verifying);
+    _log(ConsoleLineKind.narration, 'Checking the code compiles…');
+    _log(ConsoleLineKind.command, '\$ $cmd');
+    final captured = <String>[];
+    final result = await _runner.run(
+      cmd,
+      workingDirectory: brief.repoPath,
+      onOutput: (o) {
+        captured.add(o.text);
+        _log(o.isError ? ConsoleLineKind.stderr : ConsoleLineKind.stdout,
+            o.text);
+      },
+    );
+    // -1 timeout / -2 blocked / spawn failure → analyzer unavailable; don't
+    // block the run on tooling we couldn't execute.
+    if (result.exitCode == -1 || result.exitCode == -2) {
+      _log(ConsoleLineKind.info, 'Skipped analyze ($cmd unavailable).');
+      return;
+    }
+    final errs =
+        captured.where((l) => l.contains('error •')).toList();
+    if (errs.isEmpty) {
+      _log(ConsoleLineKind.success, '✓ analyze clean (no compile errors)');
+    } else {
+      _log(ConsoleLineKind.error, '✗ analyze found ${errs.length} error(s)');
+      failures
+        ..writeln('Static analysis errors ($cmd):')
+        ..writeln(errs.take(60).map((l) => '  $l').join('\n'))
+        ..writeln();
+    }
   }
 
   static String _tail(List<String> lines, int n) {
