@@ -4,6 +4,30 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-12 — Claude Code [Doc-aware scout — unified manifest + on-demand retrieval — v0.4.10]
+
+**Branch:** main · **App:** v0.4.10 · **Backlog:** §CTX3 ✅
+
+### Why
+Third context-roadmap step. CTX1/CTX2 inject the reference + build-memory pools always-on (capped, with visible trim markers). That doesn't scale: a large pool gets trimmed and the tail is lost to the builder. CTX3 makes those pools *scoutable* — the scout already selects code files; now it also selects doc-pool entries.
+
+### Design (key decision)
+The scout is offered the doc pool **only for pools that overflow their always-on cap** (`_refCap` 12k / `_memCap` 8k). A small pool is already shown in full → nothing to fetch → the scout prompt is byte-for-byte unchanged (no regression). A large, trimmed pool → the scout gets a compact manifest (id · title · preview) and returns `{"files":[…], "docs":["ref:…","mem:…"]}`. Retrieved entries are injected into Pass 2 and **de-duped** against the always-on context (`context.contains(text)`), so an entry that survived the trim isn't sent twice. The cap constant gates both the slot trim and the overflow check so they can't drift.
+
+### Done
+- `ProjectFileRepository`: `DocPoolEntry {id,kind,title,preview}`; `gatherDocManifest` (one entry per `.forge/ingested/*.facts.md` and `.forge/build_memory/*.md`); `readDocEntry(id)` with a basename/kind sandbox guard (rejects `..`, subpaths, unknown kinds).
+- `impl_agent.dart`: `proposePlan`/scout gain `docManifest` + `readDoc`; `_parseFileList` → generic `_parseKeyList(raw,key)`; scout prompt offers the overflow-only manifest and requests a `docs` array; bounded retrieval (8 docs / 40k) with dedupe; new `## Retrieved reference material` Pass-2 block; `_refCap`/`_memCap` constants shared by slots + overflow check; scout status line now names pulled docs.
+- `implementation_notifier.dart`: `_plan` gathers the manifest and passes `readDoc: (id) => repo.readDocEntry(projectPath, id)`.
+- Tests: `test/doc_manifest_test.dart` (manifest ids/kinds/titles; ignores `.fp`/raw docs/`reference_context.md`; readDocEntry round-trip; path-escape + bad-kind rejection).
+
+### Verification
+`dart analyze lib/` clean · `flutter test` **33/33** green.
+
+### Next
+- §CTX4: optional embeddings/vector retrieval behind the same scout-selection interface — only when a project's pool outgrows an LLM-readable manifest.
+
+---
+
 ## Session: 2026-09-11 — Claude Code [Feature-build memory — "gained + remains" — v0.4.9]
 
 **Branch:** main · **App:** v0.4.9 · **Backlog:** §CTX2 ✅

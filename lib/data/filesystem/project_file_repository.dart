@@ -23,6 +23,33 @@ class SpecAlreadyExistsException implements Exception {
   String toString() => 'Spec already exists at: $path';
 }
 
+/// One entry in a project's document pool that the build scout can pull on
+/// demand: an ingested reference doc's extracted facts, or a prior feature's
+/// build-memory record. The manifest lists these compactly so the scout can
+/// choose which to read in full instead of every doc being crammed into every
+/// prompt.
+class DocPoolEntry {
+  const DocPoolEntry({
+    required this.id,
+    required this.kind,
+    required this.title,
+    required this.preview,
+  });
+
+  /// Stable reference used to fetch the full text via [ProjectFileRepository
+  /// .readDocEntry], e.g. `ref:MyDoc.facts.md` or `mem:feat-1.md`. The prefix
+  /// selects the pool subfolder.
+  final String id;
+
+  /// `reference` (ingested doc) or `build-memory` (prior shipped feature).
+  final String kind;
+  final String title;
+
+  /// One-line gist shown in the manifest so the scout can choose without the
+  /// full body.
+  final String preview;
+}
+
 class ProjectFileRepository {
   final Future<Directory> Function() _rootDirProvider;
 
@@ -353,6 +380,90 @@ class ProjectFileRepository {
     }
     final s = buf.toString().trim();
     return s.isEmpty ? null : s;
+  }
+
+  static List<String> _cleanLines(String s) => s
+      .split('\n')
+      .map((l) =>
+          l.replaceFirst(RegExp(r'^#+\s*'), '').replaceAll('**', '').trim())
+      .where((l) => l.isNotEmpty)
+      .toList();
+
+  static String _clip(String s, [int cap = 160]) =>
+      s.length > cap ? '${s.substring(0, cap)}…' : s;
+
+  /// Builds a compact manifest of the project's document pool — one entry per
+  /// ingested reference doc and per shipped-feature build record — so the build
+  /// scout can choose which to pull in full (see [readDocEntry]) rather than
+  /// cramming every doc into every prompt. Empty when the project has no docs.
+  Future<List<DocPoolEntry>> gatherDocManifest(String projectPath) async {
+    final out = <DocPoolEntry>[];
+
+    final ingested =
+        Directory(p.join(projectPath, forgeDirName, 'ingested'));
+    if (ingested.existsSync()) {
+      final facts = ingested
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.facts.md'))
+          .toList()
+        ..sort((a, b) => a.path.compareTo(b.path));
+      for (final f in facts) {
+        final name = p.basename(f.path);
+        final lines = _cleanLines(await f.readAsString());
+        out.add(DocPoolEntry(
+          id: 'ref:$name',
+          kind: 'reference',
+          title: name.replaceAll('.facts.md', ''),
+          preview: lines.isEmpty ? '' : _clip(lines.first),
+        ));
+      }
+    }
+
+    final mem = Directory(p.join(projectPath, forgeDirName, 'build_memory'));
+    if (mem.existsSync()) {
+      final files = mem
+          .listSync()
+          .whereType<File>()
+          .where((f) => p.extension(f.path) == '.md')
+          .toList()
+        ..sort((a, b) => a.path.compareTo(b.path));
+      for (final f in files) {
+        final name = p.basename(f.path);
+        final lines = _cleanLines(await f.readAsString());
+        out.add(DocPoolEntry(
+          id: 'mem:$name',
+          kind: 'build-memory',
+          title: lines.isEmpty ? name : _clip(lines.first),
+          preview: lines.length > 1 ? _clip(lines[1]) : '',
+        ));
+      }
+    }
+    return out;
+  }
+
+  /// Reads the full text of a doc-pool entry by its manifest [id]. Returns ''
+  /// if the id is malformed or the file is missing. Guards path escapes — only
+  /// a bare basename inside the two known pool subfolders is allowed, since the
+  /// id ultimately comes from the model.
+  Future<String> readDocEntry(String projectPath, String id) async {
+    final i = id.indexOf(':');
+    if (i <= 0) return '';
+    final name = id.substring(i + 1);
+    if (name.isEmpty || name != p.basename(name)) return '';
+    final sub = switch (id.substring(0, i)) {
+      'ref' => 'ingested',
+      'mem' => 'build_memory',
+      _ => null,
+    };
+    if (sub == null) return '';
+    final f = File(p.join(projectPath, forgeDirName, sub, name));
+    if (!f.existsSync()) return '';
+    try {
+      return await f.readAsString();
+    } catch (_) {
+      return '';
+    }
   }
 
   Future<void> deleteProject(String projectPath) async {

@@ -237,6 +237,13 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
           'Loaded build memory ($n prior feature${n == 1 ? '' : 's'})');
     }
 
+    // A manifest of the whole doc pool the scout may pull from on demand — used
+    // for pools too large to sit fully in the always-on context above.
+    var docManifest = const <DocPoolEntry>[];
+    try {
+      docManifest = await repo.gatherDocManifest(brief.projectPath);
+    } catch (_) {}
+
     _log(ConsoleLineKind.info, 'Waiting for the model to respond…');
 
     // Reassure the user while we wait for the first streamed token — a large
@@ -263,6 +270,8 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
         goalStatement: brief.goalStatement,
         ingestedContext: ingestedContext,
         buildMemory: buildMemory,
+        docManifest: docManifest,
+        readDoc: (id) => repo.readDocEntry(brief.projectPath, id),
         components: brief.components,
         previousPlan: previousPlan,
         feedback: feedback,

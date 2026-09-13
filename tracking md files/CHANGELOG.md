@@ -2,6 +2,13 @@
 
 ---
 
+## v0.4.10 — 2026-09-12
+
+- **The build AI can now pull the right docs on demand.** As a project accumulates reference documents and prior-build records, they can outgrow what fits in every prompt. The build agent's "scout" pass now sees a compact **manifest** of the whole document pool and requests, by name, the specific reference doc or prior feature it needs for the task — the same way it already picks which code files to read. Retrieved material is fed into the plan and de-duplicated against what's already shown.
+- **Small projects are unchanged.** This only kicks in when a pool is too large to show in full; below that, everything is already always-on, so nothing changes. The console now names any reference docs it pulled (`… · N reference doc(s): …`).
+
+---
+
 ## v0.4.9 — 2026-09-11
 
 - **Builds now remember what you built before.** When you **ship** a feature, The Forge saves a durable record — what was built, why, and which files changed — into a per-project **build-memory** pool (`.forge/build_memory/`). Every later build reads that pool back, so the AI follows the patterns and file layout it already established instead of starting cold. This is the "context that's gained and remains" — the same way a human (or Claude Code) carries forward what it learned earlier in a project.

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../../data/filesystem/project_file_repository.dart';
 import '../../../services/llm/llm_provider.dart';
 import '../../../services/llm/llm_service.dart';
 import '../models/run_session.dart';
@@ -36,6 +37,8 @@ class ImplAgent {
     String? goalStatement,
     String? ingestedContext,
     String? buildMemory,
+    List<DocPoolEntry> docManifest = const [],
+    Future<String> Function(String id)? readDoc,
     List<String> components = const [],
     AgentPlan? previousPlan,
     String? feedback,
@@ -64,19 +67,43 @@ class ImplAgent {
           : '\n\n## What the user asked you to build\n${feedback.trim()}\n';
     }
 
+    // Offer the scout the doc pool ONLY for pools too big to sit fully in the
+    // always-on context above — a small pool is already shown in full, so there
+    // is nothing to fetch. This is "always-on core + scouted extras" applied to
+    // the reference-doc and build-memory pools: they become scoutable exactly
+    // when they overflow their cap and get trimmed above.
+    final refOverflow = (ingestedContext?.length ?? 0) > _refCap;
+    final memOverflow = (buildMemory?.length ?? 0) > _memCap;
+    final offered = docManifest
+        .where((e) =>
+            (e.kind == 'reference' && refOverflow) ||
+            (e.kind == 'build-memory' && memOverflow))
+        .toList();
+    final manifestBlock = offered.isEmpty
+        ? ''
+        : '\n\n## Extra reference material available'
+            '\nThese are NOT fully shown above. Request any you need by "id".\n'
+            '${offered.map((e) => '- ${e.id} — ${e.title}: ${e.preview}').join('\n')}';
+
     // --- Pass 1 — Scout: which existing files does it need to read? ---
     onStatus?.call('Choosing which files to read…');
     final scoutRaw = await _stream(
       system: _scoutSystemPrompt,
-      user: '$context\n\nReturn ONLY: '
-          '{"files": ["repo/relative/path", …]} (at most 12 files). Always '
-          'include any data-model / schema / drift database file the feature '
-          'touches.',
+      user: '$context$manifestBlock\n\nReturn ONLY: '
+          '{"files": ["repo/relative/path", …], "docs": ["ref:…", "mem:…"]} '
+          '(at most 12 files; "docs" only from the ids listed above, [] if '
+          'none). Always include any data-model / schema / drift database file '
+          'the feature touches.',
       temperature: 0.1,
       maxTokens: 4000,
       onDelta: onDelta,
     );
-    final wanted = _parseFileList(scoutRaw);
+    final wanted = _parseKeyList(scoutRaw, 'files');
+    final wantedDocs = offered.isEmpty
+        ? const <String>[]
+        : _parseKeyList(scoutRaw, 'docs')
+            .where((id) => offered.any((e) => e.id == id))
+            .toList();
 
     // Read the chosen files (bounded) so Pass 2 edits real code, not guesses.
     // Files are given whole up to a generous cap — a truncated file makes the
@@ -94,9 +121,37 @@ class ImplAgent {
       readFiles[rel] = c;
       budget -= c.length;
     }
-    onStatus?.call(readFiles.isEmpty
+    // Pull the doc-pool entries the scout asked for (bounded), skipping any
+    // whose text is already present in the always-on context above (dedupe —
+    // an entry that survived the trim is already there).
+    final readDocs = <String, String>{};
+    if (readDoc != null && wantedDocs.isNotEmpty) {
+      var docBudget = 40000;
+      for (final id in wantedDocs) {
+        if (readDocs.length >= 8 || docBudget <= 0) break;
+        final text = (await readDoc(id)).trim();
+        if (text.isEmpty || context.contains(text)) continue;
+        var t = text;
+        if (t.length > 12000) t = '${t.substring(0, 12000)}\n…(truncated)';
+        if (t.length > docBudget) t = t.substring(0, docBudget);
+        readDocs[id] = t;
+        docBudget -= t.length;
+      }
+    }
+
+    final readSummary = StringBuffer();
+    if (readFiles.isNotEmpty) {
+      readSummary.write(
+          'Read ${readFiles.length} file(s): ${readFiles.keys.join(', ')}');
+    }
+    if (readDocs.isNotEmpty) {
+      if (readSummary.isNotEmpty) readSummary.write(' · ');
+      readSummary
+          .write('${readDocs.length} reference doc(s): ${readDocs.keys.join(', ')}');
+    }
+    onStatus?.call(readSummary.isEmpty
         ? 'No matching files to read — planning from docs…'
-        : 'Read ${readFiles.length} file(s): ${readFiles.keys.join(', ')}');
+        : readSummary.toString());
 
     // --- Pass 2 — Plan: propose edits/commands grounded in the file bodies. ---
     onStatus?.call('Writing the plan…');
@@ -109,6 +164,15 @@ class ImplAgent {
           ..writeln('```')
           ..writeln(content)
           ..writeln('```')
+          ..writeln();
+      });
+    }
+    if (readDocs.isNotEmpty) {
+      planUser.writeln('\n\n## Retrieved reference material');
+      readDocs.forEach((id, content) {
+        planUser
+          ..writeln('### $id')
+          ..writeln(content)
           ..writeln();
       });
     }
@@ -185,11 +249,12 @@ class ImplAgent {
     return b.toString();
   }
 
-  List<String> _parseFileList(String raw) {
+  /// Reads a JSON string array under [key] from a possibly-fenced scout reply.
+  List<String> _parseKeyList(String raw, String key) {
     try {
       final obj = jsonDecode(_extractJsonObject(raw));
-      if (obj is Map && obj['files'] is List) {
-        return (obj['files'] as List)
+      if (obj is Map && obj[key] is List) {
+        return (obj[key] as List)
             .map((e) => e.toString().trim())
             .where((s) => s.isNotEmpty)
             .toList();
@@ -204,9 +269,13 @@ any code, decide which EXISTING files you need to read to do it well — the fil
 you will likely edit, plus any you must understand (models, providers, related
 widgets). Use the DOCUMENTATION, SPEC, and the repo FILE LIST to choose.
 
+If an "Extra reference material available" list is present, also pick the "id"s
+of any entries whose full text you need (e.g. a reference doc or a prior feature
+you should follow). Only pick ids from that list; if none apply, use [].
+
 Respond with ONLY a JSON object, no prose, no code fences:
-{"files": ["lib/path/one.dart", "lib/path/two.dart"]}
-Choose real paths from the file list. Return at most 12, fewest that suffice.
+{"files": ["lib/path/one.dart", "lib/path/two.dart"], "docs": ["ref:Foo.facts.md"]}
+Choose real paths from the file list. Return at most 12 files, fewest that suffice.
 ''';
 
   static const _systemPrompt = '''
@@ -256,6 +325,13 @@ it). The JSON must be a single top-level object with no code fences:
   ]
 }
 ''';
+
+  /// Always-on char caps for the reference-doc and build-memory slots. The same
+  /// values gate the doc-aware scout: a pool over its cap is trimmed above and
+  /// therefore offered to the scout for on-demand retrieval. Keep the slot and
+  /// the overflow check reading the SAME constant so they never drift.
+  static const _refCap = 12000;
+  static const _memCap = 8000;
 
   /// Trims [s] to [cap] characters, appending a VISIBLE marker when it must cut
   /// so the user (and the model) can see context was dropped, rather than losing
@@ -314,7 +390,7 @@ it). The JSON must be a single top-level object with no code fences:
     if (ingestedContext != null && ingestedContext.trim().isNotEmpty) {
       b
         ..writeln('## Reference context (ingested documents)')
-        ..writeln(_cap(ingestedContext.trim(), 12000, what: 'reference context'))
+        ..writeln(_cap(ingestedContext.trim(), _refCap, what: 'reference context'))
         ..writeln();
     }
     // Durable memory of what already shipped on this project — so the model
@@ -324,7 +400,7 @@ it). The JSON must be a single top-level object with no code fences:
       b
         ..writeln('## Prior builds on this project '
             '(what shipped before — reuse these patterns and files)')
-        ..writeln(_cap(buildMemory.trim(), 8000, what: 'build memory'))
+        ..writeln(_cap(buildMemory.trim(), _memCap, what: 'build memory'))
         ..writeln();
     }
     if (keyDocs != null && keyDocs.trim().isNotEmpty) {
