@@ -35,6 +35,9 @@ Two compounding problems:
   create missing files as NEW files or use commands, and explicitly "do NOT
   repeat yourself." When the scout reads nothing, the plan prompt adds a `## No
   existing file contents were included` note so there's no contradiction.
+- **Source-level mitigation** (`ollama_provider.dart`): both the streaming and
+  non-streaming calls now send `repeat_penalty: 1.3` (Ollama's default 1.1 is too
+  weak), so weaker models are less likely to enter a verbatim loop at all.
 - **Loop guard** (`_stream` + `_looksLooping`): watches all emitted text
   (thinking + content); if the last ~500 chars already appear verbatim earlier
   within the last 12k chars (an exact long repeat normal generation never

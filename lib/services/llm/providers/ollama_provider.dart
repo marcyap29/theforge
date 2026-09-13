@@ -38,6 +38,9 @@ class OllamaProvider extends LlmProvider {
           // Ensure the model has room to finish (thinking + answer); without
           // this a long reasoning phase can starve the actual response.
           if (maxTokens != null) 'num_predict': maxTokens,
+          // Discourage the verbatim-paragraph repetition loops some models fall
+          // into while reasoning (BUG-IMPL-007); default 1.1 is too weak.
+          'repeat_penalty': 1.3,
         },
         'messages': [
           {'role': 'system', 'content': systemPrompt},
@@ -79,6 +82,9 @@ class OllamaProvider extends LlmProvider {
           // Ensure the model has room to finish (thinking + answer); without
           // this a long reasoning phase can starve the actual response.
           if (maxTokens != null) 'num_predict': maxTokens,
+          // Discourage the verbatim-paragraph repetition loops some models fall
+          // into while reasoning (BUG-IMPL-007); default 1.1 is too weak.
+          'repeat_penalty': 1.3,
         },
           'messages': [
             {'role': 'system', 'content': systemPrompt},

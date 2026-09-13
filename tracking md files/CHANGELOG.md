@@ -4,7 +4,7 @@
 
 ## v0.4.14 — 2026-09-12
 
-- **Build planning no longer hangs in a repetition loop (BUG-IMPL-007).** A run could get stuck with the model reprinting the same reasoning paragraph hundreds of times and never producing a plan. Two fixes: (1) the planning prompt no longer claims "the file contents are provided below" when the scout read none — it now says so explicitly and tells the model to create new files or use commands, removing the contradiction that sent the model spiralling; (2) a new **repetition guard** watches the stream and, if a long passage repeats verbatim, stops it and fails fast with a clear message (tip: use an instruction-following/coder model) instead of burning the whole token budget.
+- **Build planning no longer hangs in a repetition loop (BUG-IMPL-007).** A run could get stuck with the model reprinting the same reasoning paragraph hundreds of times and never producing a plan. Three fixes: (1) the planning prompt no longer claims "the file contents are provided below" when the scout read none — it now says so explicitly and tells the model to create new files or use commands, removing the contradiction that sent the model spiralling; (2) a new **repetition guard** watches the stream and, if a long passage repeats verbatim, stops it and fails fast with a clear message (tip: use an instruction-following/coder model) instead of burning the whole token budget; (3) Ollama calls now send a stronger `repeat_penalty` (1.3) so weaker models are less likely to loop in the first place. Note: a small/fast model can still be too weak for a hard fix — switch the Build model to a coder/instruction-following one when it struggles.
 
 ---
 
