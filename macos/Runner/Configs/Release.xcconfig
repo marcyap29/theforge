@@ -1,2 +1,9 @@
 #include "../../Flutter/Flutter-Release.xcconfig"
 #include "Warnings.xcconfig"
+
+// Build only the local (Apple Silicon) architecture. Flutter 3.38's universal
+// engine-unpack arch check ("does not contain architectures arm64 x86_64")
+// breaks under Xcode 27; arm64-only sidesteps it for local dev deploys.
+ONLY_ACTIVE_ARCH = YES
+ARCHS = arm64
+EXCLUDED_ARCHS = x86_64

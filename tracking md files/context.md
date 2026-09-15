@@ -4,6 +4,17 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-15 — Claude Code [Xcode 27 broke the macOS build — env fixes]
+
+Xcode auto-updated to 27, breaking the deploy three ways:
+- **License reset** → `git`/`xcodebuild` refused; user ran `sudo xcodebuild -license accept`.
+- **Min `MACOSX_DEPLOYMENT_TARGET` raised to 12.0** → bumped `macos/Runner.xcodeproj/project.pbxproj` (3 configs, 10.15→12.0) + `macos/Podfile` (`platform :osx, '12.0'` + post_install forcing every pod target to 12.0, since some pinned 10.13/10.14).
+- **Flutter 3.38.7 universal-engine arch check failed** ("FlutterMacOS does not contain architectures 'arm64 x86_64'" though `lipo` shows both) → sidestepped with an **arm64-only** release build in `macos/Runner/Configs/Release.xcconfig` (`ONLY_ACTIVE_ARCH=YES`, `ARCHS=arm64`, `EXCLUDED_ARCHS=x86_64`). Fine for local (Apple Silicon) dev; bundle 53MB→27MB.
+
+Proper long-term fix = `flutter upgrade` to a Xcode-27-compatible Flutter (deferred — bumps Dart, would touch the drift/objective_c AOT workaround). Deploy green after these.
+
+---
+
 ## Session: 2026-09-15 — Claude Code [Thinking on/off toggle per role — v0.4.18]
 
 **Branch:** main · **App:** v0.4.18
