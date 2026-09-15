@@ -651,10 +651,16 @@ class ProjectFileRepository {
   }
 
   /// Creates a fresh code folder for [projectName] under [defaultCodeRoot],
-  /// `git init`s it, and seeds a README so it's a valid, non-empty repo that
-  /// Build with AI can write into. Never overwrites — appends `-2`, `-3`… if a
-  /// folder of that name already exists. Returns the created absolute path.
-  static Future<String> createCodeRepo(String projectName) async {
+  /// `git init`s it, and returns the created absolute path. Never overwrites —
+  /// appends `-2`, `-3`… if a folder of that name already exists.
+  ///
+  /// When [platforms] is given (e.g. `['ios','android','macos']`), the folder is
+  /// scaffolded as a real, runnable Flutter app via `flutter create
+  /// --platforms=…` — so the app is runnable from the start and doesn't need a
+  /// separate "Make runnable" step. Falls back to a plain README-seeded folder
+  /// if no platforms are chosen or `flutter` isn't available.
+  static Future<String> createCodeRepo(String projectName,
+      {List<String> platforms = const []}) async {
     final root = Directory(defaultCodeRoot());
     await root.create(recursive: true);
 
@@ -666,16 +672,47 @@ class ProjectFileRepository {
       dest = Directory(p.join(root.path, '$base-$n'));
       n++;
     }
-    await dest.create(recursive: true);
 
+    // Preferred: scaffold a runnable Flutter app for the chosen platforms.
+    if (platforms.isNotEmpty) {
+      final pkg = _dartPackageName(projectName);
+      try {
+        final res = await Process.run(
+          'flutter',
+          [
+            'create',
+            '--platforms=${platforms.join(',')}',
+            '--project-name=$pkg',
+            dest.path,
+          ],
+        );
+        if (res.exitCode == 0 && dest.existsSync()) {
+          try {
+            await Process.run('git', ['init'], workingDirectory: dest.path);
+          } catch (_) {}
+          return dest.path;
+        }
+      } catch (_) {
+        // flutter unavailable → fall through to a plain folder.
+      }
+    }
+
+    // Fallback: a plain, git-inited folder with a README.
+    await dest.create(recursive: true);
     await File(p.join(dest.path, 'README.md'))
         .writeAsString('# $projectName\n\nCreated by The Forge.\n');
-    // git init is best-effort — a machine without git still gets a usable
-    // folder that a user can init later.
     try {
       await Process.run('git', ['init'], workingDirectory: dest.path);
     } catch (_) {}
     return dest.path;
+  }
+
+  /// A valid Dart package name (lowercase snake_case) for `flutter create`.
+  static String _dartPackageName(String name) {
+    var s = name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_');
+    s = s.replaceAll(RegExp(r'^_+|_+$'), '');
+    if (s.isEmpty || !RegExp(r'^[a-z]').hasMatch(s)) s = 'app_$s';
+    return s.replaceAll(RegExp(r'_+'), '_');
   }
 
   /// Like [createCodeRepo] but does NOT seed a README — used as a *relocation*

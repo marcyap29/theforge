@@ -21,6 +21,7 @@ import '../scan/feature_scan.dart';
 import '../widgets/active_model_chip.dart';
 import '../widgets/dedup_review_sheet.dart';
 import '../widgets/feature_edit_dialog.dart';
+import '../widgets/platform_picker.dart';
 import '../widgets/relocate_repo.dart';
 import '../widgets/scan_review_sheet.dart';
 import '../widgets/status_chip.dart';
@@ -300,10 +301,19 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     );
     final messenger = ScaffoldMessenger.of(context);
     if (choice == 'create') {
+      // Ask which platforms so the folder is scaffolded runnable from the start.
+      if (!mounted) return null;
+      final platforms = await pickPlatforms(context, projectName: project.name);
+      if (platforms == null) return null; // cancelled
+      if (mounted) {
+        messenger.showSnackBar(const SnackBar(
+            content: Text('Creating the app… (scaffolding platforms)')));
+      }
       try {
-        final path = await ProjectFileRepository.createCodeRepo(project.name);
+        final path = await ProjectFileRepository.createCodeRepo(project.name,
+            platforms: platforms);
         await ProjectFileRepository.writeProjectConfig(
-            project.path, {'repoPath': path});
+            project.path, {'repoPath': path, 'platforms': platforms});
         if (mounted) {
           messenger.showSnackBar(
               SnackBar(content: Text('Created and linked $path')));

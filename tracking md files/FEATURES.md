@@ -87,6 +87,7 @@
 | Thinking on/off per role | Shipped v0.4.18 | `ModelAssignment.think` + Settings toggle per role; `LlmService` sends Ollama `think:false` only when off; off routes full budget to the answer (avoids thinking-driven JSON truncation/loops) |
 | New Project 2-up | Shipped v0.4.0 | `new_project_screen.dart` reduced to two modes |
 | Create a code folder | Shipped v0.4.1 | `ProjectFileRepository.createCodeRepo` — makes `~/Development/<name>`, `git init`, links it; offered in the Link-Repo row and the Build-with-AI no-repo prompt |
+| Platform picker on create → auto-scaffold | Shipped v0.4.26 | `pickPlatforms` dialog (iOS/Android/macOS/Windows/Linux/Web) → `createCodeRepo(platforms:)` runs `flutter create --platforms=…` so a new app is runnable from the start; platforms saved to project config; removes the need to press Make runnable for new apps |
 | Vibecode prompt + Esc interrupt | Shipped v0.4.4 | Persistent input in the Build window (`notifier.steer`); Escape stops the running task |
 | Copyable build console + raw-output on failure | Shipped v0.4.5 | `SelectionArea` + Copy-all; failed planning prints the model's raw output for diagnosis |
 | Build-with-AI compose screen | Shipped v0.4.7 | No auto-run; on-screen hints + prompt box; nothing sent until the user acts |

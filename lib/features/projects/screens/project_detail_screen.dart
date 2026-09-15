@@ -23,6 +23,7 @@ import '../../spec_generation/compliance/spec_compliance_screen.dart';
 import '../../spec_generation/executor_timeline_notifier.dart';
 import '../../spec_generation/worksheet_generation_screen.dart';
 import '../../tracker/screens/project_tracker_screen.dart';
+import '../../tracker/widgets/platform_picker.dart';
 import '../../tracker/widgets/relocate_repo.dart';
 import '../doc_export.dart';
 import '../ingestion/ingestion_notifier.dart';
@@ -2504,11 +2505,19 @@ class _RepoPathRowState extends State<_RepoPathRow> {
 
   Future<void> _createNew() async {
     final messenger = ScaffoldMessenger.of(context);
+    // Ask target platforms so the new app is scaffolded runnable from the start.
+    final platforms = await pickPlatforms(context, projectName: widget.projectName);
+    if (platforms == null) return; // cancelled
+    if (mounted) {
+      messenger.showSnackBar(const SnackBar(
+          content: Text('Creating the app… (scaffolding platforms)')));
+    }
     try {
-      final path =
-          await ProjectFileRepository.createCodeRepo(widget.projectName);
+      final path = await ProjectFileRepository.createCodeRepo(
+          widget.projectName,
+          platforms: platforms);
       await ProjectFileRepository.writeProjectConfig(
-          widget.projectPath, {'repoPath': path});
+          widget.projectPath, {'repoPath': path, 'platforms': platforms});
       if (mounted) {
         setState(() => _repoPath = path);
         messenger.showSnackBar(SnackBar(content: Text('Created and linked $path')));

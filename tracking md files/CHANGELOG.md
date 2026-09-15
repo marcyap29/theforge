@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.26 — 2026-09-15
+
+- **Pick target platforms when creating an app — it's scaffolded runnable automatically.** "Create a new code folder" now asks which platforms the app is for (iOS, Android, macOS, Windows, Linux, Web; mobile pre-selected) and scaffolds a real, runnable Flutter app for exactly those with `flutter create --platforms=…`. So a new app runs on a device from the start — no separate **Make runnable** step needed. The chosen platforms are saved to the project config. ("Make runnable" stays as a fallback for existing/linked repos that weren't scaffolded; it greys to "Runnable ✓" once they are.)
+
+---
+
 ## v0.4.25 — 2026-09-15
 
 - **"Mark shipped" now shows it's working.** Shipping does real work — saving build memory, writing docs, and committing + pushing — which takes a few seconds before the window returns to the board. Instead of a silent delay that looked like a hang, the bar now shows a spinner + "Shipping… saving docs, committing & pushing. This can take a few seconds — the window will close when it's done."

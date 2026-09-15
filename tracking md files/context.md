@@ -4,6 +4,31 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-15 — Claude Code [Platform picker → auto-scaffold on create — v0.4.26]
+
+**Branch:** main · **App:** v0.4.26
+
+### Why
+User: pick target platforms when making a new app and auto-scaffold it, so "runnable" is the default and the Make-runnable button becomes a fallback.
+
+### Done
+- `pickPlatforms()` dialog (`widgets/platform_picker.dart`): iOS/Android/macOS/Windows/Linux/Web checkboxes, mobile pre-checked, returns flutter platform ids or null.
+- `ProjectFileRepository.createCodeRepo(name, {platforms})`: when platforms given, `flutter create --platforms=csv --project-name=<snake> <dest>` (real runnable app) + git init; falls back to plain README folder if flutter unavailable/empty. Added `_dartPackageName` sanitizer.
+- Wired the two "Create a new code folder" paths: tracker `_ensureRepoPath` create branch + detail `_createNew` — both call `pickPlatforms` then `createCodeRepo(platforms:)` and save `platforms` into project config.
+- Make-runnable button stays as fallback (greys to "Runnable ✓" once scaffolded).
+- Docs: CHANGELOG v0.4.26, FEATURES row.
+
+### Also shipped earlier this session
+v0.4.24 grey-out Make runnable; v0.4.25 "Shipping…" progress bar on Mark shipped (docs+commit+push runs on ship, not auto).
+
+### Still open (offered, not done)
+Duplicate-changelog dedup in the ship pipeline (re-shipping prepends identical entry); + clean AR Mechanic's doubled CHANGELOG entry.
+
+### Verify
+`dart analyze lib` clean · `flutter test` 33/33 green.
+
+---
+
 ## Session: 2026-09-15 — Claude Code [Scaffold gate + ship-doc-commit — v0.4.21]
 
 **Branch:** main · **App:** v0.4.21
