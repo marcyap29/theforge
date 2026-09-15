@@ -730,6 +730,9 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
   /// Prepends [entry] to [file], keeping an optional one-time [header] at top.
   static void _prepend(File file, String entry, {required String header}) {
     final existing = file.existsSync() ? file.readAsStringSync() : '';
+    // Dedup: don't add an entry that's already present (e.g. re-shipping the
+    // same feature would otherwise repeat an identical block).
+    if (entry.trim().isNotEmpty && existing.contains(entry.trim())) return;
     if (existing.isEmpty) {
       file.writeAsStringSync('$header\n$entry\n');
       return;

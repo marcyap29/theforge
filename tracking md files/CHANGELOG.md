@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.27 — 2026-09-15
+
+- **No more duplicate changelog/doc entries on re-ship.** The ship-docs step now skips prepending an entry that's already present, so re-shipping a feature (or shipping the same run twice) no longer repeats an identical block in the app's `CHANGELOG.md` / dev log. (AR Mechanic's existing doubled entry was cleaned up too.)
+
+---
+
 ## v0.4.26 — 2026-09-15
 
 - **Pick target platforms when creating an app — it's scaffolded runnable automatically.** "Create a new code folder" now asks which platforms the app is for (iOS, Android, macOS, Windows, Linux, Web; mobile pre-selected) and scaffolds a real, runnable Flutter app for exactly those with `flutter create --platforms=…`. So a new app runs on a device from the start — no separate **Make runnable** step needed. The chosen platforms are saved to the project config. ("Make runnable" stays as a fallback for existing/linked repos that weren't scaffolded; it greys to "Runnable ✓" once they are.)
