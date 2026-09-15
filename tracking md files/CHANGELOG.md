@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.25 — 2026-09-15
+
+- **"Mark shipped" now shows it's working.** Shipping does real work — saving build memory, writing docs, and committing + pushing — which takes a few seconds before the window returns to the board. Instead of a silent delay that looked like a hang, the bar now shows a spinner + "Shipping… saving docs, committing & pushing. This can take a few seconds — the window will close when it's done."
+
+---
+
 ## v0.4.24 — 2026-09-15
 
 - **"Make runnable" greys out once the app is scaffolded.** It's a one-time, per-project setup, so once the platform folders exist the button now shows **"Runnable ✓"** and is disabled across every feature's build window — no more inviting you to re-run it on each feature.

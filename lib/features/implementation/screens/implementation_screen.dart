@@ -42,6 +42,11 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
   /// scaffolded) — used to disable "Make runnable" so it reads as already done.
   bool _scaffolded = false;
 
+  /// True while "Mark shipped" is doing its work (save memory → docs → commit →
+  /// push) before returning to the board — drives a visible "working" bar so the
+  /// few-second delay doesn't look like a hang.
+  bool _shipping = false;
+
   /// Shared prompt/compose text — used by the bottom box AND the right-side
   /// "Build this feature" button.
   late final TextEditingController _input =
@@ -323,18 +328,26 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
                         onEditCommand: notifier.editProposedCommand,
                       ),
                     if (state.phase == RunPhase.done)
-                      _DoneBar(
-                        alreadyShipped: state.featureShipped,
-                        canFix: state.canFix,
-                        onShip: () async {
-                          await notifier.shipFeature();
-                          if (context.mounted) Navigator.of(context).pop(true);
-                        },
-                        onFix: notifier.fix,
-                        onFollowUp: _followUp,
-                        onClose: () =>
-                            Navigator.of(context).pop(state.featureShipped),
-                      ),
+                      _shipping
+                          ? const _ShippingBar()
+                          : _DoneBar(
+                              alreadyShipped: state.featureShipped,
+                              canFix: state.canFix,
+                              onShip: () async {
+                                // Shipping does real work (docs + commit + push),
+                                // which takes a few seconds — show a clear
+                                // "working" bar so it doesn't look hung.
+                                setState(() => _shipping = true);
+                                await notifier.shipFeature();
+                                if (context.mounted) {
+                                  Navigator.of(context).pop(true);
+                                }
+                              },
+                              onFix: notifier.fix,
+                              onFollowUp: _followUp,
+                              onClose: () =>
+                                  Navigator.of(context).pop(state.featureShipped),
+                            ),
                     if (state.phase == RunPhase.failed ||
                         state.phase == RunPhase.stopped)
                       _FailedBar(
@@ -1413,6 +1426,41 @@ class _Timeline extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(label, style: TextStyle(fontSize: 13, color: color)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shown while "Mark shipped" is finishing up (docs + commit + push) so the
+/// few-second delay before returning to the board reads as progress, not a hang.
+class _ShippingBar extends StatelessWidget {
+  const _ShippingBar();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: const BoxDecoration(
+        color: Color(0x2281C784),
+        border: Border(top: BorderSide(color: Color(0xFF1C1C1E))),
+      ),
+      child: const Row(
+        children: [
+          SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: Color(0xFF81C784)),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Shipping… saving docs, committing & pushing. This can take a few '
+              'seconds — the window will close when it\'s done.',
+              style: TextStyle(fontSize: 13, color: Color(0xFFE5E5E7)),
+            ),
+          ),
         ],
       ),
     );
