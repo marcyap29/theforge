@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.17 — 2026-09-14
+
+- **Fixed "Planning failed: did not return valid JSON" caused by truncation.** On a large multi-file plan (several code hunks), the model could run past the output-token budget and get **cut off mid-JSON**, so it wouldn't parse. Two fixes: (1) the plan pass token ceiling is raised (16k → **32k**) so big plans fit; (2) the retry now **detects truncation** (JSON started but never closed) and asks for a *smaller, focused* plan instead of the generic "output valid JSON" nudge — which just truncated again. Genuinely malformed (non-truncated) output still gets the JSON-only retry.
+
+---
+
 ## v0.4.16 — 2026-09-12
 
 - **Fixed the app hard-quitting (SIGABRT) during builds (BUG-IMPL-008).** The local index ran on a background isolate (via `drift_flutter`); on close, `sqlite3`'s FFI-callback destructors tripped a Dart runtime assertion on that worker and aborted the whole app. The index now opens on the **main isolate** against the same database file (`~/Documents/forge_index.sqlite`) — same data, no migration — which removes the cross-isolate FFI teardown and that crash class. The index is tiny, so there's no noticeable cost.

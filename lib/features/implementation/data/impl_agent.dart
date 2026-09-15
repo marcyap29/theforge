@@ -189,26 +189,50 @@ class ImplAgent {
       system: _systemPrompt,
       user: planUserStr,
       temperature: 0.2,
-      maxTokens: 16000,
+      maxTokens: _planTokens,
       onDelta: onDelta,
     );
     try {
       return _parse(planRaw, repoPath);
     } on ImplAgentException {
-      // Reasoning models sometimes spend the turn thinking and never emit a
-      // clean JSON object. Ask once more, firmly, for JSON only.
+      // Two common failures, handled differently on retry:
+      //  • Truncation — a big multi-file plan overran the output budget, so the
+      //    JSON was cut off mid-object. Retrying the same way just truncates
+      //    again; ask for a SMALLER plan instead.
+      //  • Otherwise the model wrapped/appended prose; ask for JSON only.
       onStatus?.call('Tidying the plan into valid JSON…');
+      final truncated = _looksTruncated(planRaw);
+      final retryUser = truncated
+          ? '$planUserStr\n\nIMPORTANT: your previous reply was CUT OFF before '
+              'the JSON finished (the plan was too long). Return a SMALLER, '
+              'focused plan — the fewest and smallest hunks needed, only the '
+              'essential changes — as ONE complete JSON object. No prose, no '
+              'code fences.'
+          : '$planUserStr\n\nIMPORTANT: your previous reply was NOT a single '
+              'valid JSON object. Output ONLY the JSON object now — no prose, no '
+              'code fences, and do not ask to open more files. Use what you have.';
       final retry = await _stream(
         system: _systemPrompt,
-        user: '$planUserStr\n\nIMPORTANT: your previous reply was NOT a single '
-            'valid JSON object. Output ONLY the JSON object now — no prose, no '
-            'code fences, and do not ask to open more files. Use what you have.',
+        user: retryUser,
         temperature: 0.1,
-        maxTokens: 16000,
+        maxTokens: _planTokens,
         onDelta: onDelta,
       );
       return _parse(retry, repoPath);
     }
+  }
+
+  /// Output-token budget for the plan pass. Large enough that a multi-file plan
+  /// with several code hunks isn't cut off mid-JSON (the "did not return valid
+  /// JSON" truncation failure).
+  static const _planTokens = 32000;
+
+  /// Heuristic: the raw plan started a JSON object but never closed it → it was
+  /// almost certainly truncated at the token limit rather than malformed.
+  static bool _looksTruncated(String raw) {
+    final s = raw.trimRight();
+    if (s.isEmpty || !s.contains('{')) return false;
+    return !s.endsWith('}');
   }
 
   /// Streams one completion, forwarding deltas for live display and returning

@@ -38,6 +38,20 @@ Two compounding issues with reasoning models:
 - **Auto-retry once** on a parse failure: if the plan pass doesn't yield valid
   JSON, the agent asks once more, firmly, for JSON only before failing.
 
+## Follow-up (v0.4.17) — truncation cause of the same symptom
+
+The same "did not return valid JSON" message later recurred with a *strong* model
+(glm-5.3:cloud) for a different reason: a large multi-file plan (several code
+hunks) **overran the output-token budget and was cut off mid-JSON**, so it
+couldn't parse. The raw-output tail (surfaced since v0.4.5) ended inside
+`"hunks": [ {` with no closing braces — the tell-tale of truncation, not
+malformed output.
+
+Fix: raised the plan-pass ceiling 16k → 32k (`_planTokens`), and made the retry
+**truncation-aware** — `_looksTruncated` (JSON started but never closed) switches
+the retry to ask for a *smaller, focused* plan (fewest/smallest hunks) instead of
+the generic "output valid JSON" nudge, which just truncated again.
+
 ## Prevention Rule
 
 See BUG_PREVENTION.md — "Reasoning models may spend a turn thinking and never

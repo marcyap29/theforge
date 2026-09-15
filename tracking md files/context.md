@@ -4,6 +4,27 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-14 — Claude Code [Plan JSON truncation fix — v0.4.17]
+
+**Branch:** main · **App:** v0.4.17
+
+### Why
+On glm-5.3:cloud a big multi-file plan failed with "did not return valid JSON." Raw-output tail ended mid-`"hunks": [ {` — truncation (plan overran the 16k output budget), not malformed JSON. (BUG-IMPL-004 symptom, new cause.)
+
+### Done (`impl_agent.dart`)
+- `_planTokens = 32000`; both plan `_stream` calls use it (was 16000).
+- `_looksTruncated(raw)` (JSON started, never closed) → retry switches to "your reply was CUT OFF — return a SMALLER, focused plan (fewest/smallest hunks)" instead of the generic JSON-only nudge (which just truncated again). Non-truncated failures still get the JSON-only retry.
+- Docs: CHANGELOG v0.4.17, BUG-IMPL-004 follow-up + BUG_PREVENTION rule.
+
+### Also this session
+- Researched Ollama Cloud coding/architect models (qwen3-coder:480b retired 2026-07-15 → 410). Saved memory `theforge-forge-model-choices`: architect `glm-5.3:cloud`, executor `kimi-k2.7-code:cloud`, avoid `-flash`, live list at ollama.com/search?c=cloud.
+- Hand-fixed AR Mechanic (user was stuck): removed model-hallucinated `setMockInitialValue`/`_testController` from lib/main.dart + deleted the impossible "Displays CameraPreview on success" widget test + dropped unused foundation import → 0 analyze issues, 3 tests pass. (Not committed by me; user drives commits.)
+
+### Verify
+`dart analyze lib` clean.
+
+---
+
 ## Session: 2026-09-12 — Claude Code [Fix app SIGABRT (drift bg-isolate) — v0.4.16, BUG-IMPL-008]
 
 **Branch:** main · **App:** v0.4.16
