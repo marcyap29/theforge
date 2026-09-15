@@ -47,17 +47,40 @@ List<ModelInfo> modelsFor(LlmProviderType type) {
 class ModelAssignment {
   final LlmProviderType providerType;
   final String modelId;
-  const ModelAssignment({required this.providerType, required this.modelId});
+
+  /// Whether a reasoning model's chain-of-thought is enabled for this role.
+  /// Off routes the whole output budget to the answer — more reliable for the
+  /// executor's JSON plans (avoids thinking-driven truncation/loops); on can
+  /// improve architect-style reasoning. Default true (the model's own default).
+  final bool think;
+
+  const ModelAssignment({
+    required this.providerType,
+    required this.modelId,
+    this.think = true,
+  });
+
+  ModelAssignment copyWith({
+    LlmProviderType? providerType,
+    String? modelId,
+    bool? think,
+  }) =>
+      ModelAssignment(
+        providerType: providerType ?? this.providerType,
+        modelId: modelId ?? this.modelId,
+        think: think ?? this.think,
+      );
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is ModelAssignment &&
           other.providerType == providerType &&
-          other.modelId == modelId);
+          other.modelId == modelId &&
+          other.think == think);
 
   @override
-  int get hashCode => Object.hash(providerType, modelId);
+  int get hashCode => Object.hash(providerType, modelId, think);
 }
 
 @immutable

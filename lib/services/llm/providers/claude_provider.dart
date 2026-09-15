@@ -15,6 +15,7 @@ class ClaudeProvider extends LlmProvider {
     required double temperature,
     required String modelId,
     int? maxTokens,
+    bool? think, // accepted for interface parity; Claude thinking is separate
   }) async {
     final response = await http.post(
       Uri.parse('https://api.anthropic.com/v1/messages'),
@@ -55,6 +56,7 @@ class ClaudeProvider extends LlmProvider {
     required double temperature,
     required String modelId,
     int? maxTokens,
+    bool? think, // accepted for interface parity; Claude thinking is separate
   }) async* {
     final client = http.Client();
     try {

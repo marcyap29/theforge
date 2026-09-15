@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.18 — 2026-09-15
+
+- **Thinking on/off toggle per model (Settings → each role).** Reasoning models (glm-5.3, deepseek, etc.) spend part of their output budget on chain-of-thought — which for big Build plans could eat the whole budget and truncate the JSON. Each role's model card now has a **Thinking (chain-of-thought)** switch: leave it **on** for the architect (better reasoning on interviews/specs), turn it **off** for the executor so the full output budget goes to the answer (more reliable plans, no thinking-driven truncation/loops). Sent to Ollama as `think:false` only when you turn it off, so non-thinking models are unaffected. The choice persists per role.
+
+---
+
 ## v0.4.17 — 2026-09-14
 
 - **Fixed "Planning failed: did not return valid JSON" caused by truncation.** On a large multi-file plan (several code hunks), the model could run past the output-token budget and get **cut off mid-JSON**, so it wouldn't parse. Two fixes: (1) the plan pass token ceiling is raised (16k → **32k**) so big plans fit; (2) the retry now **detects truncation** (JSON started but never closed) and asks for a *smaller, focused* plan instead of the generic "output valid JSON" nudge — which just truncated again. Genuinely malformed (non-truncated) output still gets the JSON-only retry.

@@ -16,17 +16,23 @@ abstract class LlmProvider {
     required double temperature,
     required String modelId,
     int? maxTokens,
+    bool? think,
   });
 
   /// Streams the completion as incremental deltas. The default falls back to a
   /// single [complete] call yielded as one content chunk (no real streaming);
   /// providers override this to stream token-by-token.
+  ///
+  /// [think] controls a reasoning model's chain-of-thought: `false` disables it
+  /// so the whole output budget goes to the answer (used for JSON passes that
+  /// must not be truncated by thinking); null leaves the model default.
   Stream<LlmDelta> completeStream({
     required String systemPrompt,
     required String userPrompt,
     required double temperature,
     required String modelId,
     int? maxTokens,
+    bool? think,
   }) async* {
     yield LlmDelta(await complete(
       systemPrompt: systemPrompt,
@@ -34,6 +40,7 @@ abstract class LlmProvider {
       temperature: temperature,
       modelId: modelId,
       maxTokens: maxTokens,
+      think: think,
     ));
   }
 }

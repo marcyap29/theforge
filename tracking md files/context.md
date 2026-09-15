@@ -4,6 +4,29 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-15 — Claude Code [Thinking on/off toggle per role — v0.4.18]
+
+**Branch:** main · **App:** v0.4.18
+
+### Why
+glm-5.3:cloud plans truncated even at 32k because chain-of-thought eats the `num_predict` budget (thinking + answer share it). User asked to make thinking a per-model toggle instead of hardcoding.
+
+### Done
+- `ModelAssignment.think` (bool, default true) + `copyWith`; `==`/hashCode updated.
+- Provider interface: `bool? think` on `complete`/`completeStream`. Ollama sends top-level `if (think != null) 'think': think` (both stream + non-stream). Claude/OpenAI accept-and-ignore (interface parity).
+- `LlmService` passes `think: assignment.think ? null : false` — only forces OFF; leaves model default when on, so non-thinking models never get an unsupported `think:true`.
+- Persistence: `settings_notifier` prefs key `forge_role_think_<role>` (getBool default true) + saved in `setRoleAssignment`.
+- UI: `_RoleCard` in `settings_screen` gets a `SwitchListTile` "Thinking (chain-of-thought)"; provider/model change now preserves `think` via `assignment.copyWith`/explicit `think:`.
+- Docs: CHANGELOG v0.4.18, FEATURES row.
+
+### Recommended use
+Architect thinking ON (glm-5.3:cloud), Executor thinking OFF (frees full budget for JSON plans; complements v0.4.17 32k cap + truncation-aware retry, v0.4.14 loop guard). Ties to memory [[theforge-forge-model-choices]].
+
+### Verify
+`dart analyze lib` clean · `flutter test` 33/33 green.
+
+---
+
 ## Session: 2026-09-14 — Claude Code [Plan JSON truncation fix — v0.4.17]
 
 **Branch:** main · **App:** v0.4.17

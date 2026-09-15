@@ -15,6 +15,7 @@ class OpenAiProvider extends LlmProvider {
     required double temperature,
     required String modelId,
     int? maxTokens,
+    bool? think, // accepted for interface parity; not used by OpenAI chat
   }) async {
     final response = await http.post(
       Uri.parse('https://api.openai.com/v1/chat/completions'),
@@ -57,6 +58,7 @@ class OpenAiProvider extends LlmProvider {
     required double temperature,
     required String modelId,
     int? maxTokens,
+    bool? think, // accepted for interface parity; not used by OpenAI chat
   }) async* {
     final client = http.Client();
     try {

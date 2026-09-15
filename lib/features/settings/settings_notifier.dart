@@ -44,6 +44,7 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
   static const _prefsKeyBaseUrl = 'forge_ollama_base_url';
   static const _prefsKeyRoleProvider = 'forge_role_provider_';
   static const _prefsKeyRoleModel = 'forge_role_model_';
+  static const _prefsKeyRoleThink = 'forge_role_think_';
   static const _keychainKeyPrefix = 'forge_api_key_';
   static const _keychainKeyPrefixSwarmspace = 'forge_api_key_swarmspace';
   static const _configFileName = 'forge_config.json';
@@ -111,9 +112,13 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
                   validIds.contains(savedModelId)))
           ? savedModelId
           : (isFirstRun ? defaultModelId : fallbackId);
+      // Thinking defaults ON (model's own default); persisted per role.
+      final think =
+          prefs.getBool('$_prefsKeyRoleThink${role.name}') ?? true;
       assignments[role] = ModelAssignment(
         providerType: providerType,
         modelId: modelId,
+        think: think,
       );
     }
 
@@ -175,6 +180,10 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
     await prefs.setString(
       '$_prefsKeyRoleModel${role.name}',
       assignment.modelId,
+    );
+    await prefs.setBool(
+      '$_prefsKeyRoleThink${role.name}',
+      assignment.think,
     );
 
     final current = state.valueOrNull;

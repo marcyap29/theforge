@@ -37,6 +37,10 @@ class LlmService {
       temperature: temperature,
       modelId: modelId,
       maxTokens: maxTokens,
+      // Only force thinking OFF when the user disabled it for this role; leave
+      // the model's own default (null) when on, so non-thinking models aren't
+      // sent an unsupported `think:true`.
+      think: assignment.think ? null : false,
     );
   }
 
@@ -69,6 +73,7 @@ class LlmService {
       temperature: temperature,
       modelId: modelId,
       maxTokens: maxTokens,
+      think: assignment.think ? null : false,
     );
   }
 

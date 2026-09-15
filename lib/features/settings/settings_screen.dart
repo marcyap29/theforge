@@ -608,7 +608,10 @@ class _RoleCard extends ConsumerWidget {
                   final defaultModel = modelsFor(p).firstOrNull?.id ?? '';
                   await ref.read(settingsProvider.notifier).setRoleAssignment(
                         role,
-                        ModelAssignment(providerType: p, modelId: defaultModel),
+                        ModelAssignment(
+                            providerType: p,
+                            modelId: defaultModel,
+                            think: assignment.think),
                       );
                 },
                 decoration: const InputDecoration(
@@ -656,14 +659,17 @@ class _RoleCard extends ConsumerWidget {
                       role,
                       ModelAssignment(
                           providerType: assignment.providerType,
-                          modelId: entered),
+                          modelId: entered,
+                          think: assignment.think),
                     );
                     return;
                   }
                   await notifier.setRoleAssignment(
                     role,
                     ModelAssignment(
-                        providerType: assignment.providerType, modelId: m),
+                        providerType: assignment.providerType,
+                        modelId: m,
+                        think: assignment.think),
                   );
                 },
                 decoration: const InputDecoration(
@@ -680,6 +686,29 @@ class _RoleCard extends ConsumerWidget {
                     ref.read(settingsProvider.notifier).refreshOllama(),
               ),
           ],
+        ),
+        const SizedBox(height: 4),
+        // Thinking toggle: lets a reasoning model's chain-of-thought be turned
+        // off per role. Off routes the whole output budget to the answer —
+        // more reliable JSON for the executor (avoids thinking-driven
+        // truncation/loops); on can help the architect reason.
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          value: assignment.think,
+          onChanged: (v) =>
+              ref.read(settingsProvider.notifier).setRoleAssignment(
+                    role,
+                    assignment.copyWith(think: v),
+                  ),
+          title: const Text('Thinking (chain-of-thought)',
+              style: TextStyle(fontSize: 13)),
+          subtitle: Text(
+            assignment.think
+                ? 'On — the model reasons before answering. Best for the architect.'
+                : 'Off — full output budget goes to the answer. More reliable for building (no thinking-driven truncation/loops).',
+            style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+          ),
         ),
       ],
     );

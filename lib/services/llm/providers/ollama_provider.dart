@@ -26,6 +26,7 @@ class OllamaProvider extends LlmProvider {
     required double temperature,
     required String modelId,
     int? maxTokens,
+    bool? think,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/chat'),
@@ -33,6 +34,10 @@ class OllamaProvider extends LlmProvider {
       body: jsonEncode({
         'model': modelId,
         'stream': false,
+        // Toggle a reasoning model's chain-of-thought (off = whole budget to the
+        // answer). Only sent when explicitly set, so non-thinking models are
+        // unaffected.
+        if (think != null) 'think': think,
         'options': {
           'temperature': temperature,
           // Ensure the model has room to finish (thinking + answer); without
@@ -69,6 +74,7 @@ class OllamaProvider extends LlmProvider {
     required double temperature,
     required String modelId,
     int? maxTokens,
+    bool? think,
   }) async* {
     final client = http.Client();
     try {
@@ -77,6 +83,9 @@ class OllamaProvider extends LlmProvider {
         ..body = jsonEncode({
           'model': modelId,
           'stream': true,
+          // Toggle chain-of-thought (off = whole budget to the answer). Only
+          // sent when explicitly set, so non-thinking models are unaffected.
+          if (think != null) 'think': think,
           'options': {
           'temperature': temperature,
           // Ensure the model has room to finish (thinking + answer); without
