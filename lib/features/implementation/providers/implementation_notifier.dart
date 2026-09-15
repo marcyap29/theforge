@@ -410,6 +410,14 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     // Accumulate a failure report so "Fix it" can feed it back to the agent.
     final failures = StringBuffer();
 
+    // --- Auto-tidy: clean the cosmetic debris AI edits leave behind ---
+    // Runs the analyzer's safe automated fixes (unused imports, `const`, etc.)
+    // and the formatter, so every build lands clean instead of accumulating
+    // unused-import warnings and unformatted code the user has to chase.
+    if (applied.isNotEmpty) {
+      await _tidy(brief);
+    }
+
     // --- Analyze gate: catch edits that don't compile (BUG-IMPL-003 class) ---
     // A find/replace hunk can land a stray brace or drop a symbol. Right after
     // applying edits, run the project's analyzer so a broken edit is surfaced
@@ -475,6 +483,41 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
             : 'Run finished with issues — you can ask the AI to fix them.');
     state = state.copyWith(canFix: report.isNotEmpty);
     _phase(RunPhase.done);
+  }
+
+  /// Auto-cleans the cosmetic debris AI edits leave behind: runs `dart fix
+  /// --apply` (safe automated lint fixes — unused imports, `const`, …) then
+  /// `dart format` on the edited files. Never fails the run — tidy is
+  /// best-effort; unavailable tooling or a non-zero exit is just logged.
+  Future<void> _tidy(ImplBrief brief) async {
+    final pubspec =
+        await ImplWorkspace.readRepoFile(brief.repoPath, 'pubspec.yaml');
+    if (pubspec.trim().isEmpty) return; // Dart/Flutter repos only
+    _log(ConsoleLineKind.narration, 'Tidying up (dart fix + format)…');
+    // dart fix across the package (safe, only touches diagnosable issues);
+    // format only the files we actually edited, to avoid noisy repo-wide diffs.
+    final edited = state.appliedEditPaths
+        .where((p) => p.endsWith('.dart'))
+        .toList();
+    final steps = <String>[
+      'dart fix --apply',
+      if (edited.isNotEmpty) 'dart format ${edited.join(' ')}',
+    ];
+    for (final cmd in steps) {
+      final out = <String>[];
+      final result = await _runner.run(
+        cmd,
+        workingDirectory: brief.repoPath,
+        onOutput: (o) => out.add(o.text),
+      );
+      if (result.exitCode == -1 || result.exitCode == -2) {
+        _log(ConsoleLineKind.info, 'Skipped `$cmd` (unavailable).');
+      } else {
+        final summary = out.isEmpty ? '' : ' — ${out.last.trim()}';
+        _log(result.ok ? ConsoleLineKind.success : ConsoleLineKind.info,
+            '${result.ok ? '✓' : '•'} $cmd$summary');
+      }
+    }
   }
 
   /// Runs the project's static analyzer after edits and folds any compile-level

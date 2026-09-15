@@ -4,6 +4,28 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-15 — Claude Code [Auto-tidy build step — v0.4.20]
+
+**Branch:** main · **App:** v0.4.20
+
+### Why
+Recurring pattern: AI builds are functionally correct but leave cosmetic debris (unused imports, unformatted code, stray comments) — the "minor polish" the user keeps seeing. Absorb it into the pipeline.
+
+### Done (`implementation_notifier.dart`)
+- `_tidy(brief)`: after edits applied (`applied.isNotEmpty`), before `_analyzeGate`, run `dart fix --apply` (package-wide, safe auto-fixes) + `dart format <edited .dart files>`. Best-effort: -1/-2 exit → "skipped (unavailable)"; never fails the run; logs a one-line summary. Dart/Flutter only (pubspec check via `ImplWorkspace.readRepoFile`).
+- Docs: CHANGELOG v0.4.20, FEATURES rows (auto-tidy + the v0.4.19 JSON-mode row).
+
+### Proposed follow-ups (not yet built) — from "help with missing features / polish"
+1. **Flutter scaffold gate** — biggest gap: Build-with-AI writes lib/pubspec but never `flutter create`s platform folders, so generated apps can't run on device. Detect a Flutter repo missing android/ios scaffolding and offer/run `flutter create .` (backup+restore Info.plist/AndroidManifest permission edits).
+2. **Auto-commit on ship** — offer/auto `git commit` when a feature is marked shipped (repos currently sit uncommitted).
+3. **Surface analyzer warnings** (not just errors) in the gate as non-blocking notes.
+4. **Always-on plan-writing stream** — show the answer channel dimmed during planning so "watch it write" works even with Thinking off.
+
+### Verify
+`dart analyze lib` clean · `flutter test` 33/33 green.
+
+---
+
 ## Session: 2026-09-15 — Claude Code [Enforced JSON mode for agent passes — v0.4.19]
 
 **Branch:** main · **App:** v0.4.19

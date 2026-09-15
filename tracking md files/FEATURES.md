@@ -53,6 +53,8 @@
 | Modify-plan (edit / revise) | Shipped v0.4.0 | Edit the proposed plan inline or revise via free-text feedback → re-plan through shared revision block |
 | Fix-on-failure | Shipped v0.4.0 | Verify failure (e.g. `dart analyze`) routes back through `_plan` in fix mode for a corrective plan |
 | Analyze-gate after apply | Shipped v0.4.15 | `_analyzeGate` runs `flutter/dart analyze` right after edits; compile errors (`error •`) fold into the failure report → canFix/"Fix it"; catches hunk corruption (stray brace / dropped symbol, BUG-IMPL-003 class) before a run is called done |
+| Auto-tidy after apply | Shipped v0.4.20 | `_tidy` runs `dart fix --apply` + `dart format` on edited files post-apply; removes unused imports / formats automatically (best-effort, Dart/Flutter only) so builds don't accumulate cosmetic debris |
+| Enforced JSON output mode | Shipped v0.4.19 | `jsonMode` threads to Ollama `format:"json"` on scout/plan/scan/dedup passes so a model can't return prose where JSON is required (note: not enforced on some cloud models) |
 | Follow-up after a run | Shipped v0.4.12 | "Follow up" on the Done bar + "Suggest improvements" action → AI reviews the just-written code and proposes hardening fixes (error/permission handling, lifecycle, platform/config completeness, tests) through the normal approve/apply loop; iterate in rounds before shipping |
 | Undo (edit backups) | Shipped v0.4.0 | Applied edits backed up to `.forge/impl_backups/`; one-click revert |
 | Streamed command runner | Shipped v0.4.0 | `Process.start` streaming + denylist + 3-min timeout; first streamed subprocess in the app |

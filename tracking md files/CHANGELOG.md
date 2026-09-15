@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.20 — 2026-09-15
+
+- **Builds auto-tidy the code they write.** After applying edits (and before the analyze gate), The Forge now runs `dart fix --apply` (safe automated lint fixes — remove unused imports, add `const`, …) and `dart format` on the edited files. So the cosmetic debris AI edits tend to leave — unused imports, unformatted code, the little warnings you'd otherwise chase — is cleaned automatically every build. Best-effort: unavailable tooling or a non-zero exit is just logged, never fails the run. Dart/Flutter repos only.
+
+---
+
 ## v0.4.19 — 2026-09-15
 
 - **Plans are now generated in enforced JSON mode — the model can't "answer" with prose.** A model (esp. with thinking off) could reason out loud in its answer — musing about package versions with code fences — instead of returning the plan object, failing with "did not return valid JSON." The scout/plan passes (and the feature scan + dedup) now use Ollama's **`format: "json"`**, which constrains the output to valid JSON, so a model literally can't return prose where JSON is required. This is the structural fix that complements the 32k ceiling, truncation-aware retry, loop guard, and the Thinking toggle.
