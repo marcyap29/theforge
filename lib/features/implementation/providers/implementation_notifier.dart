@@ -805,9 +805,10 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
   /// writes lib/pubspec but never scaffolds android/ios. Backs up and restores
   /// the Info.plist / AndroidManifest so permission edits aren't lost to the
   /// regenerated defaults.
-  Future<void> scaffoldFlutter() async {
-    final brief = _brief;
-    if (brief == null) return;
+  Future<void> scaffoldFlutter(ImplBrief brief) async {
+    // Use the window's brief directly (don't require a build to have started —
+    // `_brief` is only set by start(), so on a freshly-opened feature it's null).
+    _brief ??= brief;
     if (!(state.phase == RunPhase.idle || state.phase.isTerminal)) return;
     final repoPath = brief.repoPath;
     if (repoPath.isEmpty || !Directory(repoPath).existsSync()) {

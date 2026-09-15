@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.23 — 2026-09-15
+
+- **"Make runnable" now works on a freshly-opened feature.** It previously did nothing unless you'd already started a build in that window (it relied on internal run state that's only set once a build starts). It now uses the window's linked repo directly, so you can click it right after opening the feature — no need to build first. (If `flutter` can't be found or the command fails, it now says so in the console instead of sitting silent.)
+
+---
+
 ## v0.4.22 — 2026-09-15
 
 - **Fixed "Make runnable" (and "Commit & push") being greyed out (BUG-IMPL-009).** Reopening a feature that already had a run passed an empty repo path to the Build window, which disabled the repo-dependent actions — so you couldn't see/use **Make runnable** on the shipped Camera feature. The re-attach path now carries the project's linked repo, so those actions stay enabled when you reopen a feature.

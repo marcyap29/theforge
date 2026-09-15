@@ -365,7 +365,7 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
                       },
                       onScaffold: () {
                         setState(() => _activeAction = 'scaffold');
-                        notifier.scaffoldFlutter();
+                        notifier.scaffoldFlutter(widget.brief);
                       },
                     ),
                     Expanded(
