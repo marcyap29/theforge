@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 
 import '../../../data/filesystem/project_file_repository.dart';
 import '../../tracker/widgets/active_model_chip.dart';
@@ -36,6 +38,10 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
   /// runs — cleared when the run reaches a terminal/idle phase.
   String? _activeAction;
 
+  /// True once the linked repo already has its platform folders (a Flutter app
+  /// scaffolded) — used to disable "Make runnable" so it reads as already done.
+  bool _scaffolded = false;
+
   /// Shared prompt/compose text — used by the bottom box AND the right-side
   /// "Build this feature" button.
   late final TextEditingController _input =
@@ -55,6 +61,19 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
+    Future.microtask(_checkScaffold);
+  }
+
+  /// Detects whether the linked repo already has platform scaffolding, so the
+  /// "Make runnable" action can be greyed out (it's a one-time, per-project
+  /// setup — once done it shouldn't invite re-running on every feature).
+  Future<void> _checkScaffold() async {
+    final rp = widget.brief.repoPath;
+    if (rp.isEmpty) return;
+    final has = Directory(p.join(rp, 'ios', 'Runner.xcodeproj')).existsSync() ||
+        File(p.join(rp, 'android', 'build.gradle')).existsSync() ||
+        File(p.join(rp, 'android', 'build.gradle.kts')).existsSync();
+    if (mounted && has != _scaffolded) setState(() => _scaffolded = has);
   }
 
   @override
@@ -363,9 +382,12 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
                             'Implement ${widget.brief.featureTitle}');
                         if (mounted) setState(() => _activeAction = null);
                       },
-                      onScaffold: () {
+                      scaffolded: _scaffolded,
+                      onScaffold: () async {
                         setState(() => _activeAction = 'scaffold');
-                        notifier.scaffoldFlutter(widget.brief);
+                        await notifier.scaffoldFlutter(widget.brief);
+                        await _checkScaffold();
+                        if (mounted) setState(() => _activeAction = null);
                       },
                     ),
                     Expanded(
@@ -450,6 +472,7 @@ class _ActionsPanel extends StatelessWidget {
     required this.onImprove,
     required this.onCommitPush,
     required this.onScaffold,
+    required this.scaffolded,
   });
 
   final bool busy;
@@ -461,6 +484,7 @@ class _ActionsPanel extends StatelessWidget {
   final VoidCallback onImprove;
   final VoidCallback onCommitPush;
   final VoidCallback onScaffold;
+  final bool scaffolded;
 
   @override
   Widget build(BuildContext context) {
@@ -491,8 +515,11 @@ class _ActionsPanel extends StatelessWidget {
           _button(Icons.ios_share, 'Commit & push',
               (busy || !hasRepo) ? null : onCommitPush, 'commit'),
           const SizedBox(height: 6),
-          _button(Icons.phone_iphone, 'Make runnable',
-              (busy || !hasRepo) ? null : onScaffold, 'scaffold'),
+          _button(
+              scaffolded ? Icons.check_circle_outline : Icons.phone_iphone,
+              scaffolded ? 'Runnable ✓' : 'Make runnable',
+              (busy || !hasRepo || scaffolded) ? null : onScaffold,
+              'scaffold'),
         ],
       ),
     );

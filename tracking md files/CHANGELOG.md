@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.24 — 2026-09-15
+
+- **"Make runnable" greys out once the app is scaffolded.** It's a one-time, per-project setup, so once the platform folders exist the button now shows **"Runnable ✓"** and is disabled across every feature's build window — no more inviting you to re-run it on each feature.
+
+---
+
 ## v0.4.23 — 2026-09-15
 
 - **"Make runnable" now works on a freshly-opened feature.** It previously did nothing unless you'd already started a build in that window (it relied on internal run state that's only set once a build starts). It now uses the window's linked repo directly, so you can click it right after opening the feature — no need to build first. (If `flutter` can't be found or the command fails, it now says so in the console instead of sitting silent.)
