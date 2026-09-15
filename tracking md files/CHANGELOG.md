@@ -2,6 +2,13 @@
 
 ---
 
+## v0.4.21 — 2026-09-15
+
+- **Make a generated app runnable in one click.** A new **Make runnable** action in the Build window runs `flutter create .` to generate the platform folders (android/ios) that Build-with-AI doesn't scaffold on its own — the gap that kept generated Flutter apps from running on a device. It backs up and restores your `Info.plist` / `AndroidManifest.xml` so permission edits (e.g. camera) survive the regeneration. Detects a Flutter repo, skips if already set up.
+- **Shipping a feature now documents, commits, and pushes.** When you **Mark shipped**, The Forge updates the *app repo's* docs — prepends a `CHANGELOG.md` entry (what happened), appends a detailed `docs/DEVELOPMENT_LOG.md` entry (what/why/files/commands), and refreshes `docs/ARCHITECTURE.md` via the architect model — then `git add -A`, commits (`feat: <feature> + docs`), and pushes. The same "docs ship with code" discipline The Forge holds itself to, now applied to the apps it builds. All best-effort: a docs or git hiccup never blocks the ship.
+
+---
+
 ## v0.4.20 — 2026-09-15
 
 - **Builds auto-tidy the code they write.** After applying edits (and before the analyze gate), The Forge now runs `dart fix --apply` (safe automated lint fixes — remove unused imports, add `const`, …) and `dart format` on the edited files. So the cosmetic debris AI edits tend to leave — unused imports, unformatted code, the little warnings you'd otherwise chase — is cleaned automatically every build. Best-effort: unavailable tooling or a non-zero exit is just logged, never fails the run. Dart/Flutter repos only.

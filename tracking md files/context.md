@@ -4,6 +4,27 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-15 — Claude Code [Scaffold gate + ship-doc-commit — v0.4.21]
+
+**Branch:** main · **App:** v0.4.21
+
+### Why
+Two recurring gaps in built apps: (1) generated Flutter apps can't run — Build-with-AI writes lib/pubspec but never scaffolds android/ios; (2) generated repos sit uncommitted with no docs. User: on ship, update all docs (changelog/architecture/what-happened) then commit + push.
+
+### Done (`implementation_notifier.dart`)
+- `scaffoldFlutter()`: Flutter-only, skips if already scaffolded (checks ios/Runner.xcodeproj or android/build.gradle[.kts]); backs up ios/Runner/Info.plist + android AndroidManifest.xml, runs `flutter create .` via CommandRunner, restores those files if complete (keeps permission edits). Transient `running` phase → restore prior. Wired as "Make runnable" action button (`onScaffold`, highlight key 'scaffold').
+- `_documentAndCommit(brief, plan, paths)` called from `shipFeature`: deterministic `_prepend` of app-repo `CHANGELOG.md` (`_changelogEntry`) + `docs/DEVELOPMENT_LOG.md` (`_devLogEntry`); `_updateArchitectureDoc` = best-effort architect LLM refresh of `docs/ARCHITECTURE.md` (prose out, no JSON); then `gitCommitAll('feat: <title> + docs')` + `gitPush`. All best-effort — never blocks ship. Guards empty/missing repoPath. Added `dart:io` + `package:path` imports.
+- Docs: CHANGELOG v0.4.21, FEATURES rows.
+
+### Notes / follow-ups still open
+- Bugtracker doc not separately generated on ship (feature ships have no bug); dev log covers "what happened". Could add `docs/BUGLOG.md` on fix-runs later.
+- Remaining from the polish menu: surface analyzer *warnings* (non-blocking); always-on plan-writing stream when Thinking off.
+
+### Verify
+`dart analyze lib` clean · `flutter test` 33/33 green.
+
+---
+
 ## Session: 2026-09-15 — Claude Code [Auto-tidy build step — v0.4.20]
 
 **Branch:** main · **App:** v0.4.20

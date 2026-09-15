@@ -363,6 +363,10 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
                             'Implement ${widget.brief.featureTitle}');
                         if (mounted) setState(() => _activeAction = null);
                       },
+                      onScaffold: () {
+                        setState(() => _activeAction = 'scaffold');
+                        notifier.scaffoldFlutter();
+                      },
                     ),
                     Expanded(
                       child: _Timeline(state: state, onUndo: notifier.undo),
@@ -445,6 +449,7 @@ class _ActionsPanel extends StatelessWidget {
     required this.onFix,
     required this.onImprove,
     required this.onCommitPush,
+    required this.onScaffold,
   });
 
   final bool busy;
@@ -455,6 +460,7 @@ class _ActionsPanel extends StatelessWidget {
   final VoidCallback onFix;
   final VoidCallback onImprove;
   final VoidCallback onCommitPush;
+  final VoidCallback onScaffold;
 
   @override
   Widget build(BuildContext context) {
@@ -484,6 +490,9 @@ class _ActionsPanel extends StatelessWidget {
           const SizedBox(height: 6),
           _button(Icons.ios_share, 'Commit & push',
               (busy || !hasRepo) ? null : onCommitPush, 'commit'),
+          const SizedBox(height: 6),
+          _button(Icons.phone_iphone, 'Make runnable',
+              (busy || !hasRepo) ? null : onScaffold, 'scaffold'),
         ],
       ),
     );

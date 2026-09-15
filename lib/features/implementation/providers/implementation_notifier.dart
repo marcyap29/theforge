@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 
 import '../../../data/filesystem/project_file_repository.dart';
 import '../../../services/llm/llm_provider.dart';
@@ -632,8 +634,150 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
       } catch (e) {
         _log(ConsoleLineKind.info, 'Could not save build memory: $e');
       }
+      // Document the change in the code repo, then commit + push — the same
+      // "docs ship with code" discipline The Forge holds itself to, applied to
+      // the app being built.
+      await _documentAndCommit(brief, plan, paths);
     }
     state = state.copyWith(featureShipped: true);
+  }
+
+  /// On ship: update the linked repo's docs (CHANGELOG + development log + a
+  /// best-effort ARCHITECTURE refresh), then stage/commit/push. Best-effort
+  /// throughout — a docs or git hiccup never blocks marking the feature shipped.
+  Future<void> _documentAndCommit(
+      ImplBrief brief, AgentPlan plan, List<String> paths) async {
+    final repoPath = brief.repoPath;
+    if (repoPath.isEmpty || !Directory(repoPath).existsSync()) {
+      _log(ConsoleLineKind.info, 'No linked repo — skipping docs + commit.');
+      return;
+    }
+    _log(ConsoleLineKind.narration, 'Updating docs (changelog, dev log, architecture)…');
+
+    // --- Deterministic docs (always reliable) ---
+    final today = _todayStamp();
+    try {
+      _prepend(File(p.join(repoPath, 'CHANGELOG.md')),
+          _changelogEntry(brief, plan, paths, today),
+          header: '# Changelog\n');
+      _log(ConsoleLineKind.success, '✓ CHANGELOG.md');
+    } catch (e) {
+      _log(ConsoleLineKind.info, 'Could not update CHANGELOG.md: $e');
+    }
+    try {
+      final devlog = File(p.join(repoPath, 'docs', 'DEVELOPMENT_LOG.md'));
+      devlog.parent.createSync(recursive: true);
+      _prepend(devlog, _devLogEntry(brief, plan, paths, today),
+          header: '# Development Log\n\nWhat The Forge built, and why. Newest first.\n');
+      _log(ConsoleLineKind.success, '✓ docs/DEVELOPMENT_LOG.md');
+    } catch (e) {
+      _log(ConsoleLineKind.info, 'Could not update development log: $e');
+    }
+
+    // --- Best-effort architecture refresh via the architect model ---
+    await _updateArchitectureDoc(brief, plan, paths);
+
+    // --- Commit + push ---
+    final msg = 'feat: ${brief.featureTitle}'
+        '${(brief.targetVersion?.isNotEmpty ?? false) ? ' (${brief.targetVersion})' : ''}'
+        ' + docs';
+    _log(ConsoleLineKind.command, '\$ git add -A && git commit && git push');
+    final committed = await ProjectFileRepository.gitCommitAll(repoPath, msg);
+    if (!committed) {
+      _log(ConsoleLineKind.info, 'Nothing to commit (or not a git repo).');
+      return;
+    }
+    _log(ConsoleLineKind.success, '✓ committed: $msg');
+    final pushed = await ProjectFileRepository.gitPush(repoPath);
+    _log(pushed ? ConsoleLineKind.success : ConsoleLineKind.info,
+        pushed ? '✓ pushed to origin' : '• not pushed (no remote / auth) — committed locally');
+  }
+
+  /// Asks the architect model to fold this feature into the repo's ARCHITECTURE
+  /// doc (prose out → no fragile JSON). Best-effort: skipped on any error.
+  Future<void> _updateArchitectureDoc(
+      ImplBrief brief, AgentPlan plan, List<String> paths) async {
+    try {
+      final file = File(p.join(brief.repoPath, 'docs', 'ARCHITECTURE.md'));
+      final current = file.existsSync() ? await file.readAsString() : '';
+      final llm = ref.read(llmServiceProvider);
+      final updated = await llm.complete(
+        role: LlmRole.architect,
+        temperature: 0.2,
+        maxTokens: 4000,
+        systemPrompt:
+            'You maintain a concise ARCHITECTURE.md for a software project. '
+            'Given the current doc and a newly shipped feature, return the '
+            'FULL updated ARCHITECTURE.md in Markdown — integrate the feature '
+            '(components, data flow, key files) without bloating it or dropping '
+            'existing content. Output ONLY the Markdown, no code fences.',
+        userPrompt: 'Project: ${brief.projectName}\n\n'
+            '## Current ARCHITECTURE.md\n${current.isEmpty ? '(none yet)' : current}\n\n'
+            '## Newly shipped feature: ${brief.featureTitle}\n'
+            '${plan.summary}\n${plan.rationale}\n'
+            'Files changed: ${paths.join(', ')}',
+      );
+      final text = updated.trim();
+      if (text.isEmpty) return;
+      file.parent.createSync(recursive: true);
+      await file.writeAsString(text.endsWith('\n') ? text : '$text\n');
+      _log(ConsoleLineKind.success, '✓ docs/ARCHITECTURE.md');
+    } catch (e) {
+      _log(ConsoleLineKind.info, 'Skipped ARCHITECTURE.md refresh: $e');
+    }
+  }
+
+  /// Prepends [entry] to [file], keeping an optional one-time [header] at top.
+  static void _prepend(File file, String entry, {required String header}) {
+    final existing = file.existsSync() ? file.readAsStringSync() : '';
+    if (existing.isEmpty) {
+      file.writeAsStringSync('$header\n$entry\n');
+      return;
+    }
+    // Insert the new entry just under the header (or at the very top).
+    if (existing.startsWith(header)) {
+      final rest = existing.substring(header.length);
+      file.writeAsStringSync('$header\n$entry\n$rest');
+    } else {
+      file.writeAsStringSync('$entry\n\n$existing');
+    }
+  }
+
+  static String _todayStamp() {
+    final n = DateTime.now();
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${n.year}-${two(n.month)}-${two(n.day)}';
+  }
+
+  static String _changelogEntry(
+      ImplBrief brief, AgentPlan plan, List<String> paths, String date) {
+    final v = brief.targetVersion?.trim();
+    final b = StringBuffer()
+      ..writeln('## $date — ${brief.featureTitle}'
+          '${v != null && v.isNotEmpty ? ' ($v)' : ''}');
+    if (plan.summary.isNotEmpty) b.writeln(plan.summary);
+    if (paths.isNotEmpty) {
+      b.writeln();
+      for (final path in paths) {
+        b.writeln('- $path');
+      }
+    }
+    return b.toString().trimRight();
+  }
+
+  static String _devLogEntry(
+      ImplBrief brief, AgentPlan plan, List<String> paths, String date) {
+    final b = StringBuffer()..writeln('## ${brief.featureTitle} — $date');
+    if ((brief.featureDescription ?? '').trim().isNotEmpty) {
+      b.writeln('**Feature:** ${brief.featureDescription!.trim()}');
+    }
+    if (plan.summary.isNotEmpty) b.writeln('**What was built:** ${plan.summary}');
+    if (plan.rationale.isNotEmpty) b.writeln('**Why / approach:** ${plan.rationale}');
+    if (paths.isNotEmpty) b.writeln('**Files changed:** ${paths.join(', ')}');
+    if (plan.commands.isNotEmpty) {
+      b.writeln('**Commands:** ${plan.commands.map((c) => c.raw).join('; ')}');
+    }
+    return b.toString().trimRight();
   }
 
   /// One concise markdown record of a shipped feature for the build-memory pool.
@@ -654,6 +798,74 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
       b.writeln('**Files changed:** ${paths.join(', ')}');
     }
     return b.toString().trim();
+  }
+
+  /// Makes a generated Flutter app actually runnable by creating the platform
+  /// folders (`flutter create .`) it's missing — the common gap where Build-with-AI
+  /// writes lib/pubspec but never scaffolds android/ios. Backs up and restores
+  /// the Info.plist / AndroidManifest so permission edits aren't lost to the
+  /// regenerated defaults.
+  Future<void> scaffoldFlutter() async {
+    final brief = _brief;
+    if (brief == null) return;
+    if (!(state.phase == RunPhase.idle || state.phase.isTerminal)) return;
+    final repoPath = brief.repoPath;
+    if (repoPath.isEmpty || !Directory(repoPath).existsSync()) {
+      _log(ConsoleLineKind.info, 'No linked repo to set up.');
+      return;
+    }
+    final pubspec = await ImplWorkspace.readRepoFile(repoPath, 'pubspec.yaml');
+    if (!pubspec.contains('sdk: flutter')) {
+      _log(ConsoleLineKind.info, 'Not a Flutter project — nothing to scaffold.');
+      return;
+    }
+    final alreadySetUp =
+        Directory(p.join(repoPath, 'ios', 'Runner.xcodeproj')).existsSync() ||
+            File(p.join(repoPath, 'android', 'build.gradle')).existsSync() ||
+            File(p.join(repoPath, 'android', 'build.gradle.kts')).existsSync();
+    if (alreadySetUp) {
+      _log(ConsoleLineKind.success, 'Platform folders are already set up.');
+      return;
+    }
+
+    final prior = state.phase;
+    _phase(RunPhase.running);
+    _log(ConsoleLineKind.narration,
+        'Setting up platform folders (flutter create)…');
+    // Back up files flutter create would overwrite with defaults.
+    final backups = <String, String>{};
+    for (final rel in const [
+      'ios/Runner/Info.plist',
+      'android/app/src/main/AndroidManifest.xml',
+    ]) {
+      final f = File(p.join(repoPath, rel));
+      if (f.existsSync()) backups[rel] = f.readAsStringSync();
+    }
+    _log(ConsoleLineKind.command, '\$ flutter create .');
+    final res = await _runner.run(
+      'flutter create .',
+      workingDirectory: repoPath,
+      onOutput: (o) => _log(
+          o.isError ? ConsoleLineKind.stderr : ConsoleLineKind.stdout, o.text),
+    );
+    if (!res.ok) {
+      _log(ConsoleLineKind.error,
+          '✗ flutter create failed (exit ${res.exitCode}).');
+      _phase(prior);
+      return;
+    }
+    // Restore complete manifests so permission/keys the AI added survive.
+    backups.forEach((rel, content) {
+      final complete = (rel.endsWith('.plist') && content.contains('</dict>')) ||
+          (rel.endsWith('.xml') && content.contains('</manifest>'));
+      if (complete) {
+        File(p.join(repoPath, rel)).writeAsStringSync(content);
+        _log(ConsoleLineKind.info, 'Restored your $rel (kept its keys/permissions).');
+      }
+    });
+    _log(ConsoleLineKind.success,
+        '✓ Platform folders created — the app can now build/run on a device.');
+    _phase(prior);
   }
 
   void stop() {
