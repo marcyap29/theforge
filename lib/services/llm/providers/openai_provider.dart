@@ -16,6 +16,7 @@ class OpenAiProvider extends LlmProvider {
     required String modelId,
     int? maxTokens,
     bool? think, // accepted for interface parity; not used by OpenAI chat
+    bool jsonMode = false, // parity; OpenAI JSON is via response_format
   }) async {
     final response = await http.post(
       Uri.parse('https://api.openai.com/v1/chat/completions'),
@@ -59,6 +60,7 @@ class OpenAiProvider extends LlmProvider {
     required String modelId,
     int? maxTokens,
     bool? think, // accepted for interface parity; not used by OpenAI chat
+    bool jsonMode = false, // parity; OpenAI JSON is via response_format
   }) async* {
     final client = http.Client();
     try {

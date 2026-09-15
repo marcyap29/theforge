@@ -97,6 +97,7 @@ class ImplAgent {
       temperature: 0.1,
       maxTokens: 4000,
       onDelta: onDelta,
+      jsonMode: true,
     );
     final wanted = _parseKeyList(scoutRaw, 'files');
     final wantedDocs = offered.isEmpty
@@ -191,6 +192,7 @@ class ImplAgent {
       temperature: 0.2,
       maxTokens: _planTokens,
       onDelta: onDelta,
+      jsonMode: true,
     );
     try {
       return _parse(planRaw, repoPath);
@@ -217,6 +219,7 @@ class ImplAgent {
         temperature: 0.1,
         maxTokens: _planTokens,
         onDelta: onDelta,
+        jsonMode: true,
       );
       return _parse(retry, repoPath);
     }
@@ -249,6 +252,7 @@ class ImplAgent {
     required double temperature,
     required int maxTokens,
     void Function(String text, bool thinking)? onDelta,
+    bool jsonMode = false,
   }) async {
     final buffer = StringBuffer(); // content only (the answer)
     final all = StringBuffer(); // thinking + content, for loop detection
@@ -260,6 +264,7 @@ class ImplAgent {
       maxTokens: maxTokens,
       systemPrompt: system,
       userPrompt: user,
+      jsonMode: jsonMode,
     )) {
       if (!delta.thinking) buffer.write(delta.text);
       onDelta?.call(delta.text, delta.thinking);

@@ -14,6 +14,7 @@ class LlmService {
     required double temperature,
     required LlmRole role,
     int? maxTokens,
+    bool jsonMode = false,
   }) async {
     final assignment = settings.roleAssignments[role];
     if (assignment == null) {
@@ -41,6 +42,7 @@ class LlmService {
       // the model's own default (null) when on, so non-thinking models aren't
       // sent an unsupported `think:true`.
       think: assignment.think ? null : false,
+      jsonMode: jsonMode,
     );
   }
 
@@ -52,6 +54,7 @@ class LlmService {
     required double temperature,
     required LlmRole role,
     int? maxTokens,
+    bool jsonMode = false,
   }) {
     final assignment = settings.roleAssignments[role];
     if (assignment == null) {
@@ -74,6 +77,7 @@ class LlmService {
       modelId: modelId,
       maxTokens: maxTokens,
       think: assignment.think ? null : false,
+      jsonMode: jsonMode,
     );
   }
 

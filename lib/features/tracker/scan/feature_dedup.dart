@@ -102,6 +102,7 @@ class FeatureDeduplicator {
       maxTokens: 1500,
       systemPrompt: _systemPrompt,
       userPrompt: 'Features:\n$buf',
+      jsonMode: true,
     );
     final obj = jsonDecode(_extractJsonObject(raw));
     final out = <List<String>>[];

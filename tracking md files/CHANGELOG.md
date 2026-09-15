@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.19 — 2026-09-15
+
+- **Plans are now generated in enforced JSON mode — the model can't "answer" with prose.** A model (esp. with thinking off) could reason out loud in its answer — musing about package versions with code fences — instead of returning the plan object, failing with "did not return valid JSON." The scout/plan passes (and the feature scan + dedup) now use Ollama's **`format: "json"`**, which constrains the output to valid JSON, so a model literally can't return prose where JSON is required. This is the structural fix that complements the 32k ceiling, truncation-aware retry, loop guard, and the Thinking toggle.
+
+---
+
 ## v0.4.18 — 2026-09-15
 
 - **Thinking on/off toggle per model (Settings → each role).** Reasoning models (glm-5.3, deepseek, etc.) spend part of their output budget on chain-of-thought — which for big Build plans could eat the whole budget and truncate the JSON. Each role's model card now has a **Thinking (chain-of-thought)** switch: leave it **on** for the architect (better reasoning on interviews/specs), turn it **off** for the executor so the full output budget goes to the answer (more reliable plans, no thinking-driven truncation/loops). Sent to Ollama as `think:false` only when you turn it off, so non-thinking models are unaffected. The choice persists per role.

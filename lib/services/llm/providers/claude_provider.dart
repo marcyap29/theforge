@@ -16,6 +16,7 @@ class ClaudeProvider extends LlmProvider {
     required String modelId,
     int? maxTokens,
     bool? think, // accepted for interface parity; Claude thinking is separate
+    bool jsonMode = false, // parity; Claude JSON is via tool/response_format
   }) async {
     final response = await http.post(
       Uri.parse('https://api.anthropic.com/v1/messages'),
@@ -57,6 +58,7 @@ class ClaudeProvider extends LlmProvider {
     required String modelId,
     int? maxTokens,
     bool? think, // accepted for interface parity; Claude thinking is separate
+    bool jsonMode = false, // parity; Claude JSON is via tool/response_format
   }) async* {
     final client = http.Client();
     try {

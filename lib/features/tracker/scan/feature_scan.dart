@@ -71,6 +71,7 @@ class FeatureScanner {
       maxTokens: 2000,
       systemPrompt: _systemPrompt,
       userPrompt: _userPrompt(projectPath, docs, readme, fileList, repoPath),
+      jsonMode: true,
     );
 
     return _parse(raw);

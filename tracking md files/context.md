@@ -4,6 +4,27 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-15 — Claude Code [Enforced JSON mode for agent passes — v0.4.19]
+
+**Branch:** main · **App:** v0.4.19
+
+### Why
+glm-5.3 (with thinking off) reasoned in prose in the ANSWER channel — musing about camera-plugin versions with code fences — instead of returning the plan JSON → "did not return valid JSON" (raw shown). Thinking-off pushed reasoning into content; the prompt alone didn't force JSON.
+
+### Done
+- Threaded `bool jsonMode` through `LlmProvider`/`LlmService` `complete`+`completeStream`. Ollama sends `if (jsonMode) 'format': 'json'` (stream + non-stream). Claude/OpenAI accept-and-ignore (parity).
+- `impl_agent._stream` gains `jsonMode`; scout + plan + retry pass `jsonMode: true`.
+- Architect JSON passes too: `feature_scan.scan` and `feature_dedup._llmGroups` pass `jsonMode: true`.
+- Docs: CHANGELOG v0.4.19, BUG_PREVENTION rule, BUG-IMPL-004 lineage.
+
+### Model note
+This should make glm-5.3 usable for the executor again (can't ramble prose now). If it still struggles, kimi-k2.7-code:cloud / qwen3.5:cloud remain the reliable executor picks ([[theforge-forge-model-choices]]).
+
+### Verify
+`dart analyze lib` clean · `flutter test` 33/33 green.
+
+---
+
 ## Session: 2026-09-15 — Claude Code [Xcode 27 broke the macOS build — env fixes]
 
 Xcode auto-updated to 27, breaking the deploy three ways:

@@ -17,6 +17,7 @@ abstract class LlmProvider {
     required String modelId,
     int? maxTokens,
     bool? think,
+    bool jsonMode = false,
   });
 
   /// Streams the completion as incremental deltas. The default falls back to a
@@ -26,6 +27,8 @@ abstract class LlmProvider {
   /// [think] controls a reasoning model's chain-of-thought: `false` disables it
   /// so the whole output budget goes to the answer (used for JSON passes that
   /// must not be truncated by thinking); null leaves the model default.
+  /// [jsonMode] constrains the answer to valid JSON (Ollama `format: "json"`),
+  /// so a model can't ramble prose instead of the required JSON object.
   Stream<LlmDelta> completeStream({
     required String systemPrompt,
     required String userPrompt,
@@ -33,6 +36,7 @@ abstract class LlmProvider {
     required String modelId,
     int? maxTokens,
     bool? think,
+    bool jsonMode = false,
   }) async* {
     yield LlmDelta(await complete(
       systemPrompt: systemPrompt,
@@ -41,6 +45,7 @@ abstract class LlmProvider {
       modelId: modelId,
       maxTokens: maxTokens,
       think: think,
+      jsonMode: jsonMode,
     ));
   }
 }

@@ -27,6 +27,7 @@ class OllamaProvider extends LlmProvider {
     required String modelId,
     int? maxTokens,
     bool? think,
+    bool jsonMode = false,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/chat'),
@@ -38,6 +39,9 @@ class OllamaProvider extends LlmProvider {
         // answer). Only sent when explicitly set, so non-thinking models are
         // unaffected.
         if (think != null) 'think': think,
+        // Force valid-JSON output so the model can't return prose instead of the
+        // required JSON object.
+        if (jsonMode) 'format': 'json',
         'options': {
           'temperature': temperature,
           // Ensure the model has room to finish (thinking + answer); without
@@ -75,6 +79,7 @@ class OllamaProvider extends LlmProvider {
     required String modelId,
     int? maxTokens,
     bool? think,
+    bool jsonMode = false,
   }) async* {
     final client = http.Client();
     try {
@@ -86,6 +91,9 @@ class OllamaProvider extends LlmProvider {
           // Toggle chain-of-thought (off = whole budget to the answer). Only
           // sent when explicitly set, so non-thinking models are unaffected.
           if (think != null) 'think': think,
+          // Force valid-JSON output so the model can't return prose instead of
+          // the required JSON object.
+          if (jsonMode) 'format': 'json',
           'options': {
           'temperature': temperature,
           // Ensure the model has room to finish (thinking + answer); without
