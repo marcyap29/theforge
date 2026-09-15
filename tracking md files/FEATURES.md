@@ -31,6 +31,7 @@
 | Portfolio dashboard | Shipped | Home route `/`; old project list moved to `/projects` |
 | Feature board (status tracking) | Shipped | Grouped by idea/planned/in_progress/blocked/shipped/archived; providers in `lib/features/tracker/**` |
 | Auto-scan features (docs + repo) | Shipped | `FeatureScanner` proposes features from `.forge` docs and/or a linked repo; import dedups against tracked titles (BUG-TRACKER-001) |
+| Recommend new features (virtual-PM) | Shipped v0.4.28 | `FeatureScanner.recommend` analyzes built/tracked features + docs + code → prioritized NEW feature/enhancement/improvement suggestions (excludes existing); lightbulb toolbar action → review sheet → import (source `recommend`) |
 | Remove duplicate features | Shipped v0.4.11 | `FeatureDeduplicator` (exact-title + conservative LLM semantic pass) + `showDedupReviewSheet`; broom icon on the board finds same-feature groups (incl. reworded across scans), user reviews, keeps most-progressed/newest, deletes extras |
 | Virtual-PM check-ins | Shipped | `CheckinService` diffs git since last review → status changes/new features/flags + staleness banner |
 | Import → Spec | Shipped | Paste description/doc/transcript → `ImportService` → existing `SpecGenerationScreen` |

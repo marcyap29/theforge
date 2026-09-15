@@ -4,6 +4,21 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-15 — Claude Code [Recommend-new-features + changelog dedup — v0.4.27/28]
+
+**Branch:** main · **App:** v0.4.28
+
+### Done
+- **v0.4.27 changelog dedup:** `_prepend` skips an entry already present → re-shipping won't repeat identical CHANGELOG/dev-log blocks. Cleaned AR Mechanic's doubled entry (committed in ar_mechanic `4c01dbe`).
+- **v0.4.28 Recommend new features:** `FeatureScanner.recommend({projectPath, repoPath, existing})` — forward-looking counterpart to `scan()`; reuses `_readProjectDocs/_readReadme/_listFiles/_parse`; new `_recommendSystemPrompt` (PM reviewing an existing app, propose NEW features/enhancements, exclude tracked) + `_recommendUserPrompt` (feeds existing feature list w/ statuses); architect model, `jsonMode: true`. Imports `forge_database` for `Feature`.
+  - Tracker: lightbulb toolbar action → `_recommendFeatures()` (spinner → recommend → `_normTitle` dedup vs existing → `showScanReviewSheet` → `addFeature(source:'recommend')`). Reuses scan import machinery.
+- Docs: CHANGELOG v0.4.27/28, FEATURES rows.
+
+### Verify
+`dart analyze lib` clean · `flutter test` 33/33 green.
+
+---
+
 ## Session: 2026-09-15 — Claude Code [Platform picker → auto-scaffold on create — v0.4.26]
 
 **Branch:** main · **App:** v0.4.26

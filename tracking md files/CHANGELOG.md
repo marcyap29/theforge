@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.28 — 2026-09-15
+
+- **Recommend new features (virtual-PM).** A new **lightbulb** action on the feature board analyzes what you've *already* built and tracked — plus the app's docs and codebase — and recommends **new features, enhancements, and improvements to build next**, prioritized with a one-line rationale each. Recommendations exclude what's already tracked, are deduped against the board, and you review/accept them into the tracker just like a scan (imported with source `recommend`). `FeatureScanner.recommend` (architect model, JSON mode).
+
+---
+
 ## v0.4.27 — 2026-09-15
 
 - **No more duplicate changelog/doc entries on re-ship.** The ship-docs step now skips prepending an entry that's already present, so re-shipping a feature (or shipping the same run twice) no longer repeats an identical block in the app's `CHANGELOG.md` / dev log. (AR Mechanic's existing doubled entry was cleaned up too.)

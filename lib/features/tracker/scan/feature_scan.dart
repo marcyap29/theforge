@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
 import '../../../data/filesystem/project_file_repository.dart';
+import '../../../data/local_db/forge_database.dart';
 import '../../../services/llm/llm_provider.dart';
 import '../../../services/llm/llm_service.dart';
 import '../../../services/llm/llm_service_provider.dart';
@@ -74,6 +75,39 @@ class FeatureScanner {
       jsonMode: true,
     );
 
+    return _parse(raw);
+  }
+
+  /// Looks at what's ALREADY built/tracked (plus the docs + code) and recommends
+  /// NEW features, enhancements, and improvements to build next — the forward-
+  /// looking counterpart to [scan] (which infers what already exists). Excludes
+  /// anything already in [existing].
+  Future<List<ProposedFeature>> recommend({
+    required String projectPath,
+    String? repoPath,
+    required List<Feature> existing,
+  }) async {
+    final docs = await _readProjectDocs(projectPath);
+    String? readme;
+    List<String> fileList = const [];
+    if (repoPath != null && Directory(repoPath).existsSync()) {
+      readme = await _readReadme(repoPath);
+      fileList = await _listFiles(repoPath);
+    }
+    if (docs == null && readme == null && fileList.isEmpty && existing.isEmpty) {
+      throw FeatureScanException(
+          'Nothing to analyze yet — build or track some features first, or link '
+          'a repo.');
+    }
+    final raw = await _llm.complete(
+      role: LlmRole.architect,
+      temperature: 0.4,
+      maxTokens: 2500,
+      systemPrompt: _recommendSystemPrompt,
+      userPrompt:
+          _recommendUserPrompt(projectPath, docs, readme, fileList, repoPath, existing),
+      jsonMode: true,
+    );
     return _parse(raw);
   }
 
@@ -199,6 +233,55 @@ Rules:
 Respond with ONLY a JSON array, no prose, no code fences. Each element:
 {"title": string, "description": string, "status": "idea|planned|in_progress|blocked|shipped", "targetVersion": string|null}
 ''';
+
+  static const _recommendSystemPrompt = '''
+You are a senior product manager reviewing an EXISTING app to recommend what to
+build NEXT. Given the app's DOCUMENTS, its CODEBASE, and the features ALREADY
+tracked/built, propose NEW, high-value features, enhancements, and improvements
+that are NOT already present.
+
+Rules:
+- Do NOT repeat anything in the "already tracked" list, and don't restate what's
+  clearly already built.
+- Mix categories: new user-facing features, enhancements to existing ones,
+  UX/quality/reliability improvements, and notable hardening/tech-debt.
+- Prioritize by user value and the natural next steps for THIS app specifically.
+- 6–12 recommendations. Title max ~6 words. Description: one sentence covering
+  what it is AND why it's worth doing.
+- status: "idea" for exploratory/future, "planned" for clear next steps.
+  targetVersion optional (e.g. "v2").
+
+Respond with ONLY a JSON array, no prose, no code fences. Each element:
+{"title": string, "description": string, "status": "idea|planned", "targetVersion": string|null}
+''';
+
+  String _recommendUserPrompt(String projectPath, String? docs, String? readme,
+      List<String> files, String? repoPath, List<Feature> existing) {
+    final buffer = StringBuffer()
+      ..writeln('# Project: ${p.basename(projectPath)}')
+      ..writeln();
+    if (existing.isNotEmpty) {
+      buffer.writeln('## Already tracked / built features (do NOT repeat these)');
+      for (final f in existing) {
+        buffer.writeln('- [${f.status}] ${f.title}'
+            '${(f.description ?? '').trim().isEmpty ? '' : ' — ${f.description!.trim()}'}');
+      }
+      buffer.writeln();
+    }
+    if (docs != null) {
+      buffer..writeln('## Project documents')..writeln(docs)..writeln();
+    }
+    if (repoPath != null && (readme != null || files.isNotEmpty)) {
+      buffer.writeln('## Linked codebase: ${p.basename(repoPath)}');
+      if (readme != null) {
+        buffer..writeln('### README')..writeln(readme)..writeln();
+      }
+      buffer
+        ..writeln('### Files (${files.length})')
+        ..writeln(files.join('\n'));
+    }
+    return buffer.toString();
+  }
 
   String _userPrompt(String projectPath, String? docs, String? readme,
       List<String> files, String? repoPath) {

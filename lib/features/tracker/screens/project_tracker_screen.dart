@@ -138,6 +138,11 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             onPressed: _scanRepo,
           ),
           IconButton(
+            icon: const Icon(Icons.lightbulb_outline),
+            tooltip: 'Recommend new features',
+            onPressed: _recommendFeatures,
+          ),
+          IconButton(
             icon: const Icon(Icons.cleaning_services_outlined),
             tooltip: 'Remove duplicate features',
             onPressed: _removeDuplicates,
@@ -533,6 +538,71 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
   /// whitespace-insensitive, so "V2: Multi‑Part" and "v2 multi part" collide.
   static String _normTitle(String s) =>
       s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
+
+  /// The virtual-PM move: analyze what's already built/tracked (+ docs + code)
+  /// and recommend NEW features/enhancements to build next. Dedups against the
+  /// board and imports the ones you accept (source 'recommend').
+  Future<void> _recommendFeatures() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final config = await ProjectFileRepository.readProjectConfig(project.path);
+    final rp = config['repoPath'] as String?;
+    final repoPath = (rp != null && rp.isNotEmpty) ? rp : null;
+    final existing =
+        ref.read(featureListProvider(project.id)).valueOrNull ?? const [];
+
+    if (!mounted) return;
+    _showBlockingSpinner('Analyzing your app for ideas…');
+    List<ProposedFeature> proposals;
+    try {
+      proposals = await ref.read(featureScannerProvider).recommend(
+            projectPath: project.path,
+            repoPath: repoPath,
+            existing: existing,
+          );
+    } catch (e) {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      messenger.showSnackBar(SnackBar(
+        content: Text('Recommendations failed: $e'),
+        backgroundColor: const Color(0xFF3F0A0A),
+      ));
+      return;
+    }
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop(); // close spinner
+
+    // Dedup against what's already tracked (recommendations should be new).
+    final seen = existing.map((f) => _normTitle(f.title)).toSet();
+    final fresh = <ProposedFeature>[];
+    for (final pf in proposals) {
+      final key = _normTitle(pf.title);
+      if (key.isEmpty || seen.contains(key)) continue;
+      seen.add(key);
+      fresh.add(pf);
+    }
+    if (fresh.isEmpty) {
+      messenger.showSnackBar(const SnackBar(
+          content: Text('No new recommendations right now — you\'re on top of it.')));
+      return;
+    }
+
+    final accepted = await showScanReviewSheet(context, fresh);
+    if (accepted == null || accepted.isEmpty) return;
+
+    final notifier = ref.read(featureListProvider(project.id).notifier);
+    for (final f in accepted) {
+      await notifier.addFeature(
+        title: f.title,
+        description: f.description,
+        status: f.status,
+        targetVersion: f.targetVersion,
+        source: 'recommend',
+      );
+    }
+    ref.invalidate(portfolioProvider);
+    messenger.showSnackBar(SnackBar(
+      content: Text('Added ${accepted.length} recommended feature(s)')),
+    );
+  }
 
   /// Cleans out duplicate features already on the board — exact title matches
   /// plus same-feature entries the scanner worded differently across runs.
