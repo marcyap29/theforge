@@ -358,12 +358,18 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     // and come back, without resending the task.
     final activePhase = ref.read(implActiveRunsProvider)[feature.id];
     if (activePhase != null && activePhase != RunPhase.idle) {
+      // Re-attaching to an existing run: still carry the linked repo path so
+      // repo-dependent actions (Commit & push, Make runnable) stay enabled —
+      // passing '' here previously greyed them out on any reopened feature.
+      final config = await ProjectFileRepository.readProjectConfig(project.path);
+      final rp = (config['repoPath'] as String?) ?? '';
+      if (!mounted) return;
       await Navigator.of(context).push<bool>(MaterialPageRoute(
         builder: (_) => ImplementationScreen(
           brief: ImplBrief(
             projectPath: project.path,
             projectName: project.name,
-            repoPath: '',
+            repoPath: rp,
             featureId: feature.id,
             featureTitle: feature.title,
           ),

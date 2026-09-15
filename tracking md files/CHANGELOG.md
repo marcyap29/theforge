@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.22 — 2026-09-15
+
+- **Fixed "Make runnable" (and "Commit & push") being greyed out (BUG-IMPL-009).** Reopening a feature that already had a run passed an empty repo path to the Build window, which disabled the repo-dependent actions — so you couldn't see/use **Make runnable** on the shipped Camera feature. The re-attach path now carries the project's linked repo, so those actions stay enabled when you reopen a feature.
+
+---
+
 ## v0.4.21 — 2026-09-15
 
 - **Make a generated app runnable in one click.** A new **Make runnable** action in the Build window runs `flutter create .` to generate the platform folders (android/ios) that Build-with-AI doesn't scaffold on its own — the gap that kept generated Flutter apps from running on a device. It backs up and restores your `Info.plist` / `AndroidManifest.xml` so permission edits (e.g. camera) survive the regeneration. Detects a Flutter repo, skips if already set up.
