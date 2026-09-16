@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.34 — 2026-09-16
+
+- **Fixed the real reason the broom (and Scan/Recommend/Plan) returned empty (BUG-TRACKER-002, part 2).** After v0.4.33 the "Remove duplicates" pass *still* failed, and diag.log showed the smoking gun: the model returned **empty content** (`Raw:` was blank). Root cause: `qwen3.5`/`glm` are **reasoning models**, and with **thinking ON plus a small token budget**, the model spends the entire budget in its *thinking* channel and returns nothing in `content`. Fix: the JSON-only architect passes (Scan, Recommend, Plan build order, Remove duplicates) now force **thinking OFF** — a new `think` override on `LlmService.complete` — so the whole budget goes to the answer. Dedup's budget was also bumped 1500 → 2000 tokens. This is the fix that makes semantic dedup actually run on reasoning models.
+
+---
+
 ## v0.4.33 — 2026-09-16
 
 - **"Remove duplicates" now actually catches reworded duplicates (BUG-TRACKER-002).** The broom was missing obvious semantic dupes (e.g. "Camera Permission & Live Feed" vs "Camera Permission Request") for two reasons: the AI clustering pass was wrapped in a silent `catch` (so any model/JSON hiccup was discarded and it fell back to exact-title only), and its parser only accepted one JSON shape — a JSON-clean model answering with a bare array produced **zero groups with no error**. Now: tolerant parse (object *or* bare array *or* fenced), one retry, and failures are **logged to diag.log and reported** — if the semantic pass can't run, you get a dialog telling you to switch the Architect model to `qwen3.5:cloud`, instead of a misleading "No duplicates found."

@@ -40,13 +40,29 @@ Two compounding flaws in `FeatureDeduplicator`:
   clear dialog telling the user to switch the Architect model to a JSON-clean one
   (qwen3.5:cloud) — instead of the misleading "No duplicates found."
 
+## Part 2 — the empty-content trap (v0.4.34)
+
+After v0.4.33 made the failure *visible*, the broom still failed — but now diag.log
+showed why: the model returned **empty content** (`Raw:` was blank, not malformed).
+`qwen3.5`/`glm` are **reasoning models**; with **thinking ON and a small token
+budget (1500)**, the model spends the entire budget in its *thinking* channel and
+returns nothing in `content`. No parser can recover from an empty string.
+
+**Fix:** added a `think` override to `LlmService.complete` and forced **thinking OFF**
+for the JSON-only architect passes (Scan, Recommend, Plan build order, Remove
+duplicates), so the whole budget goes to the answer. Dedup budget also raised
+1500 → 2000 tokens. `feature_dedup.dart._complete` and both `feature_scan.dart`
+`_parseWithRetry` completes now pass `think: false`.
+
 ## Prevention Rule
 
 See BUG_PREVENTION.md — "Never `catch (_) {}` a best-effort AI pass into silence:
 log it and report whether it ran, or the feature lies about its results. And
 tolerant-parse model JSON (object OR bare array OR fenced) — don't require one
-exact shape."
+exact shape." Plus: **JSON-only passes must force thinking OFF** — a reasoning
+model with thinking on can burn its whole token budget in the thinking channel and
+return empty `content`, which looks identical to a model that ignores JSON mode.
 
 ## Commit
 
-v0.4.33
+v0.4.33 (visibility), v0.4.34 (empty-content root fix)

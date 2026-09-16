@@ -147,10 +147,13 @@ class FeatureDeduplicator {
   Future<String> _complete(String user) => _llm.complete(
         role: LlmRole.architect,
         temperature: 0.1,
-        maxTokens: 1500,
+        maxTokens: 2000,
         systemPrompt: _systemPrompt,
         userPrompt: user,
         jsonMode: true,
+        // Thinking OFF: a reasoning model (qwen3.5/glm) with thinking on burns
+        // the whole budget reasoning and returns empty content (diag.log).
+        think: false,
       );
 
   static String _snippet(String s) =>

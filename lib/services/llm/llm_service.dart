@@ -15,6 +15,7 @@ class LlmService {
     required LlmRole role,
     int? maxTokens,
     bool jsonMode = false,
+    bool? think,
   }) async {
     final assignment = settings.roleAssignments[role];
     if (assignment == null) {
@@ -32,16 +33,19 @@ class LlmService {
       );
     }
     final provider = _buildProvider(assignment.providerType);
+    // [think] overrides the role's setting when provided (used by JSON-only
+    // passes to force thinking OFF — a reasoning model with thinking ON can
+    // spend its whole token budget reasoning and return EMPTY content).
+    // Otherwise: only force OFF when the user disabled it; leave the model
+    // default (null) when on, so non-thinking models aren't sent think:true.
+    final effectiveThink = think ?? assignment.think;
     return provider.complete(
       systemPrompt: systemPrompt,
       userPrompt: userPrompt,
       temperature: temperature,
       modelId: modelId,
       maxTokens: maxTokens,
-      // Only force thinking OFF when the user disabled it for this role; leave
-      // the model's own default (null) when on, so non-thinking models aren't
-      // sent an unsupported `think:true`.
-      think: assignment.think ? null : false,
+      think: effectiveThink ? null : false,
       jsonMode: jsonMode,
     );
   }

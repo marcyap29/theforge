@@ -103,6 +103,9 @@ class FeatureScanner {
       systemPrompt: system,
       userPrompt: user,
       jsonMode: true,
+      // Thinking OFF: a reasoning model with thinking on can burn the whole
+      // budget reasoning and return empty content (diag.log: empty Raw).
+      think: false,
     );
     try {
       return parse(raw);
@@ -115,6 +118,7 @@ class FeatureScanner {
         userPrompt: '$user\n\nIMPORTANT: your previous reply was not usable. '
             'Output ONLY the JSON now — no prose, no explanation, no code fences.',
         jsonMode: true,
+        think: false,
       );
       try {
         return parse(retry);
