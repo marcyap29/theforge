@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.33 — 2026-09-16
+
+- **"Remove duplicates" now actually catches reworded duplicates (BUG-TRACKER-002).** The broom was missing obvious semantic dupes (e.g. "Camera Permission & Live Feed" vs "Camera Permission Request") for two reasons: the AI clustering pass was wrapped in a silent `catch` (so any model/JSON hiccup was discarded and it fell back to exact-title only), and its parser only accepted one JSON shape — a JSON-clean model answering with a bare array produced **zero groups with no error**. Now: tolerant parse (object *or* bare array *or* fenced), one retry, and failures are **logged to diag.log and reported** — if the semantic pass can't run, you get a dialog telling you to switch the Architect model to `qwen3.5:cloud`, instead of a misleading "No duplicates found."
+
+---
+
 ## v0.4.32 — 2026-09-16
 
 - **Errors are now captured and stay on screen.** Two diagnosability wins: (1) a persistent **`diag.log`** in the app-support dir (`~/Library/Application Support/ai.orbitalai.theForge/diag.log`) records failures — including uncaught Flutter errors and the **raw model output** a scan/recommend/roadmap choked on — so problems can be inspected even when the app is launched from Finder and after a toast vanishes (modeled on Sabihin's DiagLog). (2) Scan / Recommend / Plan-build-order / Remove-duplicates / Check-in failures now show a **dismissible dialog** (with Copy) that stays until you close it, instead of an auto-vanishing toast.

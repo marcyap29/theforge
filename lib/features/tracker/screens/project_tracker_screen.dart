@@ -720,9 +720,9 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     }
 
     _showBlockingSpinner('Finding duplicates…');
-    List<DuplicateGroup> groups;
+    DedupResult result;
     try {
-      groups =
+      result =
           await ref.read(featureDeduplicatorProvider).findDuplicates(features);
     } catch (e) {
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
@@ -732,9 +732,24 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     if (!mounted) return;
     Navigator.of(context, rootNavigator: true).pop(); // close spinner
 
+    final groups = result.groups;
     if (groups.isEmpty) {
-      messenger
-          .showSnackBar(const SnackBar(content: Text('No duplicates found.')));
+      // Distinguish "genuinely none" from "the semantic pass couldn't run" —
+      // the latter is why reworded duplicates were being silently missed.
+      if (!result.semanticOk) {
+        await _showError(
+            'Duplicate check',
+            Exception(
+                'The exact-title pass found no duplicates, and the semantic '
+                '(AI) pass couldn\'t run — so reworded duplicates were NOT '
+                'checked. The Architect model likely didn\'t return JSON '
+                '(e.g. glm-5.3 on Ollama Cloud). Switch Architect to '
+                'qwen3.5:cloud in Settings and try again. Details in diag.log.\n\n'
+                '${result.error ?? ''}'));
+      } else {
+        messenger.showSnackBar(
+            const SnackBar(content: Text('No duplicates found.')));
+      }
       return;
     }
 
