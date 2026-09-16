@@ -23,6 +23,7 @@ import '../widgets/dedup_review_sheet.dart';
 import '../widgets/feature_edit_dialog.dart';
 import '../widgets/platform_picker.dart';
 import '../widgets/relocate_repo.dart';
+import '../widgets/roadmap_review_sheet.dart';
 import '../widgets/scan_review_sheet.dart';
 import '../widgets/status_chip.dart';
 import 'releases_screen.dart';
@@ -141,6 +142,11 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             icon: const Icon(Icons.lightbulb_outline),
             tooltip: 'Recommend new features',
             onPressed: _recommendFeatures,
+          ),
+          IconButton(
+            icon: const Icon(Icons.route_outlined),
+            tooltip: 'Plan build order',
+            onPressed: _planBuildOrder,
           ),
           IconButton(
             icon: const Icon(Icons.cleaning_services_outlined),
@@ -602,6 +608,74 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     messenger.showSnackBar(SnackBar(
       content: Text('Added ${accepted.length} recommended feature(s)')),
     );
+  }
+
+  /// Sequences the not-yet-shipped features into a dependency-aware, phased
+  /// build roadmap and, on approval, writes each phase's version + a running
+  /// priority to the board (which sorts by priority) so it reflects build order.
+  Future<void> _planBuildOrder() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final config = await ProjectFileRepository.readProjectConfig(project.path);
+    final rp = config['repoPath'] as String?;
+    final repoPath = (rp != null && rp.isNotEmpty) ? rp : null;
+    final features =
+        ref.read(featureListProvider(project.id)).valueOrNull ?? const [];
+    final toSequence = features
+        .where((f) => f.status != 'shipped' && f.status != 'archived')
+        .length;
+    if (toSequence < 2) {
+      messenger.showSnackBar(const SnackBar(
+          content: Text('Add a couple of planned features first, then I can '
+              'sequence them.')));
+      return;
+    }
+
+    if (!mounted) return;
+    _showBlockingSpinner('Planning the build order…');
+    List<RoadmapPhase> phases;
+    try {
+      phases = await ref.read(featureScannerProvider).planRoadmap(
+            projectPath: project.path,
+            repoPath: repoPath,
+            features: features,
+          );
+    } catch (e) {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      messenger.showSnackBar(SnackBar(
+        content: Text('Planning failed: $e'),
+        backgroundColor: const Color(0xFF3F0A0A),
+      ));
+      return;
+    }
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop(); // close spinner
+
+    final apply = await showRoadmapReviewSheet(context, phases);
+    if (apply != true) return;
+
+    // Map roadmap entries (by normalized title) back to features; write a
+    // running priority (build order) + the phase's target version.
+    final byTitle = {for (final f in features) _normTitle(f.title): f};
+    final notifier = ref.read(featureListProvider(project.id).notifier);
+    var order = 0;
+    var applied = 0;
+    for (final phase in phases) {
+      for (final entry in phase.entries) {
+        final f = byTitle[_normTitle(entry.title)];
+        if (f == null) continue;
+        order += 1;
+        await notifier.updateFeature(
+          f,
+          priority: order,
+          targetVersion: phase.version.isEmpty ? null : phase.version,
+        );
+        applied += 1;
+      }
+    }
+    ref.invalidate(portfolioProvider);
+    messenger.showSnackBar(SnackBar(
+        content: Text('Build order applied to $applied feature(s) across '
+            '${phases.length} phase(s).')));
   }
 
   /// Cleans out duplicate features already on the board — exact title matches

@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.29 — 2026-09-15
+
+- **Plan build order (phased roadmap).** A new **route** action on the feature board sequences your not-yet-shipped features into a dependency-aware, phased roadmap — Foundation → Core → Enhancements → Later — with a target version per phase and a one-line reason per feature (foundational-first, then value). Review it, and **Apply to board** writes each phase's target version + a running priority to the features, so the board sorts in build order and the Releases view groups by phase. Answers "what do we build, in what order, and what depends on what?" `FeatureScanner.planRoadmap` (architect model, JSON mode).
+
+---
+
 ## v0.4.28 — 2026-09-15
 
 - **Recommend new features (virtual-PM).** A new **lightbulb** action on the feature board analyzes what you've *already* built and tracked — plus the app's docs and codebase — and recommends **new features, enhancements, and improvements to build next**, prioritized with a one-line rationale each. Recommendations exclude what's already tracked, are deduped against the board, and you review/accept them into the tracker just like a scan (imported with source `recommend`). `FeatureScanner.recommend` (architect model, JSON mode).

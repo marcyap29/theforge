@@ -4,6 +4,27 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-09-15 — Claude Code [Plan build order (phased roadmap) — v0.4.29]
+
+**Branch:** main · **App:** v0.4.29
+
+### Why
+User: many planned features but no coordination on order/dependencies. Chose a **phased roadmap** representation (over flat ranking).
+
+### Done
+- `feature_scan.dart`: `RoadmapPhase`/`RoadmapEntry` types; `FeatureScanner.planRoadmap({projectPath, repoPath, features})` reuses doc/repo reading; `_roadmapSystemPrompt` (PM sequencing not-yet-shipped features into dependency-aware phases w/ version + per-feature reason; verbatim titles) + `_roadmapUserPrompt`; `_parseRoadmap` + `_extractJsonObject`; architect model, `jsonMode: true`.
+- `widgets/roadmap_review_sheet.dart`: `showRoadmapReviewSheet` — phases + ordered features + reasons, Apply/Cancel.
+- Tracker: `_planBuildOrder()` (route toolbar action) — spinner → planRoadmap → review → on apply map entry titles→features via `_normTitle`, `updateFeature(priority: runningIndex, targetVersion: phase.version)`. Board already sorts by priority (`_sorted`), so it reorders visibly; Releases view groups by version.
+- Docs: CHANGELOG v0.4.29, FEATURES row.
+
+### Virtual-PM loop now complete
+Scan (what exists) → Recommend (what's next) → **Plan build order (what order)** → Build with AI → Mark shipped (docs+commit+push) → Remove duplicates / Check-in.
+
+### Verify
+`dart analyze lib` clean · `flutter test` 33/33 green.
+
+---
+
 ## Session: 2026-09-15 — Claude Code [Recommend-new-features + changelog dedup — v0.4.27/28]
 
 **Branch:** main · **App:** v0.4.28

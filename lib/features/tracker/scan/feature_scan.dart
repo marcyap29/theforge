@@ -11,6 +11,22 @@ import '../../../services/llm/llm_service.dart';
 import '../../../services/llm/llm_service_provider.dart';
 import '../models/tracker_enums.dart';
 
+/// One feature slotted into a roadmap phase, in build order.
+class RoadmapEntry {
+  RoadmapEntry({required this.title, required this.reason});
+  final String title; // must match an existing tracked feature title
+  final String reason;
+}
+
+/// One phase of a phased build roadmap (e.g. "Foundation" → v1).
+class RoadmapPhase {
+  RoadmapPhase(
+      {required this.name, required this.version, required this.entries});
+  final String name;
+  final String version; // target version for the whole phase, e.g. "v1"
+  final List<RoadmapEntry> entries;
+}
+
 /// A feature proposed by the repo scanner, pending user review/import.
 class ProposedFeature {
   ProposedFeature({
@@ -233,6 +249,124 @@ Rules:
 Respond with ONLY a JSON array, no prose, no code fences. Each element:
 {"title": string, "description": string, "status": "idea|planned|in_progress|blocked|shipped", "targetVersion": string|null}
 ''';
+
+  /// Sequences the not-yet-shipped [features] into a dependency-aware, phased
+  /// build roadmap (Foundation → Core → … → Later), each phase with a target
+  /// version, using the docs + code for context. The returned entries reference
+  /// existing feature titles verbatim so the caller can map them back.
+  Future<List<RoadmapPhase>> planRoadmap({
+    required String projectPath,
+    String? repoPath,
+    required List<Feature> features,
+  }) async {
+    final docs = await _readProjectDocs(projectPath);
+    String? readme;
+    List<String> fileList = const [];
+    if (repoPath != null && Directory(repoPath).existsSync()) {
+      readme = await _readReadme(repoPath);
+      fileList = await _listFiles(repoPath);
+    }
+    final raw = await _llm.complete(
+      role: LlmRole.architect,
+      temperature: 0.2,
+      maxTokens: 2500,
+      systemPrompt: _roadmapSystemPrompt,
+      userPrompt:
+          _roadmapUserPrompt(projectPath, docs, readme, fileList, repoPath, features),
+      jsonMode: true,
+    );
+    return _parseRoadmap(raw);
+  }
+
+  List<RoadmapPhase> _parseRoadmap(String raw) {
+    dynamic decoded;
+    try {
+      decoded = jsonDecode(_extractJsonObject(raw));
+    } catch (_) {
+      throw FeatureScanException('Could not parse the roadmap as JSON.');
+    }
+    final phasesRaw = (decoded is Map) ? decoded['phases'] : null;
+    if (phasesRaw is! List) {
+      throw FeatureScanException('The roadmap had no phases.');
+    }
+    final out = <RoadmapPhase>[];
+    for (final ph in phasesRaw) {
+      if (ph is! Map) continue;
+      final name = (ph['name'] ?? '').toString().trim();
+      final version = (ph['version'] ?? '').toString().trim();
+      final feats = ph['features'];
+      final entries = <RoadmapEntry>[];
+      if (feats is List) {
+        for (final f in feats) {
+          if (f is! Map) continue;
+          final title = (f['title'] ?? '').toString().trim();
+          if (title.isEmpty) continue;
+          entries.add(RoadmapEntry(
+              title: title, reason: (f['reason'] ?? '').toString().trim()));
+        }
+      }
+      if (name.isEmpty && entries.isEmpty) continue;
+      out.add(RoadmapPhase(
+          name: name.isEmpty ? 'Phase' : name, version: version, entries: entries));
+    }
+    if (out.isEmpty) throw FeatureScanException('The roadmap was empty.');
+    return out;
+  }
+
+  /// Strips fences/prose and returns the JSON object text.
+  String _extractJsonObject(String raw) {
+    var t = raw.trim();
+    if (t.startsWith('```')) {
+      t = t.replaceFirst(RegExp(r'^```[a-zA-Z]*\n'), '');
+      final end = t.lastIndexOf('```');
+      if (end != -1) t = t.substring(0, end);
+    }
+    final s = t.indexOf('{');
+    final e = t.lastIndexOf('}');
+    if (s != -1 && e != -1 && e > s) return t.substring(s, e + 1);
+    return t.trim();
+  }
+
+  static const _roadmapSystemPrompt = '''
+You are a technical product manager sequencing an app's backlog into a phased
+build roadmap. Given the tracked FEATURES (with status), plus the DOCS and CODE,
+order the features that are NOT yet shipped into implementation PHASES.
+
+Rules:
+- Respect dependencies: a feature others depend on comes FIRST (foundational
+  first). Then order by user value and risk.
+- Group into a few phases (e.g. Foundation, Core, Enhancements, Later). Give each
+  phase a short name and a target version ("v1", "v1", "v2", …).
+- Within each phase, list features in build order, each with a ONE-LINE reason
+  (what it enables / why it belongs here).
+- Use ONLY the exact feature titles provided (copy them verbatim). Do not invent
+  features. Skip anything already "shipped" or "archived".
+
+Respond with ONLY this JSON, no prose, no code fences:
+{"phases":[{"name":"Foundation","version":"v1","features":[{"title":"exact title","reason":"why here"}]}]}
+''';
+
+  String _roadmapUserPrompt(String projectPath, String? docs, String? readme,
+      List<String> files, String? repoPath, List<Feature> features) {
+    final buffer = StringBuffer()
+      ..writeln('# Project: ${p.basename(projectPath)}')
+      ..writeln()
+      ..writeln('## Tracked features (sequence the not-yet-shipped ones)');
+    for (final f in features) {
+      buffer.writeln('- [${f.status}] ${f.title}'
+          '${(f.description ?? '').trim().isEmpty ? '' : ' — ${f.description!.trim()}'}');
+    }
+    buffer.writeln();
+    if (docs != null) {
+      buffer..writeln('## Project documents')..writeln(docs)..writeln();
+    }
+    if (repoPath != null && (readme != null || files.isNotEmpty)) {
+      buffer.writeln('## Linked codebase: ${p.basename(repoPath)}');
+      if (readme != null) buffer..writeln('### README')..writeln(readme)..writeln();
+      buffer..writeln('### Files (${files.length})')..writeln(files.join('\n'));
+    }
+    return buffer.toString();
+  }
 
   static const _recommendSystemPrompt = '''
 You are a senior product manager reviewing an EXISTING app to recommend what to
