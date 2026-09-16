@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.35 — 2026-09-16
+
+- **Board can now group by build order, not just status.** A new **Group by: Status / Build order** toggle sits above the feature board. In **Build order** mode the not-yet-built features (Idea / Planned / Blocked / In Progress) are grouped by their **target version** — versions ascending, so the one to build next is at the top and tagged **NEXT UP** — and priority-ordered within each version. This is the sequence to feed features into Build-with-AI, answering "what do I build next, and in what order?" at a glance. It reads the `targetVersion` + `priority` that **Plan build order** assigns, so the flow is: run Plan build order → flip to Build order → work top-down. Features with no version yet collect in a trailing **Unversioned** group with a nudge to run Plan build order (there's also a shortcut button in the toggle bar). Status mode (the columns) is unchanged and still the default.
+
+---
+
 ## v0.4.34 — 2026-09-16
 
 - **Fixed the real reason the broom (and Scan/Recommend/Plan) returned empty (BUG-TRACKER-002, part 2).** After v0.4.33 the "Remove duplicates" pass *still* failed, and diag.log showed the smoking gun: the model returned **empty content** (`Raw:` was blank). Root cause: `qwen3.5`/`glm` are **reasoning models**, and with **thinking ON plus a small token budget**, the model spends the entire budget in its *thinking* channel and returns nothing in `content`. Fix: the JSON-only architect passes (Scan, Recommend, Plan build order, Remove duplicates) now force **thinking OFF** — a new `think` override on `LlmService.complete` — so the whole budget goes to the answer. Dedup's budget was also bumped 1500 → 2000 tokens. This is the fix that makes semantic dedup actually run on reasoning models.

@@ -51,6 +51,10 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
   String? _repoPath;
   bool _repoLoaded = false;
 
+  /// Board grouping: false = by status (default), true = by target version in
+  /// build order (the sequence to feed features into Build-with-AI).
+  bool _buildOrderView = false;
+
   @override
   void initState() {
     super.initState();
@@ -185,6 +189,11 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             onRun: _runCheckin,
             onDismiss: () => setState(() => _bannerDismissed = true),
           ),
+          _GroupModeBar(
+            buildOrder: _buildOrderView,
+            onChanged: (v) => setState(() => _buildOrderView = v),
+            onPlan: _planBuildOrder,
+          ),
           Expanded(
             child: featuresAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -197,9 +206,12 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
                 return ListView(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   children: [
-                    for (final s in FeatureStatus.board)
-                      ..._group(s,
-                          features.where((f) => f.status == s.wire).toList()),
+                    if (_buildOrderView)
+                      ..._buildOrderGroups(features)
+                    else
+                      for (final s in FeatureStatus.board)
+                        ..._group(s,
+                            features.where((f) => f.status == s.wire).toList()),
                     const SizedBox(height: 40),
                   ],
                 );
@@ -242,6 +254,86 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             onBuild: () => _buildFeature(f),
           )),
     ];
+  }
+
+  /// Build-order grouping: the not-yet-built features (idea / planned /
+  /// blocked / in-progress) grouped by their target version, versions in
+  /// ascending order (next up first) and priority-ordered within each version.
+  /// This is the sequence to feed features into Build-with-AI. Run "Plan build
+  /// order" first to assign versions + priority; anything still unversioned
+  /// lands in a trailing "Unversioned" group as a nudge to plan it.
+  List<Widget> _buildOrderGroups(List<Feature> features) {
+    final unbuilt =
+        features.where((f) => FeatureStatus.fromWire(f.status).isActive).toList();
+    if (unbuilt.isEmpty) {
+      return const [
+        Padding(
+          padding: EdgeInsets.all(32),
+          child: Text(
+            'Nothing left to build — every feature is shipped or archived.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Color(0xFF9CA3AF)),
+          ),
+        ),
+      ];
+    }
+    final byVersion = groupFeaturesByVersion(unbuilt);
+    final versions = byVersion.keys.toList()..sort(_compareVersions);
+    final activeRuns = ref.watch(implActiveRunsProvider);
+
+    final widgets = <Widget>[];
+    var firstConcrete = true;
+    for (final v in versions) {
+      final items = [...byVersion[v]!]..sort(_byBuildOrder);
+      final isNextUp = firstConcrete && v != 'Unversioned';
+      if (v != 'Unversioned') firstConcrete = false;
+      widgets.add(_VersionGroupHeader(
+        version: v,
+        count: items.length,
+        nextUp: isNextUp,
+      ));
+      widgets.addAll(items.map((f) => _FeatureTile(
+            feature: f,
+            runPhase: activeRuns[f.id],
+            onSetStatus: (s) => ref
+                .read(featureListProvider(project.id).notifier)
+                .setStatus(f, s),
+            onEdit: () => _editFeature(f),
+            onDelete: () => ref
+                .read(featureListProvider(project.id).notifier)
+                .deleteFeature(f),
+            onBuild: () => _buildFeature(f),
+          )));
+    }
+    return widgets;
+  }
+
+  /// Within a version: lowest priority number first (nulls last), then by
+  /// status (in-progress/blocked ahead of planned/idea), then title.
+  static int _byBuildOrder(Feature a, Feature b) {
+    final pa = a.priority ?? 1 << 30;
+    final pb = b.priority ?? 1 << 30;
+    if (pa != pb) return pa.compareTo(pb);
+    final sa = FeatureStatus.board.indexOf(FeatureStatus.fromWire(a.status));
+    final sb = FeatureStatus.board.indexOf(FeatureStatus.fromWire(b.status));
+    if (sa != sb) return sa.compareTo(sb);
+    return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+  }
+
+  /// Ascending version compare that treats numeric segments numerically
+  /// (v0.9 before v0.10) and always sorts 'Unversioned' last.
+  static int _compareVersions(String a, String b) {
+    if (a == b) return 0;
+    if (a == 'Unversioned') return 1;
+    if (b == 'Unversioned') return -1;
+    final na = RegExp(r'\d+').allMatches(a).map((m) => int.parse(m[0]!)).toList();
+    final nb = RegExp(r'\d+').allMatches(b).map((m) => int.parse(m[0]!)).toList();
+    for (var i = 0; i < na.length && i < nb.length; i++) {
+      final c = na[i].compareTo(nb[i]);
+      if (c != 0) return c;
+    }
+    final lc = na.length.compareTo(nb.length);
+    return lc != 0 ? lc : a.compareTo(b);
   }
 
   Future<void> _addFeature() async {
@@ -1186,6 +1278,154 @@ class _TileAction {
   static const _TileAction build_ = _TileAction(_ActionKind.build);
   static const _TileAction edit_ = _TileAction(_ActionKind.edit);
   static const _TileAction delete_ = _TileAction(_ActionKind.delete);
+}
+
+/// The board grouping toggle: "By status" (the columns) vs "Build order"
+/// (features grouped by target version in the sequence to build them). When in
+/// build-order mode it offers a shortcut to re-run "Plan build order".
+class _GroupModeBar extends StatelessWidget {
+  const _GroupModeBar({
+    required this.buildOrder,
+    required this.onChanged,
+    required this.onPlan,
+  });
+
+  final bool buildOrder;
+  final ValueChanged<bool> onChanged;
+  final VoidCallback onPlan;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFF141416),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
+        child: Row(
+          children: [
+            const Text('Group by',
+                style: TextStyle(color: Color(0xFF8A8A8E), fontSize: 12)),
+            const SizedBox(width: 10),
+            _Segment(
+              label: 'Status',
+              icon: Icons.view_column_outlined,
+              selected: !buildOrder,
+              onTap: () => onChanged(false),
+            ),
+            const SizedBox(width: 6),
+            _Segment(
+              label: 'Build order',
+              icon: Icons.low_priority,
+              selected: buildOrder,
+              onTap: () => onChanged(true),
+            ),
+            const Spacer(),
+            if (buildOrder)
+              TextButton.icon(
+                onPressed: onPlan,
+                icon: const Icon(Icons.route_outlined, size: 15),
+                label: const Text('Plan build order'),
+                style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFE8A04C)),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Segment extends StatelessWidget {
+  const _Segment({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = selected ? const Color(0xFF0E0E10) : const Color(0xFFCFCFD2);
+    return InkWell(
+      borderRadius: BorderRadius.circular(6),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF64B5F6) : const Color(0xFF1E1E22),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 14, color: fg),
+          const SizedBox(width: 6),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 12.5,
+                  color: fg,
+                  fontWeight:
+                      selected ? FontWeight.w600 : FontWeight.w400)),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Section header for a target version in build-order mode, tagging the
+/// earliest concrete version as the one to build next.
+class _VersionGroupHeader extends StatelessWidget {
+  const _VersionGroupHeader({
+    required this.version,
+    required this.count,
+    required this.nextUp,
+  });
+
+  final String version;
+  final int count;
+  final bool nextUp;
+
+  @override
+  Widget build(BuildContext context) {
+    final unversioned = version == 'Unversioned';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+      child: Row(
+        children: [
+          Icon(unversioned ? Icons.help_outline : Icons.flag_outlined,
+              size: 15,
+              color: unversioned
+                  ? const Color(0xFF6B7280)
+                  : const Color(0xFF64B5F6)),
+          const SizedBox(width: 8),
+          Text(unversioned ? 'Unversioned' : version,
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFFE5E5E7))),
+          const SizedBox(width: 8),
+          Text('$count',
+              style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12)),
+          const SizedBox(width: 10),
+          if (nextUp)
+            const StatusChip(
+                label: 'NEXT UP', color: Color(0xFF81C784), dense: true),
+          if (unversioned) ...[
+            const SizedBox(width: 6),
+            const Expanded(
+              child: Text(
+                'Run "Plan build order" to sequence these into versions.',
+                style: TextStyle(fontSize: 11, color: Color(0xFF8A8A8E)),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _StalenessBanner extends StatelessWidget {
