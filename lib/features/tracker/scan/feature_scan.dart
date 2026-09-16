@@ -45,8 +45,13 @@ class ProposedFeature {
 }
 
 class FeatureScanException implements Exception {
-  FeatureScanException(this.message);
+  FeatureScanException(this.message, {this.raw});
   final String message;
+
+  /// The raw model output that couldn't be parsed — surfaced to diag.log so the
+  /// actual response can be inspected.
+  final String? raw;
+
   @override
   String toString() => message;
 }
@@ -116,12 +121,13 @@ class FeatureScanner {
       } on FeatureScanException {
         // Twice unparseable → almost certainly the model doesn't produce JSON
         // reliably (glm-5.3 & co. ignore JSON mode on Ollama Cloud). Point the
-        // user at the real fix rather than a cryptic parse error.
+        // user at the real fix, and carry the raw output for diag.log.
         throw FeatureScanException(
             'The Architect model didn\'t return valid JSON (even after a retry). '
             'Some models (e.g. glm-5.3) don\'t support JSON output on Ollama '
             'Cloud. Switch the Architect model to a JSON-clean one like '
-            'qwen3.5:cloud in Settings, then try again.');
+            'qwen3.5:cloud in Settings, then try again.',
+            raw: retry);
       }
     }
   }

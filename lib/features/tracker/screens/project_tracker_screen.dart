@@ -2,10 +2,12 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/filesystem/project_file_repository.dart';
 import '../../../data/local_db/forge_database.dart';
+import '../../../services/diag_log.dart';
 import '../../implementation/models/run_session.dart';
 import '../../implementation/providers/implementation_notifier.dart';
 import '../../implementation/providers/implementation_providers.dart';
@@ -489,10 +491,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
           .scan(projectPath: project.path, repoPath: repoPath);
     } catch (e) {
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
-      messenger.showSnackBar(SnackBar(
-        content: Text('Scan failed: $e'),
-        backgroundColor: const Color(0xFF3F0A0A),
-      ));
+      if (mounted) await _showError('Scan', e);
       return;
     }
     if (!mounted) return;
@@ -540,6 +539,41 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     ));
   }
 
+  /// Records an error to diag.log (with any raw model output) AND shows a
+  /// persistent dialog that stays until dismissed — so an error can be read/
+  /// screenshot/copied instead of a toast flashing by. [what] tags the action.
+  Future<void> _showError(String what, Object e) async {
+    final raw = e is FeatureScanException ? e.raw : null;
+    await DiagLog.log(
+        'ERROR [$what] $e${raw != null ? '\n--- raw model output ---\n$raw' : ''}');
+    if (!mounted) return;
+    final msg = e.toString();
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF141416),
+        title: Text('$what failed'),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: SingleChildScrollView(
+            child: SelectableText(msg,
+                style: const TextStyle(fontSize: 13, color: Color(0xFFE5E5E7))),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Clipboard.setData(ClipboardData(text: msg)),
+            child: const Text('Copy'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Dismiss'),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Normalized feature title for dedup — case-insensitive and punctuation-/
   /// whitespace-insensitive, so "V2: Multi‑Part" and "v2 multi part" collide.
   static String _normTitle(String s) =>
@@ -567,10 +601,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
           );
     } catch (e) {
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
-      messenger.showSnackBar(SnackBar(
-        content: Text('Recommendations failed: $e'),
-        backgroundColor: const Color(0xFF3F0A0A),
-      ));
+      if (mounted) await _showError('Recommendations', e);
       return;
     }
     if (!mounted) return;
@@ -641,10 +672,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
           );
     } catch (e) {
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
-      messenger.showSnackBar(SnackBar(
-        content: Text('Planning failed: $e'),
-        backgroundColor: const Color(0xFF3F0A0A),
-      ));
+      if (mounted) await _showError('Build order planning', e);
       return;
     }
     if (!mounted) return;
@@ -698,10 +726,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
           await ref.read(featureDeduplicatorProvider).findDuplicates(features);
     } catch (e) {
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
-      messenger.showSnackBar(SnackBar(
-        content: Text('Duplicate check failed: $e'),
-        backgroundColor: const Color(0xFF3F0A0A),
-      ));
+      if (mounted) await _showError('Duplicate check', e);
       return;
     }
     if (!mounted) return;
@@ -749,10 +774,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
           );
     } catch (e) {
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
-      messenger.showSnackBar(SnackBar(
-        content: Text('Check-in failed: $e'),
-        backgroundColor: const Color(0xFF3F0A0A),
-      ));
+      if (mounted) await _showError('Check-in', e);
       return;
     }
     if (!mounted) return;

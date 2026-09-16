@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.32 — 2026-09-16
+
+- **Errors are now captured and stay on screen.** Two diagnosability wins: (1) a persistent **`diag.log`** in the app-support dir (`~/Library/Application Support/ai.orbitalai.theForge/diag.log`) records failures — including uncaught Flutter errors and the **raw model output** a scan/recommend/roadmap choked on — so problems can be inspected even when the app is launched from Finder and after a toast vanishes (modeled on Sabihin's DiagLog). (2) Scan / Recommend / Plan-build-order / Remove-duplicates / Check-in failures now show a **dismissible dialog** (with Copy) that stays until you close it, instead of an auto-vanishing toast.
+
+---
+
 ## v0.4.31 — 2026-09-16
 
 - **Actionable error when the Architect model won't return JSON.** If scan/recommend/plan-build-order still can't parse after the retry, the error now says exactly what to do — "Switch the Architect model to a JSON-clean one like `qwen3.5:cloud` in Settings" — instead of a cryptic parse message. (Some models like `glm-5.3` don't support JSON output on Ollama Cloud, which no amount of parsing can fix.)
