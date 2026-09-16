@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.31 — 2026-09-16
+
+- **Actionable error when the Architect model won't return JSON.** If scan/recommend/plan-build-order still can't parse after the retry, the error now says exactly what to do — "Switch the Architect model to a JSON-clean one like `qwen3.5:cloud` in Settings" — instead of a cryptic parse message. (Some models like `glm-5.3` don't support JSON output on Ollama Cloud, which no amount of parsing can fix.)
+
+---
+
 ## v0.4.30 — 2026-09-15
 
 - **Scan / Recommend / Plan build order are resilient to flaky JSON.** These architect-model passes could fail with "Could not parse scan result as JSON" when the model (e.g. `glm-5.3:cloud`, which doesn't honor JSON mode on Ollama Cloud) returned prose or wrapped the array in an object. Now the parser tolerates code fences, surrounding prose, and object-wrapped arrays (`{"features":[…]}`), and each pass **retries once** with a firm JSON-only reminder before failing. Tip: for these features, a JSON-clean architect model like `qwen3.5:cloud` avoids the retry entirely.
