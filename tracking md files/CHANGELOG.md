@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.30 — 2026-09-15
+
+- **Scan / Recommend / Plan build order are resilient to flaky JSON.** These architect-model passes could fail with "Could not parse scan result as JSON" when the model (e.g. `glm-5.3:cloud`, which doesn't honor JSON mode on Ollama Cloud) returned prose or wrapped the array in an object. Now the parser tolerates code fences, surrounding prose, and object-wrapped arrays (`{"features":[…]}`), and each pass **retries once** with a firm JSON-only reminder before failing. Tip: for these features, a JSON-clean architect model like `qwen3.5:cloud` avoids the retry entirely.
+
+---
+
 ## v0.4.29 — 2026-09-15
 
 - **Plan build order (phased roadmap).** A new **route** action on the feature board sequences your not-yet-shipped features into a dependency-aware, phased roadmap — Foundation → Core → Enhancements → Later — with a target version per phase and a one-line reason per feature (foundational-first, then value). Review it, and **Apply to board** writes each phase's target version + a running priority to the features, so the board sorts in build order and the Releases view groups by phase. Answers "what do we build, in what order, and what depends on what?" `FeatureScanner.planRoadmap` (architect model, JSON mode).

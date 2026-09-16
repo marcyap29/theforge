@@ -82,16 +82,37 @@ class FeatureScanner {
           'first, or link a repo.');
     }
 
+    final user = _userPrompt(projectPath, docs, readme, fileList, repoPath);
+    return _parseWithRetry(_systemPrompt, user, 0.3, 2000, _parse);
+  }
+
+  /// Runs a JSON completion and parses it; on a parse failure retries ONCE with
+  /// a firm JSON-only reminder (some models — esp. glm on Ollama Cloud — ignore
+  /// JSON mode on the first pass and return prose).
+  Future<T> _parseWithRetry<T>(String system, String user, double temperature,
+      int maxTokens, T Function(String) parse) async {
     final raw = await _llm.complete(
       role: LlmRole.architect,
-      temperature: 0.3,
-      maxTokens: 2000,
-      systemPrompt: _systemPrompt,
-      userPrompt: _userPrompt(projectPath, docs, readme, fileList, repoPath),
+      temperature: temperature,
+      maxTokens: maxTokens,
+      systemPrompt: system,
+      userPrompt: user,
       jsonMode: true,
     );
-
-    return _parse(raw);
+    try {
+      return parse(raw);
+    } on FeatureScanException {
+      final retry = await _llm.complete(
+        role: LlmRole.architect,
+        temperature: 0.1,
+        maxTokens: maxTokens,
+        systemPrompt: system,
+        userPrompt: '$user\n\nIMPORTANT: your previous reply was not usable. '
+            'Output ONLY the JSON now — no prose, no explanation, no code fences.',
+        jsonMode: true,
+      );
+      return parse(retry);
+    }
   }
 
   /// Looks at what's ALREADY built/tracked (plus the docs + code) and recommends
@@ -115,16 +136,9 @@ class FeatureScanner {
           'Nothing to analyze yet — build or track some features first, or link '
           'a repo.');
     }
-    final raw = await _llm.complete(
-      role: LlmRole.architect,
-      temperature: 0.4,
-      maxTokens: 2500,
-      systemPrompt: _recommendSystemPrompt,
-      userPrompt:
-          _recommendUserPrompt(projectPath, docs, readme, fileList, repoPath, existing),
-      jsonMode: true,
-    );
-    return _parse(raw);
+    final user =
+        _recommendUserPrompt(projectPath, docs, readme, fileList, repoPath, existing);
+    return _parseWithRetry(_recommendSystemPrompt, user, 0.4, 2500, _parse);
   }
 
   /// Concatenates the project's README + `.forge` deliverables (spec/handoff/
@@ -266,16 +280,9 @@ Respond with ONLY a JSON array, no prose, no code fences. Each element:
       readme = await _readReadme(repoPath);
       fileList = await _listFiles(repoPath);
     }
-    final raw = await _llm.complete(
-      role: LlmRole.architect,
-      temperature: 0.2,
-      maxTokens: 2500,
-      systemPrompt: _roadmapSystemPrompt,
-      userPrompt:
-          _roadmapUserPrompt(projectPath, docs, readme, fileList, repoPath, features),
-      jsonMode: true,
-    );
-    return _parseRoadmap(raw);
+    final user =
+        _roadmapUserPrompt(projectPath, docs, readme, fileList, repoPath, features);
+    return _parseWithRetry(_roadmapSystemPrompt, user, 0.2, 2500, _parseRoadmap);
   }
 
   List<RoadmapPhase> _parseRoadmap(String raw) {
@@ -441,18 +448,12 @@ Respond with ONLY a JSON array, no prose, no code fences. Each element:
   }
 
   List<ProposedFeature> _parse(String raw) {
-    final jsonText = _extractJson(raw);
-    dynamic decoded;
-    try {
-      decoded = jsonDecode(jsonText);
-    } catch (e) {
+    final list = _extractList(raw);
+    if (list == null) {
       throw FeatureScanException('Could not parse scan result as JSON.');
     }
-    if (decoded is! List) {
-      throw FeatureScanException('Scan result was not a JSON array.');
-    }
     final out = <ProposedFeature>[];
-    for (final item in decoded) {
+    for (final item in list) {
       if (item is! Map) continue;
       final title = (item['title'] ?? '').toString().trim();
       if (title.isEmpty) continue;
@@ -471,20 +472,42 @@ Respond with ONLY a JSON array, no prose, no code fences. Each element:
     return out;
   }
 
-  /// Strips code fences / surrounding prose and returns the JSON array text.
-  String _extractJson(String raw) {
+  /// Robustly pulls a JSON list of feature objects out of a model response —
+  /// tolerant of code fences, surrounding prose, and the array being wrapped in
+  /// an object (e.g. `{"features":[…]}`), which JSON-mode models often produce.
+  /// Returns null only if no list can be found.
+  List? _extractList(String raw) {
     var text = raw.trim();
     if (text.startsWith('```')) {
       text = text.replaceFirst(RegExp(r'^```[a-zA-Z]*\n'), '');
       final end = text.lastIndexOf('```');
       if (end != -1) text = text.substring(0, end);
     }
-    final start = text.indexOf('[');
-    final end = text.lastIndexOf(']');
-    if (start != -1 && end != -1 && end > start) {
-      return text.substring(start, end + 1);
+    // Candidate substrings to try decoding: the [...] slice, the {...} slice,
+    // and the whole thing.
+    final candidates = <String>[];
+    final ai = text.indexOf('['), aj = text.lastIndexOf(']');
+    if (ai != -1 && aj > ai) candidates.add(text.substring(ai, aj + 1));
+    final oi = text.indexOf('{'), oj = text.lastIndexOf('}');
+    if (oi != -1 && oj > oi) candidates.add(text.substring(oi, oj + 1));
+    candidates.add(text);
+    for (final c in candidates) {
+      try {
+        final d = jsonDecode(c);
+        if (d is List) return d;
+        if (d is Map) {
+          for (final k in const [
+            'features', 'items', 'list', 'results', 'data', 'recommendations'
+          ]) {
+            if (d[k] is List) return d[k] as List;
+          }
+          for (final v in d.values) {
+            if (v is List) return v;
+          }
+        }
+      } catch (_) {}
     }
-    return text.trim();
+    return null;
   }
 }
 
