@@ -64,4 +64,65 @@ void main() {
       expect(d.screenshotKind, ScreenshotKind.none);
     });
   });
+
+  group('iosVersionFromRuntime', () {
+    test('parses the runtime identifier', () {
+      expect(
+          iosVersionFromRuntime(
+              'com.apple.CoreSimulator.SimRuntime.iOS-18-0'),
+          '18.0');
+      expect(iosVersionFromRuntime('com.apple.CoreSimulator.SimRuntime.tvOS-17-0'),
+          '');
+    });
+  });
+
+  group('parseIosSimulators', () {
+    const json = '''
+{"devices": {
+  "com.apple.CoreSimulator.SimRuntime.iOS-18-0": [
+    {"udid":"AAA","name":"iPhone 16 Pro","state":"Shutdown","isAvailable":true},
+    {"udid":"BBB","name":"iPhone 16","state":"Booted","isAvailable":true},
+    {"udid":"CCC","name":"iPhone SE","state":"Shutdown","isAvailable":false}
+  ],
+  "com.apple.CoreSimulator.SimRuntime.watchOS-11-0": [
+    {"udid":"WWW","name":"Apple Watch","state":"Shutdown","isAvailable":true}
+  ]
+}}''';
+
+    test('returns only bootable, available iOS sims (skips booted/unavailable/non-iOS)', () {
+      final sims = parseIosSimulators(json, {});
+      expect(sims.map((d) => d.id), ['AAA']);
+      final d = sims.single;
+      expect(d.needsBoot, isTrue);
+      expect(d.bootMethod, BootMethod.iosSim);
+      expect(d.screenshotKind, ScreenshotKind.iosSim);
+      expect(d.name, contains('iOS 18.0'));
+      expect(d.menuLabel, contains('tap to boot'));
+    });
+
+    test('excludes UDIDs already live via flutter devices', () {
+      expect(parseIosSimulators(json, {'AAA'}), isEmpty);
+    });
+
+    test('bad JSON yields empty, not a throw', () {
+      expect(parseIosSimulators('not json', {}), isEmpty);
+    });
+  });
+
+  group('parseAndroidEmulators', () {
+    const json = '''
+[
+  {"id":"Pixel_7_API_34","name":"Pixel 7","platformType":"android","category":"mobile"},
+  {"id":"apple_ios_simulator","name":"iOS Simulator","platformType":"ios"}
+]''';
+
+    test('returns Android AVDs only, marked bootable', () {
+      final emus = parseAndroidEmulators(json);
+      expect(emus.map((d) => d.id), ['Pixel_7_API_34']);
+      final d = emus.single;
+      expect(d.needsBoot, isTrue);
+      expect(d.bootMethod, BootMethod.androidEmu);
+      expect(d.screenshotKind, ScreenshotKind.android);
+    });
+  });
 }

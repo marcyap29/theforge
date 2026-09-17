@@ -2,6 +2,13 @@
 
 ---
 
+## v0.4.37 — 2026-09-17
+
+- **Run & Preview now boots simulators for you (one-click).** The device picker previously only listed *booted* simulators — so if none was running, you only saw your physical device. Now it also lists **available (shut-down) iOS Simulators** (`xcrun simctl`) and **Android emulators / AVDs** (`flutter emulators`), tagged "(tap to boot)". Pick one and Run: The Forge **boots it automatically**, waits for it to come up, then runs and mirrors it — no more manually launching a simulator first. (Physical-device deploys from inside The Forge can still hit an Xcode-automation permission wall — use a simulator/emulator for the in-app preview.)
+- **New apps are scaffolded at iOS 15.0 — no more Xcode-27 build wall.** Every app The Forge scaffolds (`flutter create`, via New Project *and* "Make runnable") now has its iOS deployment target raised to 15.0 in `project.pbxproj` and the `Podfile` (platform line + a `post_install` that forces every pod to 15.0). Xcode 27 rejects anything below 15.0, which used to break `flutter run` on brand-new apps. As a safety net, Run & Preview also re-applies this to iOS targets right before running (covers Podfiles generated after scaffolding). New `lib/data/filesystem/ios_deployment.dart` (pure, tested transforms).
+
+---
+
 ## v0.4.36 — 2026-09-16
 
 - **Run & Preview — watch your app run inside The Forge.** A new **play** action on the feature board opens a Run & Preview window that runs the app on a simulator/emulator and shows it live, so you can see how it looks when tested without leaving The Forge. It detects devices (`flutter devices`), runs `flutter run -d <device>` in the linked repo with a live **console** (build progress + errors), and gives **Hot reload**, **Hot restart**, and **Stop**. Because macOS can't embed Apple's Simulator window, the preview is a **live screenshot mirror** of the running app — captured from the iOS Simulator (`xcrun simctl`) or Android emulator (`adb`) and auto-refreshed after each reload (pinch/scroll to zoom). This is the native-fidelity path on purpose: camera/AR features (e.g. AR Mechanic) actually work in the real simulator/emulator, unlike a web preview. macOS/web targets run and stream their console here while opening in their own window/browser. New `lib/features/run/` (`RunController`, `RunPreviewScreen`). *Requires the relevant toolchain installed (Xcode for iOS, Android SDK for Android); note the iOS Simulator has no camera — use an Android emulator with a mapped webcam or a real device to eyeball camera apps.*

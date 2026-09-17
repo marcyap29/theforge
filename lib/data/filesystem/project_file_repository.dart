@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import '../../features/projects/models/pull_ingestion_summary.dart';
+import 'ios_deployment.dart';
 
 enum ProjectMode { build, audit, pull }
 
@@ -687,6 +688,9 @@ class ProjectFileRepository {
           ],
         );
         if (res.exitCode == 0 && dest.existsSync()) {
+          // Xcode 27 rejects iOS deployment targets below 15.0; bump the freshly
+          // scaffolded app so `flutter run` on device/simulator works out of the box.
+          await applyMinIosDeploymentTarget(dest.path);
           try {
             await Process.run('git', ['init'], workingDirectory: dest.path);
           } catch (_) {}

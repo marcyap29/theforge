@@ -73,6 +73,8 @@
 | Feature | Status | Notes |
 |---|---|---|
 | Run & Preview window | Shipped v0.4.36 | Play toolbar action → `RunPreviewScreen`; `RunController` (`lib/features/run/`) detects devices (`flutter devices --machine`), runs long-lived `flutter run -d <id>` in the repo, streams console, forwards hot reload/restart/quit over stdin. Live screenshot mirror of the running app via `xcrun simctl io booted screenshot` (iOS Simulator) / `adb exec-out screencap` (Android), auto-refreshed after each reload. macOS/web run in their own window/browser + console. Screenshot-mirror chosen over embedded WebView for reliability (no fragile macOS in-tree webview) + native fidelity (camera/AR) |
+| Auto-boot simulators/emulators | Shipped v0.4.37 | Device picker also lists shut-down iOS Simulators (`simctl list --json`, `parseIosSimulators`) + Android AVDs (`flutter emulators --machine`, `parseAndroidEmulators`), tagged "(tap to boot)". `RunController.start` boots the chosen one (`simctl boot` + wait / `flutter emulators --launch` + resolve device id) before `flutter run` |
+| Scaffold at iOS 15.0 (Xcode 27) | Shipped v0.4.37 | `lib/data/filesystem/ios_deployment.dart` — pure `bumpPbxproj`/`bumpPodfile` transforms + `applyMinIosDeploymentTarget`; called after every `flutter create` (`createCodeRepo` + `scaffoldFlutter`) and as a pre-run safety net for iOS targets. Prevents the "deployment target below 15.0" build wall |
 
 ---
 

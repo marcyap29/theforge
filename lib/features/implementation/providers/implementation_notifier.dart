@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
+import '../../../data/filesystem/ios_deployment.dart';
 import '../../../data/filesystem/project_file_repository.dart';
 import '../../../services/llm/llm_provider.dart';
 import '../../../services/llm/llm_service_provider.dart';
@@ -867,6 +868,13 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
         _log(ConsoleLineKind.info, 'Restored your $rel (kept its keys/permissions).');
       }
     });
+    // Xcode 27 rejects iOS deployment targets below 15.0; raise the scaffolded
+    // defaults so the app runs on device/simulator without a build error.
+    final bumped = await applyMinIosDeploymentTarget(repoPath);
+    if (bumped.isNotEmpty) {
+      _log(ConsoleLineKind.info,
+          'Set iOS deployment target to $kMinIosDeploymentTarget (Xcode 27).');
+    }
     _log(ConsoleLineKind.success,
         '✓ Platform folders created — the app can now build/run on a device.');
     _phase(prior);

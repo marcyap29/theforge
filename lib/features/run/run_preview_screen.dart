@@ -99,9 +99,14 @@ class _RunPreviewScreenState extends State<RunPreviewScreen> {
             if (_c.isBusy)
               _barButton(
                 icon: Icons.stop_circle_outlined,
-                label: _c.state == RunState.stopping ? 'Stopping…' : 'Stop',
+                label: switch (_c.state) {
+                  RunState.booting => 'Booting…',
+                  RunState.starting => 'Starting…',
+                  RunState.stopping => 'Stopping…',
+                  _ => 'Stop',
+                },
                 color: const Color(0xFFE57373),
-                onTap: _c.state == RunState.stopping ? null : _c.stop,
+                onTap: _c.state == RunState.running ? _c.stop : null,
               )
             else
               _barButton(
@@ -167,8 +172,7 @@ class _RunPreviewScreenState extends State<RunPreviewScreen> {
           for (final d in devices)
             DropdownMenuItem(
               value: d,
-              child: Text('${d.name}  ·  ${d.platformLabel}',
-                  overflow: TextOverflow.ellipsis),
+              child: Text(d.menuLabel, overflow: TextOverflow.ellipsis),
             ),
         ],
         onChanged: _c.isBusy ? null : (d) => setState(() => _selected = d),
@@ -210,6 +214,11 @@ class _RunPreviewScreenState extends State<RunPreviewScreen> {
       child = InteractiveViewer(
         maxScale: 4,
         child: Image.memory(_c.preview!, gaplessPlayback: true),
+      );
+    } else if (_c.state == RunState.booting) {
+      child = const _Hint(
+        icon: Icons.hourglass_top,
+        text: 'Booting the simulator/emulator…',
       );
     } else if (_c.state == RunState.starting) {
       child = const _Hint(
