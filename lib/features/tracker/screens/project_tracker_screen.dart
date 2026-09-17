@@ -29,6 +29,7 @@ import '../widgets/relocate_repo.dart';
 import '../widgets/roadmap_review_sheet.dart';
 import '../widgets/scan_review_sheet.dart';
 import '../widgets/status_chip.dart';
+import 'capability_summary_screen.dart';
 import 'releases_screen.dart';
 
 /// The per-project feature board: features grouped by status with add/edit/
@@ -139,6 +140,11 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             icon: const Icon(Icons.fact_check_outlined),
             tooltip: 'Run check-in',
             onPressed: _runCheckin,
+          ),
+          IconButton(
+            icon: const Icon(Icons.auto_awesome_outlined),
+            tooltip: 'What this app can do (analyze current repo)',
+            onPressed: _openCapabilitySummary,
           ),
           IconButton(
             icon: const Icon(Icons.radar),
@@ -372,6 +378,17 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
   void _openReleases() {
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => ReleasesScreen(project: project),
+    ));
+  }
+
+  /// Opens the live "what this app can do" capability summary (LLM reads the
+  /// current repo/docs). Works with docs alone, so it doesn't require a repo.
+  void _openCapabilitySummary() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => CapabilitySummaryScreen(
+        project: project,
+        repoPath: _repoPath,
+      ),
     ));
   }
 

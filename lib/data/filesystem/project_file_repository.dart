@@ -630,15 +630,47 @@ class ProjectFileRepository {
         ['rev-parse', 'HEAD'],
         workingDirectory: repoPath,
       );
-      
+
       if (process.exitCode != 0) {
         return null;
       }
-      
+
       return process.stdout.toString().trim();
     } catch (e) {
       return null;
     }
+  }
+
+  /// Reads the cached "what this app can do" capability summary (markdown +
+  /// the git commit it was generated against + when). Null if none yet.
+  static Future<Map<String, dynamic>?> readCapabilitySummary(
+      String projectPath) async {
+    try {
+      final f =
+          File(p.join(projectPath, forgeDirName, 'capability_summary.json'));
+      if (!f.existsSync()) return null;
+      final data = jsonDecode(await f.readAsString());
+      return data is Map<String, dynamic> ? data : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Caches a capability summary under `.forge/`, stamped with the [commit] it
+  /// describes so the UI can flag it stale when new commits land.
+  static Future<void> writeCapabilitySummary(
+    String projectPath, {
+    required String markdown,
+    String? commit,
+  }) async {
+    final dir = Directory(p.join(projectPath, forgeDirName));
+    if (!dir.existsSync()) dir.createSync(recursive: true);
+    final f = File(p.join(dir.path, 'capability_summary.json'));
+    await f.writeAsString(jsonEncode({
+      'markdown': markdown,
+      'commit': commit,
+      'generatedAt': DateTime.now().toIso8601String(),
+    }));
   }
 
   /// The default place a user's code lives (`~/Development`). New code folders

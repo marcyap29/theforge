@@ -91,6 +91,118 @@ class FeatureScanner {
     return _parseWithRetry(_systemPrompt, user, 0.3, 2000, _parse);
   }
 
+  /// Analyzes the repo AS IT IS RIGHT NOW and returns a plain-language markdown
+  /// overview of what the app can currently do — grounded in the actual source
+  /// (not just the file list) plus the project docs and tracked features. This
+  /// is a read-only narrative (no JSON, no tracker import), the automated
+  /// version of "give me an overview of this app's capabilities".
+  Future<String> describeCapabilities({
+    required String projectPath,
+    String? repoPath,
+    List<Feature> features = const [],
+  }) async {
+    final docs = await _readProjectDocs(projectPath);
+    String? readme;
+    String? code;
+    List<String> fileList = const [];
+    if (repoPath != null && Directory(repoPath).existsSync()) {
+      readme = await _readReadme(repoPath);
+      fileList = await _listFiles(repoPath);
+      code = await _readKeyCode(repoPath);
+    }
+    if (docs == null && readme == null && fileList.isEmpty) {
+      throw FeatureScanException(
+          'Nothing to analyze yet — link a repo or generate a spec first.');
+    }
+    final user = _capabilityUserPrompt(
+        projectPath, docs, readme, code, fileList, repoPath, features);
+    final md = await _llm.complete(
+      role: LlmRole.architect,
+      temperature: 0.3,
+      maxTokens: 2200,
+      systemPrompt: _capabilitySystemPrompt,
+      userPrompt: user,
+      jsonMode: false,
+      think: false,
+    );
+    final out = md.trim();
+    if (out.isEmpty) {
+      throw FeatureScanException(
+          'The Architect model returned an empty summary. Try again, or switch '
+          'to a different Architect model in Settings.',
+          raw: md);
+    }
+    return out;
+  }
+
+  /// Reads the most telling source files under `lib/` (main + screens + widgets
+  /// first) within a size budget, so the capability summary reflects real code
+  /// rather than guessing from file names.
+  Future<String?> _readKeyCode(String repoPath) async {
+    final libDir = Directory(p.join(repoPath, 'lib'));
+    if (!libDir.existsSync()) return null;
+    final files = libDir
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where((f) => f.path.endsWith('.dart'))
+        .toList();
+    int rank(File f) {
+      final n = p.basename(f.path).toLowerCase();
+      if (n == 'main.dart') return 0;
+      if (f.path.contains('${p.separator}screens${p.separator}') ||
+          n.contains('screen')) return 1;
+      if (f.path.contains('${p.separator}widgets${p.separator}')) return 2;
+      return 3;
+    }
+
+    files.sort((a, b) => rank(a).compareTo(rank(b)));
+    final buf = StringBuffer();
+    var budget = 10000;
+    for (final f in files) {
+      if (budget <= 0) break;
+      try {
+        var c = await f.readAsString();
+        final rel = p.relative(f.path, from: repoPath);
+        if (c.length > 3000) c = '${c.substring(0, 3000)}\n…(truncated)';
+        if (c.length > budget) c = c.substring(0, budget);
+        buf..writeln('// $rel')..writeln(c)..writeln();
+        budget -= c.length;
+      } catch (_) {}
+    }
+    return buf.isEmpty ? null : buf.toString();
+  }
+
+  String _capabilityUserPrompt(String projectPath, String? docs, String? readme,
+      String? code, List<String> files, String? repoPath, List<Feature> features) {
+    final buffer = StringBuffer();
+    buffer.writeln('# Project: ${p.basename(projectPath)}');
+    buffer.writeln();
+    if (features.isNotEmpty) {
+      buffer.writeln('## Tracked features (status hints — verify against code)');
+      for (final f in features) {
+        buffer.writeln('- ${f.title} (${f.status})');
+      }
+      buffer.writeln();
+    }
+    if (docs != null) {
+      buffer..writeln('## Project documents')..writeln(docs)..writeln();
+    }
+    if (repoPath != null && (readme != null || files.isNotEmpty)) {
+      buffer.writeln('## Linked codebase: ${p.basename(repoPath)}');
+      if (readme != null) buffer..writeln('### README')..writeln(readme);
+      if (code != null) {
+        buffer..writeln('### Source code (key files)')..writeln(code);
+      }
+      if (files.isNotEmpty) {
+        buffer.writeln('### File tree');
+        for (final f in files.take(200)) {
+          buffer.writeln('- $f');
+        }
+      }
+    }
+    return buffer.toString();
+  }
+
   /// Runs a JSON completion and parses it; on a parse failure retries ONCE with
   /// a firm JSON-only reminder (some models — esp. glm on Ollama Cloud — ignore
   /// JSON mode on the first pass and return prose).
@@ -264,6 +376,27 @@ class FeatureScanner {
 
   List<String> _cap(List<String> list) =>
       list.length > 400 ? list.sublist(0, 400) : list;
+
+  static const _capabilitySystemPrompt = '''
+You are a senior engineer writing a concise, accurate "What this app can do right
+now" overview for the product owner (non-technical). Base it ONLY on the actual
+source code, README, and documents provided — describe real, current
+capabilities, not aspirations.
+
+Rules:
+- Ground every claim in the code. If a feature is only in the docs or tracked
+  list but there is no code implementing it, do NOT list it as working.
+- Be honest about gaps: if something is scaffolded but not functional (an empty
+  handler, a TODO, a hardcoded/placeholder value, a stubbed branch), call it out
+  under a short "Not yet functional / in progress" section.
+- Do not invent features, libraries, or screens that aren't in the material.
+
+Output GitHub-flavored markdown, structured as:
+- A one-sentence description of what the app is.
+- "## What it can do now" — grouped bullets of working capabilities.
+- "## Not yet functional / in progress" — honest gaps (omit if none evident).
+- "## In one line" — a single summary sentence.
+No preamble, no code fences around the whole response.''';
 
   static const _systemPrompt = '''
 You are a senior product analyst. Given a project's DOCUMENTS (its locked spec,

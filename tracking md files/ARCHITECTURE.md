@@ -383,6 +383,7 @@ Lightweight project + feature tracking layered over the existing spec pipeline.
 - **Portfolio dashboard is the home route `/`** — the old project list moved to `/projects`
 - Per-project **feature board** groups features by status: `idea` / `planned` / `in_progress` / `blocked` / `shipped` / `archived`
 - Providers live in `lib/features/tracker/**`
+- **Capability summary (v0.4.38).** `FeatureScanner.describeCapabilities` reads the *current* repo (key `lib/` source via `_readKeyCode` + README + `.forge` docs) plus tracked features and asks the Architect model (non-JSON, `think:false`) for a plain-language markdown overview of what the app can do now. `CapabilitySummaryScreen` renders it (`flutter_markdown`), on-demand + cached to `.forge/capability_summary.json` via `ProjectFileRepository.read/writeCapabilitySummary` (stamped with `getGitHead`); a staleness banner offers Refresh when HEAD ≠ the cached commit.
 - Project delete is an index + folder cascade, guarded to only operate under the canonical projects root (refuses paths outside it)
 
 ---

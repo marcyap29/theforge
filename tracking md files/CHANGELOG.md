@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.38 — 2026-09-17
+
+- **"What this app can do" — a live capability overview per project.** A new ✨ toolbar action on the feature board has the Architect LLM read the project's **current** repo (key `lib/` source + README + `.forge` docs) and the tracked features, then write a plain-language markdown overview of what the app can actually do right now — grouped capabilities, an honest "Not yet functional / in progress" section for stubbed/planned bits, and a one-line summary. It's **on-demand + cached**: the summary is saved to `.forge/capability_summary.json` (stamped with the git commit it describes) so it shows instantly next time, and a **"repo has changed"** banner offers a one-tap Refresh when new commits have landed since. Grounded in code (not just file names), so it reflects reality rather than aspirations. `FeatureScanner.describeCapabilities` + `CapabilitySummaryScreen`.
+
+---
+
 ## v0.4.37 — 2026-09-17
 
 - **Run & Preview now boots simulators for you (one-click).** The device picker previously only listed *booted* simulators — so if none was running, you only saw your physical device. Now it also lists **available (shut-down) iOS Simulators** (`xcrun simctl`) and **Android emulators / AVDs** (`flutter emulators`), tagged "(tap to boot)". Pick one and Run: The Forge **boots it automatically**, waits for it to come up, then runs and mirrors it — no more manually launching a simulator first. (Physical-device deploys from inside The Forge can still hit an Xcode-automation permission wall — use a simulator/emulator for the in-app preview.)
