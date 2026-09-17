@@ -29,6 +29,7 @@ import '../widgets/relocate_repo.dart';
 import '../widgets/roadmap_review_sheet.dart';
 import '../widgets/scan_review_sheet.dart';
 import '../widgets/status_chip.dart';
+import 'build_advice_screen.dart';
 import 'capability_summary_screen.dart';
 import 'releases_screen.dart';
 
@@ -264,6 +265,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
                 .read(featureListProvider(project.id).notifier)
                 .deleteFeature(f),
             onBuild: () => _buildFeature(f),
+            onAdvice: () => _openBuildAdvice(f),
           )),
     ];
   }
@@ -315,6 +317,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
                 .read(featureListProvider(project.id).notifier)
                 .deleteFeature(f),
             onBuild: () => _buildFeature(f),
+            onAdvice: () => _openBuildAdvice(f),
           )));
     }
     return widgets;
@@ -378,6 +381,18 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
   void _openReleases() {
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => ReleasesScreen(project: project),
+    ));
+  }
+
+  /// Opens scale-aware build advice for a single feature (LLM reads the repo:
+  /// scope, feasibility, approach, effort, risks, breakdown).
+  void _openBuildAdvice(Feature feature) {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => BuildAdviceScreen(
+        project: project,
+        repoPath: _repoPath,
+        feature: feature,
+      ),
     ));
   }
 
@@ -1105,6 +1120,7 @@ class _FeatureTile extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onBuild,
+    required this.onAdvice,
     this.runPhase,
   });
 
@@ -1113,6 +1129,7 @@ class _FeatureTile extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onBuild;
+  final VoidCallback onAdvice;
 
   /// Non-null when a Build with AI run for this feature is live (any phase);
   /// drives the status dot on the board.
@@ -1153,6 +1170,8 @@ class _FeatureTile extends StatelessWidget {
               onSetStatus(a.status!);
             case _ActionKind.build:
               onBuild();
+            case _ActionKind.advice:
+              onAdvice();
             case _ActionKind.edit:
               onEdit();
             case _ActionKind.delete:
@@ -1171,6 +1190,15 @@ class _FeatureTile extends StatelessWidget {
                 Text(status == FeatureStatus.shipped
                     ? 'Re-build / edit with AI'
                     : 'Build with AI'),
+              ]),
+            ),
+            const PopupMenuItem(
+              value: _TileAction.advice_,
+              child: Row(children: [
+                Icon(Icons.tips_and_updates_outlined,
+                    size: 16, color: Color(0xFF64B5F6)),
+                SizedBox(width: 8),
+                Text('How to build this'),
               ]),
             ),
             const PopupMenuDivider(),
@@ -1299,7 +1327,7 @@ class _RunDotState extends State<_RunDot>
   }
 }
 
-enum _ActionKind { setStatus, build, edit, delete }
+enum _ActionKind { setStatus, build, advice, edit, delete }
 
 class _TileAction {
   const _TileAction(this.kind, [this.status]);
@@ -1309,6 +1337,7 @@ class _TileAction {
   static _TileAction move(FeatureStatus s) =>
       _TileAction(_ActionKind.setStatus, s);
   static const _TileAction build_ = _TileAction(_ActionKind.build);
+  static const _TileAction advice_ = _TileAction(_ActionKind.advice);
   static const _TileAction edit_ = _TileAction(_ActionKind.edit);
   static const _TileAction delete_ = _TileAction(_ActionKind.delete);
 }

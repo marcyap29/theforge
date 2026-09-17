@@ -135,6 +135,94 @@ class FeatureScanner {
     return out;
   }
 
+  /// Scale-aware build advice for ONE feature: how to build it, which tools/
+  /// libraries, rough effort, risks, whether The Forge's Build-with-AI can
+  /// realistically code-generate it (vs work that needs a human / ML / dataset),
+  /// and — if it's really an epic — how to split it into sub-features. Grounded
+  /// in the current repo + docs. Read-only markdown (no JSON, no tracker writes).
+  Future<String> adviseBuild({
+    required String projectPath,
+    String? repoPath,
+    required Feature feature,
+    List<Feature> allFeatures = const [],
+  }) async {
+    final docs = await _readProjectDocs(projectPath);
+    String? readme;
+    String? code;
+    List<String> fileList = const [];
+    if (repoPath != null && Directory(repoPath).existsSync()) {
+      readme = await _readReadme(repoPath);
+      fileList = await _listFiles(repoPath);
+      code = await _readKeyCode(repoPath);
+    }
+    final user = _adviseUserPrompt(
+        projectPath, feature, allFeatures, docs, readme, code, fileList, repoPath);
+    final md = await _llm.complete(
+      role: LlmRole.architect,
+      temperature: 0.3,
+      maxTokens: 2500,
+      systemPrompt: _adviseSystemPrompt,
+      userPrompt: user,
+      jsonMode: false,
+      think: false,
+    );
+    final out = md.trim();
+    if (out.isEmpty) {
+      throw FeatureScanException(
+          'The Architect model returned empty advice. Try again, or switch the '
+          'Architect model in Settings.',
+          raw: md);
+    }
+    return out;
+  }
+
+  String _adviseUserPrompt(
+      String projectPath,
+      Feature feature,
+      List<Feature> allFeatures,
+      String? docs,
+      String? readme,
+      String? code,
+      List<String> files,
+      String? repoPath) {
+    final buffer = StringBuffer();
+    buffer.writeln('# Project: ${p.basename(projectPath)}');
+    buffer.writeln();
+    buffer.writeln('## Feature to advise on');
+    buffer.writeln('Title: ${feature.title}');
+    if ((feature.description ?? '').trim().isNotEmpty) {
+      buffer.writeln('Current description: ${feature.description!.trim()}');
+    }
+    buffer.writeln('Status: ${feature.status}'
+        '${feature.targetVersion != null ? ' · target ${feature.targetVersion}' : ''}');
+    buffer.writeln();
+    final others = allFeatures.where((f) => f.id != feature.id).toList();
+    if (others.isNotEmpty) {
+      buffer.writeln('## Other tracked features (for dependencies/context)');
+      for (final f in others) {
+        buffer.writeln('- ${f.title} (${f.status})');
+      }
+      buffer.writeln();
+    }
+    if (docs != null) {
+      buffer..writeln('## Project documents')..writeln(docs)..writeln();
+    }
+    if (repoPath != null && (readme != null || files.isNotEmpty)) {
+      buffer.writeln('## Linked codebase: ${p.basename(repoPath)}');
+      if (readme != null) buffer..writeln('### README')..writeln(readme);
+      if (code != null) {
+        buffer..writeln('### Source code (key files)')..writeln(code);
+      }
+      if (files.isNotEmpty) {
+        buffer.writeln('### File tree');
+        for (final f in files.take(200)) {
+          buffer.writeln('- $f');
+        }
+      }
+    }
+    return buffer.toString();
+  }
+
   /// Reads the most telling source files under `lib/` (main + screens + widgets
   /// first) within a size budget, so the capability summary reflects real code
   /// rather than guessing from file names.
@@ -376,6 +464,46 @@ class FeatureScanner {
 
   List<String> _cap(List<String> list) =>
       list.length > 400 ? list.sublist(0, 400) : list;
+
+  static const _adviseSystemPrompt = '''
+You are a pragmatic senior engineer advising a solo builder (non-expert) on HOW
+to build a specific feature in their app, using the actual code + docs provided.
+Be concrete and honest — especially about whether an in-app AI code generator
+("Build with AI") can realistically produce this, or whether it needs human
+work, a dataset, model training, design, or external services.
+
+Output GitHub-flavored markdown with these sections (omit one only if truly N/A):
+
+## Scope
+Is this a single feature, or is it really an EPIC (a subsystem spanning multiple
+features)? Say which, plainly. If it's an epic, that's the most important thing
+to surface.
+
+## Feasibility
+One of: **Buildable now** (an AI code generator can do it against this repo),
+**Hybrid** (AI can build the plumbing, but part needs human/ML/design/data), or
+**Needs human effort** (not a code-gen task). Explain briefly why.
+
+## Recommended approach
+Concrete steps + the specific Flutter/Dart packages, platform APIs, or tools you
+would use (name them). Prefer what fits the existing code.
+
+## Effort
+A rough size (S / M / L, or hours–days) and the main cost drivers.
+
+## Risks & gotchas
+The things most likely to bite (platform limits, permissions, performance, model
+accuracy, store review, etc.).
+
+## Suggested breakdown
+If it's an epic: 2–5 smaller sub-features to track separately, noting which are
+buildable vs need human work. If it's a single feature: the ordered build steps.
+
+## Suggested description
+One sharper one-line descriptor for the tracker that reflects the real scope.
+
+Ground everything in the provided material. Do not invent APIs. No preamble, no
+code fences around the whole reply.''';
 
   static const _capabilitySystemPrompt = '''
 You are a senior engineer writing a concise, accurate "What this app can do right

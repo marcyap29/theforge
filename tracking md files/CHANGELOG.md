@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.39 — 2026-09-17
+
+- **"How to build this" — scale-aware build advice per feature.** Each feature's ⋮ menu has a new **How to build this** action: the Architect LLM reads the current repo + docs and returns concrete guidance for that feature — **Scope** (is this really a single feature, or an *epic* that should be split?), **Feasibility** (Buildable now / Hybrid / Needs human effort — i.e. can Build-with-AI actually code-generate it, or does it need a human, a dataset, or model training?), **Recommended approach** with named packages/APIs, **Effort**, **Risks & gotchas**, a **Suggested breakdown** into sub-features, and a sharper **descriptor**. Point it at something like on-device "Local AI Image Recognition" and it correctly flags it as an epic needing an ML model + dataset (not a one-shot code-gen), rather than letting a deceptively short description hide the real lift. On-demand with Regenerate + Copy. `FeatureScanner.adviseBuild` + `BuildAdviceScreen`.
+
+---
+
 ## v0.4.38 — 2026-09-17
 
 - **"What this app can do" — a live capability overview per project.** A new ✨ toolbar action on the feature board has the Architect LLM read the project's **current** repo (key `lib/` source + README + `.forge` docs) and the tracked features, then write a plain-language markdown overview of what the app can actually do right now — grouped capabilities, an honest "Not yet functional / in progress" section for stubbed/planned bits, and a one-line summary. It's **on-demand + cached**: the summary is saved to `.forge/capability_summary.json` (stamped with the git commit it describes) so it shows instantly next time, and a **"repo has changed"** banner offers a one-tap Refresh when new commits have landed since. Grounded in code (not just file names), so it reflects reality rather than aspirations. `FeatureScanner.describeCapabilities` + `CapabilitySummaryScreen`.
