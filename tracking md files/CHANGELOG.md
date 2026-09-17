@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.36 — 2026-09-16
+
+- **Run & Preview — watch your app run inside The Forge.** A new **play** action on the feature board opens a Run & Preview window that runs the app on a simulator/emulator and shows it live, so you can see how it looks when tested without leaving The Forge. It detects devices (`flutter devices`), runs `flutter run -d <device>` in the linked repo with a live **console** (build progress + errors), and gives **Hot reload**, **Hot restart**, and **Stop**. Because macOS can't embed Apple's Simulator window, the preview is a **live screenshot mirror** of the running app — captured from the iOS Simulator (`xcrun simctl`) or Android emulator (`adb`) and auto-refreshed after each reload (pinch/scroll to zoom). This is the native-fidelity path on purpose: camera/AR features (e.g. AR Mechanic) actually work in the real simulator/emulator, unlike a web preview. macOS/web targets run and stream their console here while opening in their own window/browser. New `lib/features/run/` (`RunController`, `RunPreviewScreen`). *Requires the relevant toolchain installed (Xcode for iOS, Android SDK for Android); note the iOS Simulator has no camera — use an Android emulator with a mapped webcam or a real device to eyeball camera apps.*
+
+---
+
 ## v0.4.35 — 2026-09-16
 
 - **Board can now group by build order, not just status.** A new **Group by: Status / Build order** toggle sits above the feature board. In **Build order** mode the not-yet-built features (Idea / Planned / Blocked / In Progress) are grouped by their **target version** — versions ascending, so the one to build next is at the top and tagged **NEXT UP** — and priority-ordered within each version. This is the sequence to feed features into Build-with-AI, answering "what do I build next, and in what order?" at a glance. It reads the `targetVersion` + `priority` that **Plan build order** assigns, so the flow is: run Plan build order → flip to Build order → work top-down. Features with no version yet collect in a trailing **Unversioned** group with a nudge to run Plan build order (there's also a shortcut button in the toggle bar). Status mode (the columns) is unchanged and still the default.

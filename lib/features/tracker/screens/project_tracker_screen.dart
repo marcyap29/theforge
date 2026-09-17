@@ -13,6 +13,7 @@ import '../../implementation/providers/implementation_notifier.dart';
 import '../../implementation/providers/implementation_providers.dart';
 import '../../implementation/screens/implementation_screen.dart';
 import '../../projects/providers/providers.dart';
+import '../../run/run_preview_screen.dart';
 import '../checkin/checkin_review_dialog.dart';
 import '../checkin/checkin_service.dart';
 import '../models/tracker_enums.dart';
@@ -158,6 +159,11 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             icon: const Icon(Icons.cleaning_services_outlined),
             tooltip: 'Remove duplicate features',
             onPressed: _removeDuplicates,
+          ),
+          IconButton(
+            icon: const Icon(Icons.play_circle_outline),
+            tooltip: 'Run & preview',
+            onPressed: _openRunPreview,
           ),
           IconButton(
             icon: const Icon(Icons.rocket_launch_outlined),
@@ -366,6 +372,16 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
   void _openReleases() {
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => ReleasesScreen(project: project),
+    ));
+  }
+
+  /// Opens the Run & Preview window: run the app on a simulator/emulator and
+  /// watch it (live screenshot mirror + console). Needs a linked, runnable repo.
+  Future<void> _openRunPreview() async {
+    final repoPath = await _ensureRepoPath();
+    if (repoPath == null || !mounted) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => RunPreviewScreen(project: project, repoPath: repoPath),
     ));
   }
 

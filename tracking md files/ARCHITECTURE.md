@@ -434,6 +434,17 @@ Release tracking layered onto the tracker, mirroring the Portfolio Tracker's DB 
 
 ---
 
+## Run & Preview (v0.4.36)
+
+Lets the user run the app-under-construction and watch it inside The Forge — "see how it looks when tested." Module lives in `lib/features/run/`.
+
+- **`RunController`** (`ChangeNotifier`) owns a long-lived `flutter run -d <device>` process in the linked repo. Unlike `CommandRunner` (fire-and-forget with a 3-min timeout), it keeps the process alive, streams stdout/stderr into a capped console buffer, and forwards **hot reload** (`r`) / **hot restart** (`R`) / **quit** (`q`) over the process's stdin. `listDevices()` parses `flutter devices --machine`.
+- **Live mirror, not embedding.** macOS can't reparent Apple's Simulator window, so instead of an embedded view the app captures the running frame: `xcrun simctl io booted screenshot` (iOS Simulator) or `adb exec-out screencap -p` (Android). `RunDevice.screenshotKind` decides which (or `none` for macOS/web/physical iOS). Frames auto-refresh ~1.4s after each `Reloaded`/`Restarted` line and ~3s after first launch; manual refresh + pinch-zoom via `InteractiveViewer`.
+- **Deliberate design choice:** screenshot-mirror over an embedded WebView — no fragile macOS in-tree webview dependency on an otherwise-clean build, and native fidelity (camera/AR actually run) which a web preview can't give. Trade-off: the mirror is read-only (drive the app in the real simulator window); iOS Simulator has no camera, so camera apps need an Android emulator (mapped webcam) or a real device.
+- **`RunPreviewScreen`** — device picker + Run/Stop/Reload/Restart controls, a preview pane (`Image.memory` mirror or an honest hint for own-window targets), and the live console. Reached via the **play** toolbar action on `project_tracker_screen`, gated through `_ensureRepoPath` (needs a linked runnable repo).
+
+---
+
 ## Design System — Forge v2 (v0.4.0)
 
 A cohesive visual identity replacing the original monospace shell.

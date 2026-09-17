@@ -68,6 +68,14 @@
 
 ---
 
+## Run & Preview
+
+| Feature | Status | Notes |
+|---|---|---|
+| Run & Preview window | Shipped v0.4.36 | Play toolbar action → `RunPreviewScreen`; `RunController` (`lib/features/run/`) detects devices (`flutter devices --machine`), runs long-lived `flutter run -d <id>` in the repo, streams console, forwards hot reload/restart/quit over stdin. Live screenshot mirror of the running app via `xcrun simctl io booted screenshot` (iOS Simulator) / `adb exec-out screencap` (Android), auto-refreshed after each reload. macOS/web run in their own window/browser + console. Screenshot-mirror chosen over embedded WebView for reliability (no fragile macOS in-tree webview) + native fidelity (camera/AR) |
+
+---
+
 ## Releases
 
 | Feature | Status | Notes |
