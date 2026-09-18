@@ -59,6 +59,10 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
   /// build order (the sequence to feed features into Build-with-AI).
   bool _buildOrderView = false;
 
+  /// The feature the user is currently focused on (highlighted). Set on click,
+  /// right-click, or opening a feature's actions menu.
+  String? _focusedFeatureId;
+
   @override
   void initState() {
     super.initState();
@@ -268,6 +272,8 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             onBuild: () => _buildFeature(f),
             onAdvice: () => _openBuildAdvice(f),
             onArchitect: () => _architectFeature(f),
+            selected: f.id == _focusedFeatureId,
+            onFocus: () => setState(() => _focusedFeatureId = f.id),
           )),
     ];
   }
@@ -321,6 +327,8 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             onBuild: () => _buildFeature(f),
             onAdvice: () => _openBuildAdvice(f),
             onArchitect: () => _architectFeature(f),
+            selected: f.id == _focusedFeatureId,
+            onFocus: () => setState(() => _focusedFeatureId = f.id),
           )));
     }
     return widgets;
@@ -1228,6 +1236,8 @@ class _FeatureTile extends StatelessWidget {
     required this.onBuild,
     required this.onAdvice,
     required this.onArchitect,
+    required this.selected,
+    required this.onFocus,
     this.runPhase,
   });
 
@@ -1239,6 +1249,13 @@ class _FeatureTile extends StatelessWidget {
   final VoidCallback onAdvice;
   final VoidCallback onArchitect;
 
+  /// Whether this is the focused feature (highlighted).
+  final bool selected;
+
+  /// Marks this feature as focused — fired on click, right-click, or opening
+  /// the actions menu so the user always knows which feature is in focus.
+  final VoidCallback onFocus;
+
   /// Non-null when a Build with AI run for this feature is live (any phase);
   /// drives the status dot on the board.
   final RunPhase? runPhase;
@@ -1248,14 +1265,40 @@ class _FeatureTile extends StatelessWidget {
     final status = FeatureStatus.fromWire(feature.status);
     final phase = runPhase;
     final hasRun = phase != null && phase != RunPhase.idle;
+    return GestureDetector(
+      // Right-click anywhere on the row → focus it + the same actions menu.
+      onSecondaryTapDown: (d) {
+        onFocus();
+        _showContextMenu(context, status, d.globalPosition);
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: selected ? const Color(0x2264B5F6) : null,
+          border: Border(
+            left: BorderSide(
+              width: 3,
+              color: selected ? const Color(0xFF64B5F6) : Colors.transparent,
+            ),
+          ),
+        ),
+        child: _tile(context, status, phase, hasRun),
+      ),
+    );
+  }
+
+  Widget _tile(BuildContext context, FeatureStatus status, RunPhase? phase,
+      bool hasRun) {
     return ListTile(
       dense: true,
-      // A feature with a live AI build is tappable — clicking it re-opens the
-      // build window so you can watch progress, without going through the menu.
-      onTap: hasRun ? onBuild : null,
-      mouseCursor: hasRun ? SystemMouseCursors.click : null,
+      // Single click focuses (highlights) the row; a feature with a live AI
+      // build also re-opens its build window.
+      onTap: () {
+        onFocus();
+        if (hasRun) onBuild();
+      },
+      mouseCursor: SystemMouseCursors.click,
       leading: hasRun
-          ? _RunDot(phase)
+          ? _RunDot(phase!)
           : Icon(Icons.circle, size: 12, color: status.color),
       title: Row(
         children: [
@@ -1269,102 +1312,127 @@ class _FeatureTile extends StatelessWidget {
           ],
           if (hasRun) ...[
             const SizedBox(width: 8),
-            Icon(Icons.open_in_new, size: 12, color: phase.dotColor),
+            Icon(Icons.open_in_new, size: 12, color: phase!.dotColor),
           ],
         ],
       ),
       subtitle: _subtitle(),
       trailing: PopupMenuButton<_TileAction>(
         icon: const Icon(Icons.more_vert, size: 18, color: Color(0xFF8A8A8E)),
-        onSelected: (a) {
-          switch (a.kind) {
-            case _ActionKind.setStatus:
-              onSetStatus(a.status!);
-            case _ActionKind.build:
-              onBuild();
-            case _ActionKind.advice:
-              onAdvice();
-            case _ActionKind.architect:
-              onArchitect();
-            case _ActionKind.edit:
-              onEdit();
-            case _ActionKind.delete:
-              onDelete();
-          }
-        },
-        itemBuilder: (_) => [
-          // Available on any non-archived feature — including shipped ones, so
-          // a finished feature can be re-opened and edited/extended.
-          if (status != FeatureStatus.archived) ...[
-            PopupMenuItem(
-              value: _TileAction.build_,
-              child: Row(children: [
-                const Icon(Icons.auto_awesome, size: 16, color: Color(0xFFE8A04C)),
-                const SizedBox(width: 8),
-                Text(status == FeatureStatus.shipped
-                    ? 'Re-build / edit with AI'
-                    : 'Build with AI'),
-              ]),
-            ),
-            const PopupMenuItem(
-              value: _TileAction.advice_,
-              child: Row(children: [
-                Icon(Icons.tips_and_updates_outlined,
-                    size: 16, color: Color(0xFF64B5F6)),
-                SizedBox(width: 8),
-                Text('How to build this'),
-              ]),
-            ),
-            const PopupMenuItem(
-              value: _TileAction.architect_,
-              child: Row(children: [
-                Icon(Icons.account_tree_outlined,
-                    size: 16, color: Color(0xFFBA68C8)),
-                SizedBox(width: 8),
-                Text('Architect (break into sub-features)'),
-              ]),
-            ),
-            const PopupMenuDivider(),
-          ],
-          const PopupMenuItem(
-            enabled: false,
-            height: 28,
-            child: Text('Move to',
-                style: TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
-          ),
-          ...FeatureStatus.board.where((s) => s != status).map(
-                (s) => PopupMenuItem(
-                  value: _TileAction.move(s),
-                  child: Row(
-                    children: [
-                      Icon(Icons.circle, size: 10, color: s.color),
-                      const SizedBox(width: 8),
-                      Text(s.label),
-                    ],
-                  ),
-                ),
-              ),
-          const PopupMenuDivider(),
-          const PopupMenuItem(
-            value: _TileAction.edit_,
-            child: Row(children: [
-              Icon(Icons.edit_outlined, size: 16),
-              SizedBox(width: 8),
-              Text('Edit'),
-            ]),
-          ),
-          const PopupMenuItem(
-            value: _TileAction.delete_,
-            child: Row(children: [
-              Icon(Icons.delete_outline, size: 16, color: Color(0xFFFF453A)),
-              SizedBox(width: 8),
-              Text('Delete', style: TextStyle(color: Color(0xFFFF453A))),
-            ]),
-          ),
-        ],
+        onOpened: onFocus,
+        onSelected: _handleAction,
+        itemBuilder: (_) => _menuItems(status),
       ),
     );
   }
+
+  /// Dispatches a chosen menu action to the right callback (shared by the ⋮
+  /// button and the right-click context menu).
+  void _handleAction(_TileAction a) {
+    switch (a.kind) {
+      case _ActionKind.setStatus:
+        onSetStatus(a.status!);
+      case _ActionKind.build:
+        onBuild();
+      case _ActionKind.advice:
+        onAdvice();
+      case _ActionKind.architect:
+        onArchitect();
+      case _ActionKind.edit:
+        onEdit();
+      case _ActionKind.delete:
+        onDelete();
+    }
+  }
+
+  /// Shows the actions menu at [position] (right-click), reusing the same items.
+  Future<void> _showContextMenu(
+      BuildContext context, FeatureStatus status, Offset position) async {
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox;
+    final choice = await showMenu<_TileAction>(
+      context: context,
+      position: RelativeRect.fromRect(
+        position & const Size(40, 40),
+        Offset.zero & overlay.size,
+      ),
+      items: _menuItems(status),
+    );
+    if (choice != null) _handleAction(choice);
+  }
+
+  /// The actions menu items — one source of truth for the ⋮ button and
+  /// right-click.
+  List<PopupMenuEntry<_TileAction>> _menuItems(FeatureStatus status) => [
+        // Available on any non-archived feature — including shipped ones, so
+        // a finished feature can be re-opened and edited/extended.
+        if (status != FeatureStatus.archived) ...[
+          PopupMenuItem(
+            value: _TileAction.build_,
+            child: Row(children: [
+              const Icon(Icons.auto_awesome, size: 16, color: Color(0xFFE8A04C)),
+              const SizedBox(width: 8),
+              Text(status == FeatureStatus.shipped
+                  ? 'Re-build / edit with AI'
+                  : 'Build with AI'),
+            ]),
+          ),
+          const PopupMenuItem(
+            value: _TileAction.advice_,
+            child: Row(children: [
+              Icon(Icons.tips_and_updates_outlined,
+                  size: 16, color: Color(0xFF64B5F6)),
+              SizedBox(width: 8),
+              Text('How to build this'),
+            ]),
+          ),
+          const PopupMenuItem(
+            value: _TileAction.architect_,
+            child: Row(children: [
+              Icon(Icons.account_tree_outlined,
+                  size: 16, color: Color(0xFFBA68C8)),
+              SizedBox(width: 8),
+              Text('Architect (break into sub-features)'),
+            ]),
+          ),
+          const PopupMenuDivider(),
+        ],
+        const PopupMenuItem(
+          enabled: false,
+          height: 28,
+          child: Text('Move to',
+              style: TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+        ),
+        ...FeatureStatus.board.where((s) => s != status).map(
+              (s) => PopupMenuItem(
+                value: _TileAction.move(s),
+                child: Row(
+                  children: [
+                    Icon(Icons.circle, size: 10, color: s.color),
+                    const SizedBox(width: 8),
+                    Text(s.label),
+                  ],
+                ),
+              ),
+            ),
+        const PopupMenuDivider(),
+        const PopupMenuItem(
+          value: _TileAction.edit_,
+          child: Row(children: [
+            Icon(Icons.edit_outlined, size: 16),
+            SizedBox(width: 8),
+            Text('Edit'),
+          ]),
+        ),
+        const PopupMenuItem(
+          value: _TileAction.delete_,
+          child: Row(children: [
+            Icon(Icons.delete_outline, size: 16, color: Color(0xFFFF453A)),
+            SizedBox(width: 8),
+            Text('Delete', style: TextStyle(color: Color(0xFFFF453A))),
+          ]),
+        ),
+      ];
 
   Widget? _subtitle() {
     final bits = <String>[];

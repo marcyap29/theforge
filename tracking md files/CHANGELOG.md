@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.42 — 2026-09-18
+
+- **Right-click a feature for its actions, and see which feature is focused.** Two feature-board quality-of-life wins: (1) **right-clicking** anywhere on a feature row now opens the same actions menu as the ⋮ button (one shared menu, so they never drift apart). (2) The row you're working with is **highlighted** — a blue tint + left accent bar — set when you **click** it, **right-click** it, or open its **⋮** menu, so you always know which feature is in focus. Single-click now focuses any row (features with a live AI build still re-open their build window on click).
+
+---
+
 ## v0.4.41 — 2026-09-17
 
 - **Splash screen lingers a beat longer.** The launch screen was gated by its animation at ~1.15s and flew by. Raised the minimum hold to 2.5s (safety cap 4s→6s) so the intro animation and branding are actually visible before the app routes on. Still data-driven — a slow boot extends it, a fast one now settles at ~2.5s.
