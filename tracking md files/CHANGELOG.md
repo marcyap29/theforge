@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.46 — 2026-09-18
+
+- **Accepting a conflict resolution now actually records the decision.** When the interview surfaces a contradiction between two answers, it already proposes a fix and shows an "Accept: …" button — but accepting used to just *dismiss the warning*, so the spec never learned which way you chose. Now accepting feeds the decision back into the interview as a turn ("Let's resolve the tension between X and Y this way: …"), so the LLM reconciles its extracted state and the generated spec reflects the resolution. The prompts also tell the model to treat an accepted pair as reconciled and stop re-surfacing it. `InterviewNotifier.resolveConflict`.
+
+---
+
 ## v0.4.45 — 2026-09-18
 
 - **Interview stops rushing past thin answers (hybrid layer gate).** Building on the new confidence read: a funnel layer no longer advances the moment its fields are merely *filled* — it also has to clear the LLM's quality bar. If the LLM marked a layer's dimension **partial** (present but vague), advancement is **held** so the interview keeps probing that spot instead of moving on. The deterministic field check stays the floor, so this can only make advancement *stricter*, never premature — and layers with no directly-mapped dimension (L2's decomposition work) still rely on the field gate. `_layerAnswersSolid` + `_layerConfidenceDims`.

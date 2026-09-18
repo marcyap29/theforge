@@ -442,7 +442,9 @@ turn, even when nothing changed. Emit the FULL extracted map each turn:
 \`\`\`
 
 Set \`layerComplete: true\` only when the current layer\'s exit condition is
-met. Set \`conflicts: []\` unless you detected an actual contradiction.
+met. Set \`conflicts: []\` unless you detected an actual contradiction. When the
+user ACCEPTS a resolution you proposed, treat that pair as reconciled: update the
+extracted map to reflect the chosen path and do NOT re-emit that conflict.
 
 \`confidence\` is your quality read per dimension id — "resolved" when the
 answer is clear and specific enough to build from, "partial" when it exists but
@@ -617,7 +619,9 @@ After EVERY response, append a fenced forge-state block. MANDATORY every turn:
 }
 \`\`\`
 
-Set layerComplete: true only when the current layer exit condition is met.
+Set layerComplete: true only when the current layer exit condition is met. When
+the user ACCEPTS a resolution you proposed, treat that pair as reconciled and do
+NOT re-emit that conflict.
 \`confidence\` is your per-dimension quality read: "resolved" (clear enough to
 build from), "partial" (present but vague/thin), "unknown" (unanswered). Judge
 answer QUALITY, not just presence. Include only dimensions you have a read on.''';
@@ -1277,9 +1281,23 @@ class InterviewNotifier
     );
   }
 
-  void resolveConflict(String conflictId) {
+  /// Accepts the LLM's recommended resolution for a conflict. Drops it from the
+  /// open list AND feeds the decision back into the interview as a user turn, so
+  /// the LLM reconciles the extracted state and the spec records which way we
+  /// went — instead of the old behavior, which just silently dismissed the flag.
+  Future<void> resolveConflict(String conflictId) async {
     final current = state.valueOrNull;
-    if (current == null) return;
+    if (current == null || current.isLoading) return;
+
+    ConflictItem? conflict;
+    for (final c in current.openConflicts) {
+      if (c.id == conflictId) {
+        conflict = c;
+        break;
+      }
+    }
+
+    // Remove it first so the next LLM turn doesn't carry it forward.
     final updated = current.openConflicts
         .where((c) => c.id != conflictId)
         .toList(growable: false);
@@ -1291,6 +1309,14 @@ class InterviewNotifier
         specGenEnabled: allResolved && updated.isEmpty,
       ),
     );
+
+    // Record the decision so the model updates its extracted state + the spec.
+    if (conflict != null && conflict.recommendation.trim().isNotEmpty) {
+      await addUserMessage(
+        "Let's resolve the tension between ${conflict.dimensionALabel} and "
+        '${conflict.dimensionBLabel} this way: ${conflict.recommendation}',
+      );
+    }
   }
 
   Future<void> rewindToLayer(String layer) async {
