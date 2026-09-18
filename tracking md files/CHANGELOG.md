@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.41 — 2026-09-17
+
+- **Splash screen lingers a beat longer.** The launch screen was gated by its animation at ~1.15s and flew by. Raised the minimum hold to 2.5s (safety cap 4s→6s) so the intro animation and branding are actually visible before the app routes on. Still data-driven — a slow boot extends it, a fast one now settles at ~2.5s.
+
+---
+
 ## v0.4.40 — 2026-09-17
 
 - **The Forge now architects epics instead of stubbing them (Detect → Decompose → Gate).** The root problem behind AR Mechanic's fake "Local AI Image Recognition v1": Build-with-AI is a single-feature code executor, so a giant feature (ML runtime + dataset + model + inference) got stubbed and marked done. Now features carry a **build classification** — `standard` (AI can code-generate it), `epic` (must be decomposed), or `manual` (human/ML/data/design/external work) — shown as a tag on the board.

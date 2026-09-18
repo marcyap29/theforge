@@ -26,8 +26,8 @@ class LaunchScreen extends ConsumerStatefulWidget {
 
 class _LaunchScreenState extends ConsumerState<LaunchScreen>
     with SingleTickerProviderStateMixin {
-  static const _minHold = Duration(milliseconds: 600);
-  static const _cap = Duration(seconds: 4);
+  static const _minHold = Duration(milliseconds: 2500);
+  static const _cap = Duration(seconds: 6);
 
   late final AnimationController _anim = AnimationController(
     vsync: this,
