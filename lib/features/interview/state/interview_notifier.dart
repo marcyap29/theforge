@@ -693,6 +693,34 @@ bool _layerGateMet(String layer, Map<String, dynamic> extracted) {
   }
 }
 
+/// The confidence dimensions a layer is responsible for resolving (L2's
+/// decomposition work maps to no single dimension, so it defers to the gate).
+List<String> _layerConfidenceDims(String layer) => switch (layer) {
+      'L1' => const ['corePurpose', 'primaryUser'],
+      'L3' => const ['scopeBoundary'],
+      'L4' => const [
+          'platform',
+          'identityModel',
+          'inputModel',
+          'outputModel',
+          'externalServices'
+        ],
+      _ => const [],
+    };
+
+/// Whether this layer's answers are solid enough (per the LLM's confidence read)
+/// to advance. A dimension the LLM marked `partial`/`unknown` holds advancement;
+/// anything not tracked is treated as solid so the interview can't get stuck.
+bool _layerAnswersSolid(String layer, Map<String, DimensionState> confidence) {
+  for (final dim in _layerConfidenceDims(layer)) {
+    final st = confidence[dim];
+    if (st == DimensionState.partial || st == DimensionState.unknown) {
+      return false;
+    }
+  }
+  return true;
+}
+
 String _nextLayer(String current) {
   switch (current) {
     case 'L1':
@@ -1175,17 +1203,22 @@ class InterviewNotifier
       }
     }
 
-    // Flutter side is authoritative for layer advancement — do not require
-    // layerComplete from the LLM (models copy the false-example literally).
-    String newLayer = withUser.currentLayer;
-    if (_layerGateMet(withUser.currentLayer, mergedExtracted)) {
-      newLayer = _nextLayer(withUser.currentLayer);
-    }
-
     final confidenceUpdates =
         _confidenceFromExtracted(mergedExtracted, parse.confidence);
     final newMap = Map<String, DimensionState>.from(withUser.confidenceMap);
     newMap.addAll(confidenceUpdates);
+
+    // Flutter side is authoritative for layer advancement — do not require
+    // layerComplete from the LLM (models copy the false-example literally).
+    // Hybrid gate: the deterministic field check is the FLOOR, but we also hold
+    // advancement when the LLM judged this layer's answers thin (partial), so a
+    // technically-filled-but-weak layer keeps getting probed instead of rushing
+    // ahead. This can only make advancement STRICTER — never premature.
+    String newLayer = withUser.currentLayer;
+    if (_layerGateMet(withUser.currentLayer, mergedExtracted) &&
+        _layerAnswersSolid(withUser.currentLayer, newMap)) {
+      newLayer = _nextLayer(withUser.currentLayer);
+    }
 
     final newConflicts = [...withUser.openConflicts, ...parse.conflicts];
 

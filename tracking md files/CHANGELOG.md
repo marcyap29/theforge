@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.45 — 2026-09-18
+
+- **Interview stops rushing past thin answers (hybrid layer gate).** Building on the new confidence read: a funnel layer no longer advances the moment its fields are merely *filled* — it also has to clear the LLM's quality bar. If the LLM marked a layer's dimension **partial** (present but vague), advancement is **held** so the interview keeps probing that spot instead of moving on. The deterministic field check stays the floor, so this can only make advancement *stricter*, never premature — and layers with no directly-mapped dimension (L2's decomposition work) still rely on the field gate. `_layerAnswersSolid` + `_layerConfidenceDims`.
+
+---
+
 ## v0.4.44 — 2026-09-18
 
 - **The interview's confidence meter now reflects answer *quality*, not just presence.** Previously a dimension flipped to "resolved" the instant its field was non-null — a one-word vague answer looked as done as a crisp one, and the "partial" state was never used. Now the interview LLM emits a per-dimension **confidence read** (`resolved` / `partial` / `unknown`) in its `forge-state` block, judging how clear and buildable each answer actually is. The meter uses it — a present-but-thin answer shows **partial** (amber) instead of a false **resolved** (green). Presence stays the floor (a missing field can never show resolved), and if the model emits no read (older models / a parse failure) it falls back to the old presence behavior, so nothing regresses. Part of an ongoing pass to let the LLM own the judgment calls in the interview rather than crude heuristics. `parseForgeState` + `_confidenceFromExtracted`.
