@@ -20,9 +20,19 @@ typedef ForgeStateParse = ({
   String? layer,
   bool layerComplete,
   List<ConflictItem> conflicts,
+  Map<String, DimensionState> confidence,
   String visibleText,
   bool parseOk,
 });
+
+/// Parses a dimension confidence word emitted by the LLM. Null when absent or
+/// unrecognized (so we fall back to presence-based scoring).
+DimensionState? _dimStateFromWire(Object? v) => switch (v?.toString().trim()) {
+      'resolved' => DimensionState.resolved,
+      'partial' => DimensionState.partial,
+      'unknown' => DimensionState.unknown,
+      _ => null,
+    };
 
 StubLlmResult stubInterviewStep(InterviewState state, String userMessage) {
   final userTurnCount = state.turns.where((t) => t.isUser).length;
@@ -66,6 +76,7 @@ ForgeStateParse parseForgeState(String llmRaw) {
       layer: null,
       layerComplete: false,
       conflicts: const [],
+      confidence: const {},
       visibleText: llmRaw,
       parseOk: false,
     );
@@ -79,6 +90,7 @@ ForgeStateParse parseForgeState(String llmRaw) {
         layer: null,
         layerComplete: false,
         conflicts: const <ConflictItem>[],
+        confidence: const <String, DimensionState>{},
         visibleText: visibleText,
         parseOk: false,
       );
@@ -134,6 +146,15 @@ ForgeStateParse parseForgeState(String llmRaw) {
     final layer = parsed['layer'] as String?;
     final layerComplete = parsed['layerComplete'] as bool? ?? false;
 
+    // Optional per-dimension confidence read from the LLM (quality of the
+    // answer, not just presence). Absent/old models → empty → presence scoring.
+    final confidenceRaw = parsed['confidence'] as Map<String, dynamic>? ?? {};
+    final confidence = <String, DimensionState>{};
+    for (final e in confidenceRaw.entries) {
+      final st = _dimStateFromWire(e.value);
+      if (st != null) confidence[e.key] = st;
+    }
+
     final conflictsRaw = parsed['conflicts'] as List<dynamic>? ?? [];
     final conflicts = conflictsRaw.map((c) {
       final cm = c as Map<String, dynamic>;
@@ -155,6 +176,7 @@ ForgeStateParse parseForgeState(String llmRaw) {
       layer: layer,
       layerComplete: layerComplete,
       conflicts: conflicts,
+      confidence: confidence,
       visibleText: visibleText,
       parseOk: true,
     );
@@ -414,12 +436,20 @@ turn, even when nothing changed. Emit the FULL extracted map each turn:
   "layer": "${state.currentLayer}",
   "layerComplete": false,
   "extracted": { ... full map ... },
+  "confidence": { "corePurpose": "resolved", "primaryUser": "partial" },
   "conflicts": []
 }
 \`\`\`
 
 Set \`layerComplete: true\` only when the current layer\'s exit condition is
-met. Set \`conflicts: []\` unless you detected an actual contradiction.''';
+met. Set \`conflicts: []\` unless you detected an actual contradiction.
+
+\`confidence\` is your quality read per dimension id — "resolved" when the
+answer is clear and specific enough to build from, "partial" when it exists but
+is vague/thin/assumed, "unknown" when unanswered. Judge the ANSWER QUALITY, not
+just whether a field is filled. Dimension ids: corePurpose, primaryUser,
+identityModel, inputModel, outputModel, platform, scopeBoundary,
+externalServices. Only include dimensions you have a read on; omit the rest.''';
 }
 
 String? _extractGoalStatement(String? featureContext) {
@@ -582,11 +612,15 @@ After EVERY response, append a fenced forge-state block. MANDATORY every turn:
   "layer": "${state.currentLayer}",
   "layerComplete": false,
   "extracted": { ... full map ... },
+  "confidence": { "corePurpose": "resolved", "primaryUser": "partial" },
   "conflicts": []
 }
 \`\`\`
 
-Set layerComplete: true only when the current layer exit condition is met.''';
+Set layerComplete: true only when the current layer exit condition is met.
+\`confidence\` is your per-dimension quality read: "resolved" (clear enough to
+build from), "partial" (present but vague/thin), "unknown" (unanswered). Judge
+answer QUALITY, not just presence. Include only dimensions you have a read on.''';
 }
 
 String _buildUserContextBlock(InterviewState state) {
@@ -672,31 +706,38 @@ String _nextLayer(String current) {
   }
 }
 
+/// Derives dimension confidence. Presence of the extracted field is the FLOOR
+/// (a missing field never shows resolved); among PRESENT fields, the LLM's
+/// per-dimension quality read [llmConfidence] decides resolved vs partial — so
+/// a vague-but-non-null answer surfaces as "partial" instead of a false
+/// "resolved". When the LLM emits no read (old models / parse failure), a
+/// present field defaults to resolved, preserving the prior behavior.
 Map<String, DimensionState> _confidenceFromExtracted(
-    Map<String, dynamic> extracted) {
+  Map<String, dynamic> extracted, [
+  Map<String, DimensionState> llmConfidence = const {},
+]) {
   final updates = <String, DimensionState>{};
-  if (extracted['outcome'] != null) {
-    updates['corePurpose'] = DimensionState.resolved;
+
+  // A present field is `resolved`, unless the LLM judged the answer thin — then
+  // `partial`. It can't drop to `unknown`: the data IS there, just weak.
+  void mark(String dim) {
+    final llm = llmConfidence[dim];
+    updates[dim] = (llm == DimensionState.partial || llm == DimensionState.unknown)
+        ? DimensionState.partial
+        : DimensionState.resolved;
   }
-  if (extracted['primaryUser'] != null) {
-    updates['primaryUser'] = DimensionState.resolved;
-  }
-  if (extracted['identityModel'] != null) {
-    updates['identityModel'] = DimensionState.resolved;
-  }
-  if (extracted['inputModel'] != null) {
-    updates['inputModel'] = DimensionState.resolved;
-  }
-  if (extracted['outputModel'] != null) {
-    updates['outputModel'] = DimensionState.resolved;
-  }
-  if (extracted['platform'] != null) {
-    updates['platform'] = DimensionState.resolved;
-  }
+
+  if (extracted['outcome'] != null) mark('corePurpose');
+  if (extracted['primaryUser'] != null) mark('primaryUser');
+  if (extracted['identityModel'] != null) mark('identityModel');
+  if (extracted['inputModel'] != null) mark('inputModel');
+  if (extracted['outputModel'] != null) mark('outputModel');
+  if (extracted['platform'] != null) mark('platform');
+
   final v2Seeds = extracted['v2Seeds'] as List;
   final demoScript = extracted['demoScript'] as List;
   if (v2Seeds.isNotEmpty && demoScript.isNotEmpty) {
-    updates['scopeBoundary'] = DimensionState.resolved;
+    mark('scopeBoundary');
   }
   // externalServices resolves when the other L4 fields are present.
   // Checking the list type is unreliable — LLMs often emit "None" (string)
@@ -707,7 +748,7 @@ Map<String, DimensionState> _confidenceFromExtracted(
       extracted['identityModel'] != null &&
       extracted['inputModel'] != null &&
       extracted['outputModel'] != null) {
-    updates['externalServices'] = DimensionState.resolved;
+    mark('externalServices');
   }
   return updates;
 }
@@ -1141,7 +1182,8 @@ class InterviewNotifier
       newLayer = _nextLayer(withUser.currentLayer);
     }
 
-    final confidenceUpdates = _confidenceFromExtracted(mergedExtracted);
+    final confidenceUpdates =
+        _confidenceFromExtracted(mergedExtracted, parse.confidence);
     final newMap = Map<String, DimensionState>.from(withUser.confidenceMap);
     newMap.addAll(confidenceUpdates);
 

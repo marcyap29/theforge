@@ -298,10 +298,13 @@ The 8 original confidence dimensions survive as **spec invariants** — they mus
     "externalServices": []
   },
   "layerComplete": false,
+  "confidence": { "corePurpose": "resolved", "primaryUser": "partial" },
   "conflicts": []
 }
 ```
 ```
+
+**Confidence (v0.4.44):** the LLM now emits an optional `confidence` object — a per-dimension quality read (`resolved`/`partial`/`unknown`) judging how clear/buildable each answer is, not just whether the field is filled. `_confidenceFromExtracted(extracted, [llmConfidence])` uses presence as the floor (a missing field is never resolved) and, among present fields, downgrades to `partial` when the LLM judged the answer thin. Absent/unparseable `confidence` → falls back to presence-only scoring (no regression). This is the first step of migrating the interview's hardcoded heuristics to LLM judgment; layer gates remain deterministic on purpose (the LLM's `layerComplete` is still not trusted — see invariants).
 
 **Key invariants:**
 - Flutter is authoritative for layer advancement — never trust LLM alone

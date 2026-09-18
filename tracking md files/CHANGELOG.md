@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.44 — 2026-09-18
+
+- **The interview's confidence meter now reflects answer *quality*, not just presence.** Previously a dimension flipped to "resolved" the instant its field was non-null — a one-word vague answer looked as done as a crisp one, and the "partial" state was never used. Now the interview LLM emits a per-dimension **confidence read** (`resolved` / `partial` / `unknown`) in its `forge-state` block, judging how clear and buildable each answer actually is. The meter uses it — a present-but-thin answer shows **partial** (amber) instead of a false **resolved** (green). Presence stays the floor (a missing field can never show resolved), and if the model emits no read (older models / a parse failure) it falls back to the old presence behavior, so nothing regresses. Part of an ongoing pass to let the LLM own the judgment calls in the interview rather than crude heuristics. `parseForgeState` + `_confidenceFromExtracted`.
+
+---
+
 ## v0.4.43 — 2026-09-18
 
 - **Feature-board toolbar decluttered from 10 icons to 2 + two labeled menus.** The board had grown into a wall of mystery icons. Grouped by intent: everything the AI does to read/organize your project now lives under a single **✨ AI tools ▾** menu (What this app can do · Scan repo & documents · Recommend features · Plan build order · Remove duplicates · Run check-in), and less-frequent project actions under **⋯ More ▾** (Releases · Review cadence). Only the two everyday actions stay as direct buttons — **▶️ Run & preview** and **➕ Add feature**. Nothing was removed; it's organized with text labels so it's far less overwhelming and each action is clearer than a bare icon.
