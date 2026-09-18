@@ -142,51 +142,30 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
                   .setStatus(s),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.fact_check_outlined),
-            tooltip: 'Run check-in',
-            onPressed: _runCheckin,
-          ),
-          IconButton(
-            icon: const Icon(Icons.auto_awesome_outlined),
-            tooltip: 'What this app can do (analyze current repo)',
-            onPressed: _openCapabilitySummary,
-          ),
-          IconButton(
-            icon: const Icon(Icons.radar),
-            tooltip: 'Scan Repo and Documents',
-            onPressed: _scanRepo,
-          ),
-          IconButton(
-            icon: const Icon(Icons.lightbulb_outline),
-            tooltip: 'Recommend new features',
-            onPressed: _recommendFeatures,
-          ),
-          IconButton(
-            icon: const Icon(Icons.route_outlined),
-            tooltip: 'Plan build order',
-            onPressed: _planBuildOrder,
-          ),
-          IconButton(
-            icon: const Icon(Icons.cleaning_services_outlined),
-            tooltip: 'Remove duplicate features',
-            onPressed: _removeDuplicates,
-          ),
+          // AI-driven analysis actions, grouped so the board isn't a wall of
+          // mystery icons. Everything the AI does to read/organize the project.
+          _barMenu(Icons.auto_awesome_outlined, 'AI tools', [
+            _menuEntry(Icons.auto_awesome_outlined, 'What this app can do',
+                _openCapabilitySummary),
+            _menuEntry(Icons.radar, 'Scan repo & documents', _scanRepo),
+            _menuEntry(
+                Icons.lightbulb_outline, 'Recommend features', _recommendFeatures),
+            _menuEntry(Icons.route_outlined, 'Plan build order', _planBuildOrder),
+            _menuEntry(Icons.cleaning_services_outlined, 'Remove duplicates',
+                _removeDuplicates),
+            const PopupMenuDivider(),
+            _menuEntry(Icons.fact_check_outlined, 'Run check-in', _runCheckin),
+          ]),
           IconButton(
             icon: const Icon(Icons.play_circle_outline),
             tooltip: 'Run & preview',
             onPressed: _openRunPreview,
           ),
-          IconButton(
-            icon: const Icon(Icons.rocket_launch_outlined),
-            tooltip: 'Releases',
-            onPressed: _openReleases,
-          ),
-          IconButton(
-            icon: const Icon(Icons.schedule),
-            tooltip: 'Review cadence',
-            onPressed: () => _editCadence(trackingAsync.valueOrNull),
-          ),
+          _barMenu(Icons.more_horiz, 'More', [
+            _menuEntry(Icons.rocket_launch_outlined, 'Releases', _openReleases),
+            _menuEntry(Icons.schedule, 'Review cadence',
+                () => _editCadence(trackingAsync.valueOrNull)),
+          ]),
           IconButton(
             icon: const Icon(Icons.add),
             tooltip: 'Add feature',
@@ -243,6 +222,47 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
 
   bool get _showStalenessBanner =>
       !_bannerDismissed && (_staleness?.stale ?? false);
+
+  /// A labeled dropdown in the app bar (e.g. "AI tools ▾"), grouping related
+  /// actions so the toolbar reads as a few clear choices, not a wall of icons.
+  Widget _barMenu(
+      IconData icon, String label, List<PopupMenuEntry<VoidCallback>> items) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 3),
+      child: PopupMenuButton<VoidCallback>(
+        tooltip: label,
+        onSelected: (fn) => fn(),
+        itemBuilder: (_) => items,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E1E22),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(icon, size: 16, color: const Color(0xFFCFCFD2)),
+            const SizedBox(width: 6),
+            Text(label,
+                style: const TextStyle(
+                    fontSize: 12.5, color: Color(0xFFCFCFD2))),
+            const Icon(Icons.arrow_drop_down, size: 18, color: Color(0xFF8A8A8E)),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  /// One entry in a [_barMenu]: an icon + label whose value is the action to run.
+  PopupMenuEntry<VoidCallback> _menuEntry(
+          IconData icon, String label, VoidCallback onTap) =>
+      PopupMenuItem<VoidCallback>(
+        value: onTap,
+        child: Row(children: [
+          Icon(icon, size: 16, color: const Color(0xFF9CA3AF)),
+          const SizedBox(width: 10),
+          Text(label),
+        ]),
+      );
 
   List<Widget> _group(FeatureStatus status, List<Feature> items) {
     if (items.isEmpty) return const [];

@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.43 — 2026-09-18
+
+- **Feature-board toolbar decluttered from 10 icons to 2 + two labeled menus.** The board had grown into a wall of mystery icons. Grouped by intent: everything the AI does to read/organize your project now lives under a single **✨ AI tools ▾** menu (What this app can do · Scan repo & documents · Recommend features · Plan build order · Remove duplicates · Run check-in), and less-frequent project actions under **⋯ More ▾** (Releases · Review cadence). Only the two everyday actions stay as direct buttons — **▶️ Run & preview** and **➕ Add feature**. Nothing was removed; it's organized with text labels so it's far less overwhelming and each action is clearer than a bare icon.
+
+---
+
 ## v0.4.42 — 2026-09-18
 
 - **Right-click a feature for its actions, and see which feature is focused.** Two feature-board quality-of-life wins: (1) **right-clicking** anywhere on a feature row now opens the same actions menu as the ⋮ button (one shared menu, so they never drift apart). (2) The row you're working with is **highlighted** — a blue tint + left accent bar — set when you **click** it, **right-click** it, or open its **⋮** menu, so you always know which feature is in focus. Single-click now focuses any row (features with a live AI build still re-open their build window on click).
