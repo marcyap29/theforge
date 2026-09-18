@@ -19,6 +19,7 @@ Feature feat(
       status: status.wire,
       targetVersion: version,
       source: 'manual',
+      buildKind: 'standard',
       createdAt: 0,
       updatedAt: 0,
     );

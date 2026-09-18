@@ -43,6 +43,8 @@ class FeatureListNotifier extends FamilyAsyncNotifier<List<Feature>, String> {
     int? priority,
     String? targetVersion,
     String source = 'manual',
+    BuildKind buildKind = BuildKind.standard,
+    String? parentId,
   }) async {
     final repo = ref.read(trackerRepositoryProvider);
     final path = await _projectPath();
@@ -56,6 +58,8 @@ class FeatureListNotifier extends FamilyAsyncNotifier<List<Feature>, String> {
       priority: priority,
       targetVersion: targetVersion,
       source: source,
+      buildKind: buildKind.wire,
+      parentId: parentId,
       createdAt: now,
       updatedAt: now,
     );
@@ -70,6 +74,7 @@ class FeatureListNotifier extends FamilyAsyncNotifier<List<Feature>, String> {
     FeatureStatus? status,
     int? priority,
     String? targetVersion,
+    BuildKind? buildKind,
   }) async {
     final repo = ref.read(trackerRepositoryProvider);
     final path = await _projectPath();
@@ -79,6 +84,7 @@ class FeatureListNotifier extends FamilyAsyncNotifier<List<Feature>, String> {
       status: status?.wire ?? feature.status,
       priority: Value(priority ?? feature.priority),
       targetVersion: Value(targetVersion ?? feature.targetVersion),
+      buildKind: buildKind?.wire ?? feature.buildKind,
       updatedAt: DateTime.now().millisecondsSinceEpoch,
     );
     await repo.saveFeature(updated, projectPath: path);

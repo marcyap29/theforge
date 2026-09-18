@@ -143,6 +143,8 @@ class TrackerRepository {
                 'priority': f.priority,
                 'targetVersion': f.targetVersion,
                 'source': f.source,
+                'buildKind': f.buildKind,
+                'parentId': f.parentId,
                 'createdAt': f.createdAt,
                 'updatedAt': f.updatedAt,
               })
@@ -175,6 +177,8 @@ FeaturesCompanion newFeatureCompanion({
   int? priority,
   String? targetVersion,
   String source = 'manual',
+  String buildKind = 'standard',
+  String? parentId,
 }) {
   final now = DateTime.now().millisecondsSinceEpoch;
   return FeaturesCompanion(
@@ -186,6 +190,8 @@ FeaturesCompanion newFeatureCompanion({
     priority: Value(priority),
     targetVersion: Value(targetVersion),
     source: Value(source),
+    buildKind: Value(buildKind),
+    parentId: Value(parentId),
     createdAt: Value(now),
     updatedAt: Value(now),
   );

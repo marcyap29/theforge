@@ -44,6 +44,36 @@ class ProposedFeature {
   bool selected;
 }
 
+/// One sub-feature produced by decomposing an epic, with its build type so the
+/// board can tag code-gen work vs human/ML/data work.
+class ArchitectSubFeature {
+  ArchitectSubFeature({
+    required this.title,
+    this.description,
+    required this.buildKind,
+    required this.reason,
+    this.selected = true,
+  });
+  final String title;
+  final String? description;
+  final BuildKind buildKind;
+  final String reason;
+  bool selected;
+}
+
+/// The result of architecting a feature: whether it's really an epic, why, and
+/// the ordered sub-features it should be broken into.
+class ArchitectPlan {
+  ArchitectPlan({
+    required this.isEpic,
+    required this.rationale,
+    required this.subFeatures,
+  });
+  final bool isEpic;
+  final String rationale;
+  final List<ArchitectSubFeature> subFeatures;
+}
+
 class FeatureScanException implements Exception {
   FeatureScanException(this.message, {this.raw});
   final String message;
@@ -174,6 +204,111 @@ class FeatureScanner {
           raw: md);
     }
     return out;
+  }
+
+  /// Decomposes a feature into properly-sized, typed sub-features. Returns
+  /// whether it's really an epic, a rationale, and the ordered sub-features
+  /// (each tagged standard/manual). Grounded in the repo + docs; JSON output.
+  Future<ArchitectPlan> architectFeature({
+    required String projectPath,
+    String? repoPath,
+    required Feature feature,
+    List<Feature> allFeatures = const [],
+  }) async {
+    final docs = await _readProjectDocs(projectPath);
+    String? readme;
+    String? code;
+    List<String> fileList = const [];
+    if (repoPath != null && Directory(repoPath).existsSync()) {
+      readme = await _readReadme(repoPath);
+      fileList = await _listFiles(repoPath);
+      code = await _readKeyCode(repoPath);
+    }
+    final user = _architectUserPrompt(
+        projectPath, feature, allFeatures, docs, readme, code, fileList, repoPath);
+    return _parseWithRetry(
+        _architectSystemPrompt, user, 0.3, 2500, _parseArchitect);
+  }
+
+  ArchitectPlan _parseArchitect(String raw) {
+    dynamic decoded;
+    try {
+      decoded = jsonDecode(_extractJsonObject(raw));
+    } catch (_) {
+      throw FeatureScanException('Could not parse the decomposition as JSON.');
+    }
+    if (decoded is! Map) {
+      throw FeatureScanException('The decomposition was not a JSON object.');
+    }
+    final subsRaw = decoded['subFeatures'];
+    final subs = <ArchitectSubFeature>[];
+    if (subsRaw is List) {
+      for (final s in subsRaw) {
+        if (s is! Map) continue;
+        final title = (s['title'] ?? '').toString().trim();
+        if (title.isEmpty) continue;
+        final desc = (s['description'] ?? '').toString().trim();
+        subs.add(ArchitectSubFeature(
+          title: title,
+          description: desc.isEmpty ? null : desc,
+          buildKind: BuildKind.fromWire((s['buildKind'] ?? '').toString().trim()),
+          reason: (s['reason'] ?? '').toString().trim(),
+        ));
+      }
+    }
+    if (subs.isEmpty) {
+      throw FeatureScanException('The decomposition had no sub-features.');
+    }
+    return ArchitectPlan(
+      isEpic: decoded['isEpic'] == true,
+      rationale: (decoded['rationale'] ?? '').toString().trim(),
+      subFeatures: subs,
+    );
+  }
+
+  String _architectUserPrompt(
+      String projectPath,
+      Feature feature,
+      List<Feature> allFeatures,
+      String? docs,
+      String? readme,
+      String? code,
+      List<String> files,
+      String? repoPath) {
+    final buffer = StringBuffer();
+    buffer.writeln('# Project: ${p.basename(projectPath)}');
+    buffer.writeln();
+    buffer.writeln('## Feature to architect');
+    buffer.writeln('Title: ${feature.title}');
+    if ((feature.description ?? '').trim().isNotEmpty) {
+      buffer.writeln('Current description: ${feature.description!.trim()}');
+    }
+    buffer.writeln();
+    final others = allFeatures.where((f) => f.id != feature.id).toList();
+    if (others.isNotEmpty) {
+      buffer.writeln('## Already-tracked features (avoid duplicating these)');
+      for (final f in others) {
+        buffer.writeln('- ${f.title} (${f.status})');
+      }
+      buffer.writeln();
+    }
+    if (docs != null) {
+      buffer..writeln('## Project documents')..writeln(docs)..writeln();
+    }
+    if (repoPath != null && (readme != null || files.isNotEmpty)) {
+      buffer.writeln('## Linked codebase: ${p.basename(repoPath)}');
+      if (readme != null) buffer..writeln('### README')..writeln(readme);
+      if (code != null) {
+        buffer..writeln('### Source code (key files)')..writeln(code);
+      }
+      if (files.isNotEmpty) {
+        buffer.writeln('### File tree');
+        for (final f in files.take(200)) {
+          buffer.writeln('- $f');
+        }
+      }
+    }
+    return buffer.toString();
   }
 
   String _adviseUserPrompt(
@@ -464,6 +599,38 @@ class FeatureScanner {
 
   List<String> _cap(List<String> list) =>
       list.length > 400 ? list.sublist(0, 400) : list;
+
+  static const _architectSystemPrompt = '''
+You are a senior software architect breaking a tracked "feature" into properly
+sized, buildable sub-features for a solo builder whose main tool is an in-app AI
+CODE GENERATOR ("Build with AI"). Judge honestly whether the feature is really an
+EPIC (a subsystem too big for one build) and split it accordingly.
+
+Tag every sub-feature with a buildKind:
+- "standard" — the AI code generator can implement it against this repo (UI,
+  state, wiring, plumbing, integrating a package).
+- "manual" — NOT a code-generation task: needs a human, a dataset, model
+  training, design assets, paid/external services, or account/keys. (e.g.
+  "Collect & label a dataset", "Train & export the model".)
+
+Rules:
+- Order sub-features by build sequence (dependencies first).
+- Prefer 2–6 sub-features. Each must be independently trackable and testable.
+- Do NOT duplicate features already tracked (listed in the prompt).
+- Be honest: if real accuracy needs an ML model + data, that MUST appear as one
+  or more "manual" sub-features — do not pretend a code generator can do it.
+
+Respond with ONLY this JSON (no prose, no code fences):
+{
+  "isEpic": true,
+  "rationale": "one or two sentences on why it's an epic (or not)",
+  "subFeatures": [
+    {"title": "...", "description": "...", "buildKind": "standard", "reason": "why / what it covers"},
+    {"title": "...", "description": "...", "buildKind": "manual", "reason": "..."}
+  ]
+}
+If it is genuinely a single buildable feature, set isEpic=false and return one
+sub-feature describing it.''';
 
   static const _adviseSystemPrompt = '''
 You are a pragmatic senior engineer advising a solo builder (non-expert) on HOW

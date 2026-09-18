@@ -69,6 +69,46 @@ enum FeatureStatus {
   ];
 }
 
+/// How a tracked item should be built — the axis that lets The Forge tell an
+/// AI-buildable feature apart from an epic that must be broken down, or work
+/// that isn't code generation at all (ML models, datasets, design, external
+/// services). Drives the pre-build gate so epics aren't silently stubbed.
+enum BuildKind {
+  /// A normal, code-generatable feature — Build-with-AI can implement it.
+  standard,
+
+  /// Too big for one build: a subsystem that must be decomposed into
+  /// sub-features first.
+  epic,
+
+  /// Not a code-generation task — needs a human, a dataset, model training,
+  /// design assets, or an external service.
+  manual;
+
+  String get wire => name;
+
+  static BuildKind fromWire(String? value) => switch (value) {
+        'epic' => BuildKind.epic,
+        'manual' => BuildKind.manual,
+        _ => BuildKind.standard,
+      };
+
+  String get label => switch (this) {
+        BuildKind.standard => 'Buildable',
+        BuildKind.epic => 'Epic',
+        BuildKind.manual => 'Manual',
+      };
+
+  Color get color => switch (this) {
+        BuildKind.standard => const Color(0xFF81C784),
+        BuildKind.epic => const Color(0xFFBA68C8),
+        BuildKind.manual => const Color(0xFFE8A04C),
+      };
+
+  /// Whether Build-with-AI should run directly on this item.
+  bool get isDirectlyBuildable => this == BuildKind.standard;
+}
+
 /// Overall status of a project in the portfolio.
 enum ProjectStatus {
   active,

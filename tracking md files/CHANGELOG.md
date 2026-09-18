@@ -2,6 +2,15 @@
 
 ---
 
+## v0.4.40 — 2026-09-17
+
+- **The Forge now architects epics instead of stubbing them (Detect → Decompose → Gate).** The root problem behind AR Mechanic's fake "Local AI Image Recognition v1": Build-with-AI is a single-feature code executor, so a giant feature (ML runtime + dataset + model + inference) got stubbed and marked done. Now features carry a **build classification** — `standard` (AI can code-generate it), `epic` (must be decomposed), or `manual` (human/ML/data/design/external work) — shown as a tag on the board.
+  - **Architect this feature** (feature ⋮ menu): the LLM decomposes an item into ordered, *typed* sub-features (e.g. recognition → *Inference pipeline* `standard`, *Collect & label dataset* `manual`, *Train & export model* `manual`), you review/deselect, and Apply creates them nested under the now-epic parent (`parentId`), tagged so manual work is never mistaken for code-gen.
+  - **Build gate:** hitting **Build with AI** on an epic or a manual item no longer silently stubs it — it steers you to *Architect it* / *How to build this* (with an explicit "Build anyway" override).
+  - Schema: drift v3→v4 adds `buildKind` + `parentId` (create-only migration; existing features default to `standard`). `FeatureScanner.architectFeature`, `BuildKind`, `showArchitectReviewSheet`.
+
+---
+
 ## v0.4.39 — 2026-09-17
 
 - **"How to build this" — scale-aware build advice per feature.** Each feature's ⋮ menu has a new **How to build this** action: the Architect LLM reads the current repo + docs and returns concrete guidance for that feature — **Scope** (is this really a single feature, or an *epic* that should be split?), **Feasibility** (Buildable now / Hybrid / Needs human effort — i.e. can Build-with-AI actually code-generate it, or does it need a human, a dataset, or model training?), **Recommended approach** with named packages/APIs, **Effort**, **Risks & gotchas**, a **Suggested breakdown** into sub-features, and a sharper **descriptor**. Point it at something like on-device "Local AI Image Recognition" and it correctly flags it as an epic needing an ML model + dataset (not a one-shot code-gen), rather than letting a deceptively short description hide the real lift. On-demand with Regenerate + Copy. `FeatureScanner.adviseBuild` + `BuildAdviceScreen`.

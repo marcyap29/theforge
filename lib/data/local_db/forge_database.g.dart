@@ -601,6 +601,29 @@ class $FeaturesTable extends Features with TableInfo<$FeaturesTable, Feature> {
     requiredDuringInsert: false,
     defaultValue: const Constant('manual'),
   );
+  static const VerificationMeta _buildKindMeta = const VerificationMeta(
+    'buildKind',
+  );
+  @override
+  late final GeneratedColumn<String> buildKind = GeneratedColumn<String>(
+    'build_kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('standard'),
+  );
+  static const VerificationMeta _parentIdMeta = const VerificationMeta(
+    'parentId',
+  );
+  @override
+  late final GeneratedColumn<String> parentId = GeneratedColumn<String>(
+    'parent_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -633,6 +656,8 @@ class $FeaturesTable extends Features with TableInfo<$FeaturesTable, Feature> {
     priority,
     targetVersion,
     source,
+    buildKind,
+    parentId,
     createdAt,
     updatedAt,
   ];
@@ -707,6 +732,18 @@ class $FeaturesTable extends Features with TableInfo<$FeaturesTable, Feature> {
         source.isAcceptableOrUnknown(data['source']!, _sourceMeta),
       );
     }
+    if (data.containsKey('build_kind')) {
+      context.handle(
+        _buildKindMeta,
+        buildKind.isAcceptableOrUnknown(data['build_kind']!, _buildKindMeta),
+      );
+    }
+    if (data.containsKey('parent_id')) {
+      context.handle(
+        _parentIdMeta,
+        parentId.isAcceptableOrUnknown(data['parent_id']!, _parentIdMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -764,6 +801,14 @@ class $FeaturesTable extends Features with TableInfo<$FeaturesTable, Feature> {
         DriftSqlType.string,
         data['${effectivePrefix}source'],
       )!,
+      buildKind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}build_kind'],
+      )!,
+      parentId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}parent_id'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}created_at'],
@@ -794,8 +839,16 @@ class Feature extends DataClass implements Insertable<Feature> {
   final int? priority;
   final String? targetVersion;
 
-  /// Where the feature came from: manual | scan | spec
+  /// Where the feature came from: manual | scan | spec | recommend | architect
   final String source;
+
+  /// Build classification (BuildKind): standard (code-gen buildable) | epic
+  /// (must be decomposed before building) | manual (human/ML/data/design/
+  /// external work — not something the AI can code-generate).
+  final String buildKind;
+
+  /// For sub-features produced by decomposing an epic: the parent feature's id.
+  final String? parentId;
   final int createdAt;
   final int updatedAt;
   const Feature({
@@ -807,6 +860,8 @@ class Feature extends DataClass implements Insertable<Feature> {
     this.priority,
     this.targetVersion,
     required this.source,
+    required this.buildKind,
+    this.parentId,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -827,6 +882,10 @@ class Feature extends DataClass implements Insertable<Feature> {
       map['target_version'] = Variable<String>(targetVersion);
     }
     map['source'] = Variable<String>(source);
+    map['build_kind'] = Variable<String>(buildKind);
+    if (!nullToAbsent || parentId != null) {
+      map['parent_id'] = Variable<String>(parentId);
+    }
     map['created_at'] = Variable<int>(createdAt);
     map['updated_at'] = Variable<int>(updatedAt);
     return map;
@@ -848,6 +907,10 @@ class Feature extends DataClass implements Insertable<Feature> {
           ? const Value.absent()
           : Value(targetVersion),
       source: Value(source),
+      buildKind: Value(buildKind),
+      parentId: parentId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentId),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -867,6 +930,8 @@ class Feature extends DataClass implements Insertable<Feature> {
       priority: serializer.fromJson<int?>(json['priority']),
       targetVersion: serializer.fromJson<String?>(json['targetVersion']),
       source: serializer.fromJson<String>(json['source']),
+      buildKind: serializer.fromJson<String>(json['buildKind']),
+      parentId: serializer.fromJson<String?>(json['parentId']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
     );
@@ -883,6 +948,8 @@ class Feature extends DataClass implements Insertable<Feature> {
       'priority': serializer.toJson<int?>(priority),
       'targetVersion': serializer.toJson<String?>(targetVersion),
       'source': serializer.toJson<String>(source),
+      'buildKind': serializer.toJson<String>(buildKind),
+      'parentId': serializer.toJson<String?>(parentId),
       'createdAt': serializer.toJson<int>(createdAt),
       'updatedAt': serializer.toJson<int>(updatedAt),
     };
@@ -897,6 +964,8 @@ class Feature extends DataClass implements Insertable<Feature> {
     Value<int?> priority = const Value.absent(),
     Value<String?> targetVersion = const Value.absent(),
     String? source,
+    String? buildKind,
+    Value<String?> parentId = const Value.absent(),
     int? createdAt,
     int? updatedAt,
   }) => Feature(
@@ -910,6 +979,8 @@ class Feature extends DataClass implements Insertable<Feature> {
         ? targetVersion.value
         : this.targetVersion,
     source: source ?? this.source,
+    buildKind: buildKind ?? this.buildKind,
+    parentId: parentId.present ? parentId.value : this.parentId,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -927,6 +998,8 @@ class Feature extends DataClass implements Insertable<Feature> {
           ? data.targetVersion.value
           : this.targetVersion,
       source: data.source.present ? data.source.value : this.source,
+      buildKind: data.buildKind.present ? data.buildKind.value : this.buildKind,
+      parentId: data.parentId.present ? data.parentId.value : this.parentId,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -943,6 +1016,8 @@ class Feature extends DataClass implements Insertable<Feature> {
           ..write('priority: $priority, ')
           ..write('targetVersion: $targetVersion, ')
           ..write('source: $source, ')
+          ..write('buildKind: $buildKind, ')
+          ..write('parentId: $parentId, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -959,6 +1034,8 @@ class Feature extends DataClass implements Insertable<Feature> {
     priority,
     targetVersion,
     source,
+    buildKind,
+    parentId,
     createdAt,
     updatedAt,
   );
@@ -974,6 +1051,8 @@ class Feature extends DataClass implements Insertable<Feature> {
           other.priority == this.priority &&
           other.targetVersion == this.targetVersion &&
           other.source == this.source &&
+          other.buildKind == this.buildKind &&
+          other.parentId == this.parentId &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -987,6 +1066,8 @@ class FeaturesCompanion extends UpdateCompanion<Feature> {
   final Value<int?> priority;
   final Value<String?> targetVersion;
   final Value<String> source;
+  final Value<String> buildKind;
+  final Value<String?> parentId;
   final Value<int> createdAt;
   final Value<int> updatedAt;
   final Value<int> rowid;
@@ -999,6 +1080,8 @@ class FeaturesCompanion extends UpdateCompanion<Feature> {
     this.priority = const Value.absent(),
     this.targetVersion = const Value.absent(),
     this.source = const Value.absent(),
+    this.buildKind = const Value.absent(),
+    this.parentId = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1012,6 +1095,8 @@ class FeaturesCompanion extends UpdateCompanion<Feature> {
     this.priority = const Value.absent(),
     this.targetVersion = const Value.absent(),
     this.source = const Value.absent(),
+    this.buildKind = const Value.absent(),
+    this.parentId = const Value.absent(),
     required int createdAt,
     required int updatedAt,
     this.rowid = const Value.absent(),
@@ -1030,6 +1115,8 @@ class FeaturesCompanion extends UpdateCompanion<Feature> {
     Expression<int>? priority,
     Expression<String>? targetVersion,
     Expression<String>? source,
+    Expression<String>? buildKind,
+    Expression<String>? parentId,
     Expression<int>? createdAt,
     Expression<int>? updatedAt,
     Expression<int>? rowid,
@@ -1043,6 +1130,8 @@ class FeaturesCompanion extends UpdateCompanion<Feature> {
       if (priority != null) 'priority': priority,
       if (targetVersion != null) 'target_version': targetVersion,
       if (source != null) 'source': source,
+      if (buildKind != null) 'build_kind': buildKind,
+      if (parentId != null) 'parent_id': parentId,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -1058,6 +1147,8 @@ class FeaturesCompanion extends UpdateCompanion<Feature> {
     Value<int?>? priority,
     Value<String?>? targetVersion,
     Value<String>? source,
+    Value<String>? buildKind,
+    Value<String?>? parentId,
     Value<int>? createdAt,
     Value<int>? updatedAt,
     Value<int>? rowid,
@@ -1071,6 +1162,8 @@ class FeaturesCompanion extends UpdateCompanion<Feature> {
       priority: priority ?? this.priority,
       targetVersion: targetVersion ?? this.targetVersion,
       source: source ?? this.source,
+      buildKind: buildKind ?? this.buildKind,
+      parentId: parentId ?? this.parentId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -1104,6 +1197,12 @@ class FeaturesCompanion extends UpdateCompanion<Feature> {
     if (source.present) {
       map['source'] = Variable<String>(source.value);
     }
+    if (buildKind.present) {
+      map['build_kind'] = Variable<String>(buildKind.value);
+    }
+    if (parentId.present) {
+      map['parent_id'] = Variable<String>(parentId.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<int>(createdAt.value);
     }
@@ -1127,6 +1226,8 @@ class FeaturesCompanion extends UpdateCompanion<Feature> {
           ..write('priority: $priority, ')
           ..write('targetVersion: $targetVersion, ')
           ..write('source: $source, ')
+          ..write('buildKind: $buildKind, ')
+          ..write('parentId: $parentId, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -2436,6 +2537,8 @@ typedef $$FeaturesTableCreateCompanionBuilder =
       Value<int?> priority,
       Value<String?> targetVersion,
       Value<String> source,
+      Value<String> buildKind,
+      Value<String?> parentId,
       required int createdAt,
       required int updatedAt,
       Value<int> rowid,
@@ -2450,6 +2553,8 @@ typedef $$FeaturesTableUpdateCompanionBuilder =
       Value<int?> priority,
       Value<String?> targetVersion,
       Value<String> source,
+      Value<String> buildKind,
+      Value<String?> parentId,
       Value<int> createdAt,
       Value<int> updatedAt,
       Value<int> rowid,
@@ -2501,6 +2606,16 @@ class $$FeaturesTableFilterComposer
 
   ColumnFilters<String> get source => $composableBuilder(
     column: $table.source,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get buildKind => $composableBuilder(
+    column: $table.buildKind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get parentId => $composableBuilder(
+    column: $table.parentId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2564,6 +2679,16 @@ class $$FeaturesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get buildKind => $composableBuilder(
+    column: $table.buildKind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get parentId => $composableBuilder(
+    column: $table.parentId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -2612,6 +2737,12 @@ class $$FeaturesTableAnnotationComposer
   GeneratedColumn<String> get source =>
       $composableBuilder(column: $table.source, builder: (column) => column);
 
+  GeneratedColumn<String> get buildKind =>
+      $composableBuilder(column: $table.buildKind, builder: (column) => column);
+
+  GeneratedColumn<String> get parentId =>
+      $composableBuilder(column: $table.parentId, builder: (column) => column);
+
   GeneratedColumn<int> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -2655,6 +2786,8 @@ class $$FeaturesTableTableManager
                 Value<int?> priority = const Value.absent(),
                 Value<String?> targetVersion = const Value.absent(),
                 Value<String> source = const Value.absent(),
+                Value<String> buildKind = const Value.absent(),
+                Value<String?> parentId = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
                 Value<int> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -2667,6 +2800,8 @@ class $$FeaturesTableTableManager
                 priority: priority,
                 targetVersion: targetVersion,
                 source: source,
+                buildKind: buildKind,
+                parentId: parentId,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -2681,6 +2816,8 @@ class $$FeaturesTableTableManager
                 Value<int?> priority = const Value.absent(),
                 Value<String?> targetVersion = const Value.absent(),
                 Value<String> source = const Value.absent(),
+                Value<String> buildKind = const Value.absent(),
+                Value<String?> parentId = const Value.absent(),
                 required int createdAt,
                 required int updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -2693,6 +2830,8 @@ class $$FeaturesTableTableManager
                 priority: priority,
                 targetVersion: targetVersion,
                 source: source,
+                buildKind: buildKind,
+                parentId: parentId,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,

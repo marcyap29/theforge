@@ -53,8 +53,17 @@ class Features extends Table {
   IntColumn get priority => integer().nullable()();
   TextColumn get targetVersion => text().nullable()();
 
-  /// Where the feature came from: manual | scan | spec
+  /// Where the feature came from: manual | scan | spec | recommend | architect
   TextColumn get source => text().withDefault(const Constant('manual'))();
+
+  /// Build classification (BuildKind): standard (code-gen buildable) | epic
+  /// (must be decomposed before building) | manual (human/ML/data/design/
+  /// external work — not something the AI can code-generate).
+  TextColumn get buildKind =>
+      text().withDefault(const Constant('standard'))();
+
+  /// For sub-features produced by decomposing an epic: the parent feature's id.
+  TextColumn get parentId => text().nullable()();
   IntColumn get createdAt => integer()();
   IntColumn get updatedAt => integer()();
 
@@ -116,7 +125,7 @@ class ForgeDatabase extends _$ForgeDatabase {
   ForgeDatabase() : super(_openForgeIndex());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -131,6 +140,12 @@ class ForgeDatabase extends _$ForgeDatabase {
           // v2 -> v3: introduce the releases table. Existing rows untouched.
           if (from < 3) {
             await m.createTable(releases);
+          }
+          // v3 -> v4: feature build classification + epic sub-feature nesting.
+          // Existing rows default to 'standard' / null parent.
+          if (from < 4) {
+            await m.addColumn(features, features.buildKind);
+            await m.addColumn(features, features.parentId);
           }
         },
       );

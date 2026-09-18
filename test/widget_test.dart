@@ -38,6 +38,7 @@ void main() {
           title: id,
           status: status.wire,
           source: 'manual',
+          buildKind: 'standard',
           createdAt: 0,
           updatedAt: 0,
         );

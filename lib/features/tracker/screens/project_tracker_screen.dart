@@ -22,6 +22,7 @@ import '../releases/release_providers.dart';
 import '../scan/feature_dedup.dart';
 import '../scan/feature_scan.dart';
 import '../widgets/active_model_chip.dart';
+import '../widgets/architect_review_sheet.dart';
 import '../widgets/dedup_review_sheet.dart';
 import '../widgets/feature_edit_dialog.dart';
 import '../widgets/platform_picker.dart';
@@ -266,6 +267,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
                 .deleteFeature(f),
             onBuild: () => _buildFeature(f),
             onAdvice: () => _openBuildAdvice(f),
+            onArchitect: () => _architectFeature(f),
           )),
     ];
   }
@@ -318,6 +320,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
                 .deleteFeature(f),
             onBuild: () => _buildFeature(f),
             onAdvice: () => _openBuildAdvice(f),
+            onArchitect: () => _architectFeature(f),
           )));
     }
     return widgets;
@@ -382,6 +385,99 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => ReleasesScreen(project: project),
     ));
+  }
+
+  /// The pre-build gate for an epic / manual feature: steer to Architect or
+  /// How-to-build. Returns true only if the user chooses "Build anyway".
+  Future<bool?> _confirmBuildDespiteKind(Feature feature, BuildKind kind) {
+    final epic = kind == BuildKind.epic;
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF141416),
+        title: Text(epic ? 'This is an epic' : 'This needs human / ML work'),
+        content: Text(
+          epic
+              ? '“${feature.title}” is too big to build in one go. Break it into '
+                  'sub-features first — otherwise the AI will only scaffold part '
+                  'of it and mark it done.'
+              : '“${feature.title}” isn\'t a code-generation task (it needs a '
+                  'human, a dataset, model training, design, or an external '
+                  'service). Build-with-AI can\'t complete it. See how to '
+                  'approach it instead.',
+          style: const TextStyle(fontSize: 13, color: Color(0xFFE5E5E7)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Build anyway',
+                style: TextStyle(color: Color(0xFF8A8A8E))),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx, false);
+              if (epic) {
+                _architectFeature(feature);
+              } else {
+                _openBuildAdvice(feature);
+              }
+            },
+            child: Text(epic ? 'Architect it' : 'How to build this'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Architects a feature: asks the LLM to decompose it into typed sub-features,
+  /// lets the user review, then creates the kept sub-features nested under this
+  /// feature (which becomes an epic).
+  Future<void> _architectFeature(Feature feature) async {
+    _showBlockingSpinner('Architecting “${feature.title}”…');
+    ArchitectPlan plan;
+    try {
+      final all =
+          ref.read(featureListProvider(project.id)).valueOrNull ?? const [];
+      plan = await ref.read(featureScannerProvider).architectFeature(
+            projectPath: project.path,
+            repoPath: _repoPath,
+            feature: feature,
+            allFeatures: all,
+          );
+    } catch (e) {
+      if (mounted) Navigator.of(context).pop(); // dismiss spinner
+      _showError('Architect feature', e);
+      return;
+    }
+    if (!mounted) return;
+    Navigator.of(context).pop(); // dismiss spinner
+
+    final kept = await showArchitectReviewSheet(context, plan);
+    if (kept == null || kept.isEmpty || !mounted) return;
+
+    final notifier = ref.read(featureListProvider(project.id).notifier);
+    // Mark the parent as an epic so the board tags it and the build gate steers
+    // to its sub-features.
+    await notifier.updateFeature(feature, buildKind: BuildKind.epic);
+    for (final s in kept) {
+      await notifier.addFeature(
+        title: s.title,
+        description: s.description,
+        status: FeatureStatus.planned,
+        source: 'architect',
+        buildKind: s.buildKind,
+        parentId: feature.id,
+      );
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Added ${kept.length} sub-features under '
+              '“${feature.title}”.')));
+    }
   }
 
   /// Opens scale-aware build advice for a single feature (LLM reads the repo:
@@ -541,6 +637,16 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
       if (mounted) await _handleBuildResult(feature);
       return;
     }
+
+    // Build gate: don't silently code-generate (and stub) an epic or work that
+    // isn't a code-gen task. Steer to Architect / How-to-build instead; allow an
+    // explicit override.
+    final kind = BuildKind.fromWire(feature.buildKind);
+    if (!kind.isDirectlyBuildable) {
+      final proceed = await _confirmBuildDespiteKind(feature, kind);
+      if (proceed != true) return;
+    }
+
     final repoPath = await _ensureRepoPath();
     if (repoPath == null) return; // user cancelled the create/link prompt
 
@@ -1121,6 +1227,7 @@ class _FeatureTile extends StatelessWidget {
     required this.onDelete,
     required this.onBuild,
     required this.onAdvice,
+    required this.onArchitect,
     this.runPhase,
   });
 
@@ -1130,6 +1237,7 @@ class _FeatureTile extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onBuild;
   final VoidCallback onAdvice;
+  final VoidCallback onArchitect;
 
   /// Non-null when a Build with AI run for this feature is live (any phase);
   /// drives the status dot on the board.
@@ -1155,6 +1263,10 @@ class _FeatureTile extends StatelessWidget {
             child: Text(feature.title,
                 style: const TextStyle(fontSize: 13, color: Color(0xFFE5E5E7))),
           ),
+          if (BuildKind.fromWire(feature.buildKind) != BuildKind.standard) ...[
+            const SizedBox(width: 8),
+            _KindTag(BuildKind.fromWire(feature.buildKind)),
+          ],
           if (hasRun) ...[
             const SizedBox(width: 8),
             Icon(Icons.open_in_new, size: 12, color: phase.dotColor),
@@ -1172,6 +1284,8 @@ class _FeatureTile extends StatelessWidget {
               onBuild();
             case _ActionKind.advice:
               onAdvice();
+            case _ActionKind.architect:
+              onArchitect();
             case _ActionKind.edit:
               onEdit();
             case _ActionKind.delete:
@@ -1199,6 +1313,15 @@ class _FeatureTile extends StatelessWidget {
                     size: 16, color: Color(0xFF64B5F6)),
                 SizedBox(width: 8),
                 Text('How to build this'),
+              ]),
+            ),
+            const PopupMenuItem(
+              value: _TileAction.architect_,
+              child: Row(children: [
+                Icon(Icons.account_tree_outlined,
+                    size: 16, color: Color(0xFFBA68C8)),
+                SizedBox(width: 8),
+                Text('Architect (break into sub-features)'),
               ]),
             ),
             const PopupMenuDivider(),
@@ -1268,6 +1391,26 @@ class _FeatureTile extends StatelessWidget {
   }
 }
 
+/// A small colored tag marking a feature as an epic or manual (human/ML) item,
+/// so the board shows at a glance what shouldn't be code-generated directly.
+class _KindTag extends StatelessWidget {
+  const _KindTag(this.kind);
+  final BuildKind kind;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(
+        color: kind.color.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(kind.label.toLowerCase(),
+          style: TextStyle(fontSize: 9.5, color: kind.color)),
+    );
+  }
+}
+
 /// The board's live indicator for a feature with a Build-with-AI run:
 /// yellow (pulsing) = the AI is actively working; blue = waiting for your
 /// approval; green = done; red = failed/stopped.
@@ -1327,7 +1470,7 @@ class _RunDotState extends State<_RunDot>
   }
 }
 
-enum _ActionKind { setStatus, build, advice, edit, delete }
+enum _ActionKind { setStatus, build, advice, architect, edit, delete }
 
 class _TileAction {
   const _TileAction(this.kind, [this.status]);
@@ -1338,6 +1481,7 @@ class _TileAction {
       _TileAction(_ActionKind.setStatus, s);
   static const _TileAction build_ = _TileAction(_ActionKind.build);
   static const _TileAction advice_ = _TileAction(_ActionKind.advice);
+  static const _TileAction architect_ = _TileAction(_ActionKind.architect);
   static const _TileAction edit_ = _TileAction(_ActionKind.edit);
   static const _TileAction delete_ = _TileAction(_ActionKind.delete);
 }
