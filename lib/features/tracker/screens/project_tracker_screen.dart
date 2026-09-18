@@ -33,6 +33,7 @@ import '../widgets/status_chip.dart';
 import 'build_advice_screen.dart';
 import 'capability_summary_screen.dart';
 import 'releases_screen.dart';
+import 'security_check_screen.dart';
 
 /// The per-project feature board: features grouped by status with add/edit/
 /// delete + quick status changes, plus project-level status, review cadence,
@@ -154,6 +155,8 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             _menuEntry(Icons.cleaning_services_outlined, 'Remove duplicates',
                 _removeDuplicates),
             const PopupMenuDivider(),
+            _menuEntry(
+                Icons.shield_outlined, 'Security check', _openSecurityCheck),
             _menuEntry(Icons.fact_check_outlined, 'Run check-in', _runCheckin),
           ]),
           IconButton(
@@ -517,6 +520,14 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
         repoPath: _repoPath,
         feature: feature,
       ),
+    ));
+  }
+
+  /// Opens the Security Check for the whole app/repo (secret pre-scan + LLM
+  /// security review).
+  void _openSecurityCheck() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => SecurityCheckScreen(project: project, repoPath: _repoPath),
     ));
   }
 

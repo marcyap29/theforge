@@ -165,6 +165,143 @@ class FeatureScanner {
     return out;
   }
 
+  /// Security review of the whole app/repo: a deterministic secret pre-scan
+  /// (grep for high-signal credential patterns across the repo) fed to the LLM
+  /// alongside the source + docs, returning a markdown report (risk level,
+  /// secrets, permissions/data, dependencies, unsafe patterns, what to fix
+  /// first). Read-only.
+  Future<String> securityCheck({
+    required String projectPath,
+    String? repoPath,
+  }) async {
+    final docs = await _readProjectDocs(projectPath);
+    String? readme;
+    String? code;
+    List<String> fileList = const [];
+    List<String> secretHits = const [];
+    if (repoPath != null && Directory(repoPath).existsSync()) {
+      readme = await _readReadme(repoPath);
+      fileList = await _listFiles(repoPath);
+      code = await _readKeyCode(repoPath);
+      secretHits = await _scanForSecretHits(repoPath);
+    }
+    if (docs == null && readme == null && fileList.isEmpty) {
+      throw FeatureScanException(
+          'Nothing to review yet — link a repo or generate a spec first.');
+    }
+    final user = _securityUserPrompt(
+        projectPath, docs, readme, code, fileList, secretHits, repoPath);
+    final md = await _llm.complete(
+      role: LlmRole.architect,
+      temperature: 0.2,
+      maxTokens: 2500,
+      systemPrompt: _securitySystemPrompt,
+      userPrompt: user,
+      jsonMode: false,
+      think: false,
+    );
+    final out = md.trim();
+    if (out.isEmpty) {
+      throw FeatureScanException(
+          'The Architect model returned an empty report. Try again, or switch '
+          'the Architect model in Settings.',
+          raw: md);
+    }
+    return out;
+  }
+
+  /// Deterministic grep for high-signal secret patterns across the repo's text
+  /// files. Returns redacted "path:line — <kind>" hits (capped), so the LLM can
+  /// ground its report in real findings rather than guessing.
+  Future<List<String>> _scanForSecretHits(String repoPath) async {
+    const skipDirs = {
+      '.git', 'build', '.dart_tool', 'node_modules', 'Pods',
+      'DerivedData', '.forge', '.idea', 'ephemeral',
+    };
+    const textExt = {
+      '.dart', '.yaml', '.yml', '.json', '.env', '.sh', '.js', '.ts',
+      '.md', '.plist', '.xml', '.properties', '.gradle', '.txt', '.toml',
+      '.cfg', '.ini', '.kt', '.swift', '.h', '.m', '.rb', '.py',
+    };
+    final patterns = <String, RegExp>{
+      'private key': RegExp(r'-----BEGIN [A-Z ]*PRIVATE KEY-----'),
+      'AWS access key': RegExp(r'AKIA[0-9A-Z]{16}'),
+      'OpenAI key': RegExp(r'sk-[A-Za-z0-9]{20,}'),
+      'GitHub token': RegExp(r'gh[pousr]_[A-Za-z0-9]{20,}'),
+      'Slack token': RegExp(r'xox[baprs]-[A-Za-z0-9-]{10,}'),
+      'Google API key': RegExp(r'AIza[0-9A-Za-z_\-]{30,}'),
+      'hardcoded secret': RegExp(
+          '''(?i)(api[_-]?key|secret|token|password|passwd|client[_-]?secret)\\s*[:=]\\s*['"][^'"\\s]{12,}['"]'''),
+    };
+    final hits = <String>[];
+    var filesScanned = 0;
+    try {
+      await for (final entity in Directory(repoPath).list(recursive: true)) {
+        if (hits.length >= 50 || filesScanned >= 3000) break;
+        if (entity is! File) continue;
+        final rel = p.relative(entity.path, from: repoPath);
+        if (rel.split(p.separator).any(skipDirs.contains)) continue;
+        if (!textExt.contains(p.extension(entity.path).toLowerCase())) continue;
+        filesScanned++;
+        String content;
+        try {
+          if (await entity.length() > 512 * 1024) continue; // skip huge files
+          content = await entity.readAsString();
+        } catch (_) {
+          continue;
+        }
+        final lines = content.split('\n');
+        for (var i = 0; i < lines.length && hits.length < 50; i++) {
+          for (final entry in patterns.entries) {
+            if (entry.value.hasMatch(lines[i])) {
+              hits.add('$rel:${i + 1} — possible ${entry.key}');
+              break; // one hit per line is enough
+            }
+          }
+        }
+      }
+    } catch (_) {
+      // best-effort scan; return whatever we found.
+    }
+    return hits;
+  }
+
+  String _securityUserPrompt(String projectPath, String? docs, String? readme,
+      String? code, List<String> files, List<String> secretHits, String? repoPath) {
+    final buffer = StringBuffer();
+    buffer.writeln('# Project: ${p.basename(projectPath)}');
+    buffer.writeln();
+    if (secretHits.isNotEmpty) {
+      buffer.writeln('## Deterministic secret pre-scan hits '
+          '(grep — verify each; may include false positives)');
+      for (final h in secretHits) {
+        buffer.writeln('- $h');
+      }
+      buffer.writeln();
+    } else if (repoPath != null) {
+      buffer.writeln('## Deterministic secret pre-scan: no obvious hardcoded '
+          'secrets matched.');
+      buffer.writeln();
+    }
+    if (docs != null) {
+      buffer..writeln('## Project documents')..writeln(docs)..writeln();
+    }
+    if (repoPath != null && (readme != null || files.isNotEmpty)) {
+      buffer.writeln('## Linked codebase: ${p.basename(repoPath)}');
+      if (readme != null) buffer..writeln('### README')..writeln(readme);
+      if (code != null) {
+        buffer..writeln('### Source code (key files)')..writeln(code);
+      }
+      if (files.isNotEmpty) {
+        buffer.writeln('### File tree');
+        for (final f in files.take(250)) {
+          buffer.writeln('- $f');
+        }
+      }
+    }
+    return buffer.toString();
+  }
+
   /// Scale-aware build advice for ONE feature: how to build it, which tools/
   /// libraries, rough effort, risks, whether The Forge's Build-with-AI can
   /// realistically code-generate it (vs work that needs a human / ML / dataset),
@@ -671,6 +808,39 @@ One sharper one-line descriptor for the tracker that reflects the real scope.
 
 Ground everything in the provided material. Do not invent APIs. No preamble, no
 code fences around the whole reply.''';
+
+  static const _securitySystemPrompt = '''
+You are a pragmatic application security reviewer auditing a solo builder's app
++ repo. Use the provided deterministic secret pre-scan hits, source code, and
+docs. Be concrete and honest; do NOT invent CVEs or issues you can't see
+evidence for. Prioritize what actually matters for a small app.
+
+Output GitHub-flavored markdown with these sections (omit one only if truly N/A):
+
+## Overall risk
+One line: **Low / Medium / High**, with a one-sentence why.
+
+## Secrets & credentials
+Assess the pre-scan hits (real leak vs false positive vs test fixture) and any
+hardcoded keys/tokens you see in the source. Say exactly which file to fix and
+how (move to env / secure storage / rotate the key if it was committed).
+
+## Permissions & data access
+Platform permissions requested (camera, location, files…), and whether user
+data / API keys are stored or transmitted safely.
+
+## Dependencies & supply chain
+Risky or unmaintained packages, anything pulling untrusted code.
+
+## Unsafe patterns
+Injection, unvalidated input, insecure network (http/no TLS), unsafe file paths,
+eval/dynamic code, logging of secrets, etc. — grounded in the code shown.
+
+## Fix first
+An ordered short list of the highest-impact fixes.
+
+Ground every claim in the provided material. No preamble, no code fences around
+the whole reply.''';
 
   static const _capabilitySystemPrompt = '''
 You are a senior engineer writing a concise, accurate "What this app can do right

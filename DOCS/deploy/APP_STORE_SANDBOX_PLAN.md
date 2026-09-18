@@ -1,14 +1,33 @@
 # Path to a sandboxed / Mac App Store–eligible build
 
-**Status:** parked (not scheduled). The Forge currently ships **unsandboxed** for
-direct distribution. This document is the plan for *if/when* App Store eligibility
-is wanted.
+**Status:** effectively **not viable** (was "parked"). The Forge ships
+**unsandboxed** for direct distribution (Developer ID + notarization via
+`tool/release_macos.sh`). This document records why the App Store is off the
+table and what it would cost.
 
-## Why it's blocked today
-The Mac App Store **requires** the App Sandbox. The Forge is currently ineligible
-because it **spawns the system `git` binary** — the App Sandbox forbids executing
-arbitrary external binaries. That is the only hard blocker; everything else
-(BYOK API keys, cloud LLM calls over `network.client`, paid apps) is App-Store-fine.
+## Why it's blocked — and why the gap WIDENED (2026-09)
+The Mac App Store **requires** the App Sandbox, which forbids executing external
+binaries not shipped inside the app bundle. When this doc was written the only
+offender was the system `git` binary (4 read-only call sites, replaceable with an
+in-process git library — see WS1 below). **That is no longer the situation.** The
+app's core now spawns the user's dev toolchain, none of which can run in-process:
+
+| Feature | Spawns | In-process substitute? |
+|---|---|---|
+| Build with AI (executor) | arbitrary shell, `flutter analyze`, `dart fix` (`command_runner.dart`) | ❌ none |
+| Make runnable / scaffold | `flutter create` | ❌ none |
+| Run & Preview | `flutter run`/`devices`/`emulators`, `xcrun simctl`, `adb`, `open` (`run_controller.dart`) | ❌ none |
+| Deploy kit | `flutter build`, `pod install`, `xcodebuild` | ❌ none |
+| Scan / Check-in / repos | `git …` | ⚠️ possible (in-process git) |
+
+So App Store eligibility would require **removing Build with AI and Run &
+Preview** (the product's hands-on-keyboard half) — not an acceptable trade.
+Everything else (BYOK keys, cloud LLM over `network.client`, paid apps) is
+App-Store-fine, but that's moot while the toolchain spawning stays.
+
+**Decision: distribute direct + notarized; do not pursue the Mac App Store.** The
+git-only workstreams below are retained for reference only — they no longer get
+you to eligibility on their own.
 
 ## The git subprocess surface (small + read-only)
 Watch Mode already uses the **GitHub REST/GraphQL API over HTTP** (sandbox-legal).

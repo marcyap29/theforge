@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../data/filesystem/project_file_repository.dart';
 import '../../projects/project_actions.dart';
 import '../../projects/providers/providers.dart';
 import '../../projects/screens/new_project_screen.dart';
@@ -10,6 +11,7 @@ import '../widgets/active_model_chip.dart';
 import '../widgets/portfolio_digest.dart';
 import '../widgets/project_card.dart';
 import 'project_tracker_screen.dart';
+import 'security_check_screen.dart';
 
 /// The portfolio dashboard — the app's home. Shows every project as a card with
 /// its status and feature roll-up, plus a summary strip and review nudges.
@@ -114,6 +116,14 @@ class _PortfolioDashboardScreenState
       ),
       items: const [
         PopupMenuItem(value: 'open', child: Text('Open tracker')),
+        PopupMenuItem(
+          value: 'security',
+          child: Row(children: [
+            Icon(Icons.shield_outlined, size: 16, color: Color(0xFF64B5F6)),
+            SizedBox(width: 8),
+            Text('Security check'),
+          ]),
+        ),
         PopupMenuItem(value: 'select', child: Text('Select')),
         PopupMenuItem(
           value: 'delete',
@@ -123,11 +133,25 @@ class _PortfolioDashboardScreenState
     );
     if (choice == 'open') {
       _openTracker(entry);
+    } else if (choice == 'security') {
+      await _openSecurityCheck(entry);
     } else if (choice == 'select') {
       _enterSelection(entry.project.id);
     } else if (choice == 'delete') {
       await _deleteOne(entry);
     }
+  }
+
+  Future<void> _openSecurityCheck(PortfolioEntry entry) async {
+    final config =
+        await ProjectFileRepository.readProjectConfig(entry.project.path);
+    if (!mounted) return;
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => SecurityCheckScreen(
+        project: entry.project,
+        repoPath: config['repoPath'] as String?,
+      ),
+    ));
   }
 
   void _openTracker(PortfolioEntry entry) {

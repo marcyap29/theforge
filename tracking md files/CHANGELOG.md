@@ -2,6 +2,13 @@
 
 ---
 
+## v0.4.47 — 2026-09-18
+
+- **Security Check — audit the whole app/repo.** A new **shield** action: **right-click a project on the dashboard → Security check**, or open it from a project's **✨ AI tools ▾ → Security check**. It runs a deterministic **secret pre-scan** (greps the repo's text files for high-signal credential patterns — private keys, AWS/OpenAI/GitHub/Slack/Google tokens, hardcoded `api_key=…`) and feeds those redacted hits, plus the source and docs, to the Architect LLM for a grounded markdown report: **overall risk**, secrets & credentials, permissions & data access, dependencies/supply-chain, unsafe patterns, and an ordered **fix-first** list. Read-only, on-demand, with Re-scan + Copy. `FeatureScanner.securityCheck` + `SecurityCheckScreen`.
+- **Notarized-DMG release path for distribution.** New `tool/release_macos.sh`: Developer ID sign (hardened runtime + timestamp) → **notarize** (`notarytool`) → **staple** → package a **DMG** for the website. Preflight checks fail fast with the exact prerequisites (Apple Developer membership, Developer ID Application cert, notary credentials) when they're missing. This is the direct-distribution path; the Mac App Store remains not viable (Build-with-AI / Run & Preview spawn `flutter`/`xcrun`/`adb`, which the App Store sandbox forbids — see `DOCS/deploy/APP_STORE_SANDBOX_PLAN.md`).
+
+---
+
 ## v0.4.46 — 2026-09-18
 
 - **Accepting a conflict resolution now actually records the decision.** When the interview surfaces a contradiction between two answers, it already proposes a fix and shows an "Accept: …" button — but accepting used to just *dismiss the warning*, so the spec never learned which way you chose. Now accepting feeds the decision back into the interview as a turn ("Let's resolve the tension between X and Y this way: …"), so the LLM reconciles its extracted state and the generated spec reflects the resolution. The prompts also tell the model to treat an accepted pair as reconciled and stop re-surfacing it. `InterviewNotifier.resolveConflict`.
