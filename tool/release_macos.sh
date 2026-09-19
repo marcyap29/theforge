@@ -110,6 +110,13 @@ xcrun notarytool submit "$DMG_PATH" $(notary_args) --wait
 echo "==> Stapling the notarization ticket"
 xcrun stapler staple "$DMG_PATH"
 xcrun stapler validate "$DMG_PATH"
-spctl --assess --type open --context context:primary-signature "$DMG_PATH" || true
+
+# Verify Gatekeeper accepts the APP INSIDE the DMG (asserting on the .dmg
+# container itself gives a misleading "rejected" — the app is what's assessed).
+echo "==> Verifying Gatekeeper acceptance of the app inside the DMG"
+MOUNT="$(hdiutil attach "$DMG_PATH" -nobrowse -readonly | grep -o '/Volumes/.*' | head -1)"
+APP_IN_DMG="$(ls -d "$MOUNT"/*.app 2>/dev/null | head -1)"
+spctl -a -vvv --type exec "$APP_IN_DMG" 2>&1 | sed 's/^/    /' || true
+hdiutil detach "$MOUNT" >/dev/null 2>&1 || true
 
 echo "Done. Distributable, notarized DMG: $DMG_PATH"
