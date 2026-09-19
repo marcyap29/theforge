@@ -64,3 +64,6 @@ xcuserdata/
 
 # Nested repos (managed independently)
 forge-mcp/
+
+# Marketing site download binaries (host separately)
+website/downloads/
