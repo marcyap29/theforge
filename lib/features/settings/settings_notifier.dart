@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -48,6 +49,40 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
   static const _keychainKeyPrefix = 'forge_api_key_';
   static const _keychainKeyPrefixSwarmspace = 'forge_api_key_swarmspace';
   static const _configFileName = 'forge_config.json';
+
+  /// API keys now live in the OS keychain (encrypted at rest) rather than the
+  /// plaintext config file / SharedPreferences. The prefixes above are reused as
+  /// keychain item names, so legacy plaintext keys migrate to the same names.
+  // Use the legacy (file-based) login keychain, not the data-protection
+  // keychain — the latter needs a `keychain-access-groups` entitlement that's
+  // awkward for a Developer ID (non-App-Store) app. Keys are still encrypted at
+  // rest in the macOS keychain; this just avoids the entitlement dance.
+  static const _secure = FlutterSecureStorage(
+    mOptions: MacOsOptions(usesDataProtectionKeychain: false),
+  );
+
+  static Future<String?> _readSecure(String key) async {
+    try {
+      return await _secure.read(key: key);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Returns true only if the keychain write/delete actually succeeded — so
+  /// migration never scrubs a plaintext key it failed to move into the keychain.
+  static Future<bool> _writeSecure(String key, String? value) async {
+    try {
+      if (value == null || value.isEmpty) {
+        await _secure.delete(key: key);
+      } else {
+        await _secure.write(key: key, value: value);
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 
   // ── Config file helpers ───────────────────────────────────────────────────
 
@@ -122,39 +157,66 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
       );
     }
 
-    // Load API keys: config file is authoritative, SharedPreferences is fallback
+    // Load API keys from the OS keychain (encrypted). For existing users whose
+    // keys are still in the plaintext config file / SharedPreferences (or a
+    // key a power-user dropped into forge_config.json), migrate into the
+    // keychain and then SCRUB the plaintext copies below.
     final apiKeys = <LlmProviderType, String?>{};
-    final migratedKeys = <String, dynamic>{};
-    bool needsMigration = false;
+    var migratedAny = false;
+    var migrationFailed = false;
 
     for (final type in LlmProviderType.values) {
-      {
-        // All providers (including Ollama, for Cloud API-key auth) resolve a
-        // key from the config file first, then SharedPreferences.
-        final fromFile = savedKeys[type.name] as String?;
-        final fromPrefs = prefs.getString('$_keychainKeyPrefix${type.name}');
-        final resolved =
-            (fromFile?.isNotEmpty == true) ? fromFile : fromPrefs;
-        apiKeys[type] = resolved;
+      final name = type.name;
+      var key = await _readSecure('$_keychainKeyPrefix$name');
+      if (key == null || key.isEmpty) {
+        final fromFile = savedKeys[name] as String?;
+        final fromPrefs = prefs.getString('$_keychainKeyPrefix$name');
+        final legacy = (fromFile?.isNotEmpty == true) ? fromFile : fromPrefs;
+        if (legacy != null && legacy.isNotEmpty) {
+          key = legacy; // use it this session regardless of keychain outcome
+          if (await _writeSecure('$_keychainKeyPrefix$name', legacy)) {
+            migratedAny = true;
+          } else {
+            migrationFailed = true;
+          }
+        }
+      }
+      apiKeys[type] = (key == null || key.isEmpty) ? null : key;
+    }
 
-        // Migrate key found only in prefs to config file
-        if (fromFile == null && fromPrefs != null && fromPrefs.isNotEmpty) {
-          migratedKeys[type.name] = fromPrefs;
-          needsMigration = true;
+    var swarmspaceApiKey = await _readSecure(_keychainKeyPrefixSwarmspace);
+    if (swarmspaceApiKey == null || swarmspaceApiKey.isEmpty) {
+      final legacy = (config['swarmspace_api_key'] as String?) ??
+          prefs.getString(_keychainKeyPrefixSwarmspace);
+      if (legacy != null && legacy.isNotEmpty) {
+        swarmspaceApiKey = legacy;
+        if (await _writeSecure(_keychainKeyPrefixSwarmspace, legacy)) {
+          migratedAny = true;
         } else {
-          migratedKeys[type.name] = fromFile;
+          migrationFailed = true;
         }
       }
     }
-
-    if (needsMigration) {
-      final updatedConfig = Map<String, dynamic>.from(config);
-      updatedConfig['api_keys'] = migratedKeys;
-      await _writeConfigFile(updatedConfig);
+    if (swarmspaceApiKey != null && swarmspaceApiKey.isEmpty) {
+      swarmspaceApiKey = null;
     }
 
-    final swarmspaceApiKey =
-        config['swarmspace_api_key'] as String?;
+    // Scrub plaintext ONLY when every discovered key made it into the keychain —
+    // never delete a plaintext copy we failed to migrate (retry next launch).
+    final scrubPlaintext = migratedAny && !migrationFailed;
+
+    // One-time cleanup: remove every plaintext key copy now that they're in the
+    // keychain, leaving non-secret config (if any) intact.
+    if (scrubPlaintext) {
+      final cleaned = Map<String, dynamic>.from(config)
+        ..remove('api_keys')
+        ..remove('swarmspace_api_key');
+      await _writeConfigFile(cleaned);
+      for (final type in LlmProviderType.values) {
+        await prefs.remove('$_keychainKeyPrefix${type.name}');
+      }
+      await prefs.remove(_keychainKeyPrefixSwarmspace);
+    }
 
     return LlmSettingsState(
       settings: LlmSettings(
@@ -218,16 +280,8 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
     final trimmed = key.trim();
     if (trimmed.isEmpty) return;
 
-    // Write to SharedPreferences
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('$_keychainKeyPrefix${type.name}', trimmed);
-
-    // Write to config file (authoritative on next launch)
-    final config = await _readConfigFile();
-    final keys = Map<String, dynamic>.from(
-        config['api_keys'] as Map<String, dynamic>? ?? {});
-    keys[type.name] = trimmed;
-    await _writeConfigFile({...config, 'api_keys': keys});
+    // Store in the OS keychain (encrypted), not plaintext.
+    await _writeSecure('$_keychainKeyPrefix${type.name}', trimmed);
 
     final current = state.valueOrNull;
     if (current == null) return;
@@ -243,15 +297,10 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
   }
 
   Future<void> clearApiKey(LlmProviderType type) async {
+    await _writeSecure('$_keychainKeyPrefix${type.name}', null);
+    // Also clear any legacy plaintext copy that predates the keychain move.
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('$_keychainKeyPrefix${type.name}');
-
-    // Remove from config file
-    final config = await _readConfigFile();
-    final keys = Map<String, dynamic>.from(
-        config['api_keys'] as Map<String, dynamic>? ?? {});
-    keys.remove(type.name);
-    await _writeConfigFile({...config, 'api_keys': keys});
 
     final current = state.valueOrNull;
     if (current == null) return;
@@ -270,11 +319,7 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
     final trimmed = key.trim();
     if (trimmed.isEmpty) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keychainKeyPrefixSwarmspace, trimmed);
-
-    final config = await _readConfigFile();
-    await _writeConfigFile({...config, 'swarmspace_api_key': trimmed});
+    await _writeSecure(_keychainKeyPrefixSwarmspace, trimmed);
 
     final current = state.valueOrNull;
     if (current == null) return;
@@ -286,13 +331,9 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
   }
 
   Future<void> clearSwarmspaceApiKey() async {
+    await _writeSecure(_keychainKeyPrefixSwarmspace, null);
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keychainKeyPrefixSwarmspace);
-
-    final config = await _readConfigFile();
-    final updatedConfig = Map<String, dynamic>.from(config);
-    updatedConfig.remove('swarmspace_api_key');
-    await _writeConfigFile(updatedConfig);
 
     final current = state.valueOrNull;
     if (current == null) return;

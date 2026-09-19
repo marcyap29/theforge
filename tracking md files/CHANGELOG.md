@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.48 — 2026-09-19
+
+- **API keys are now encrypted at rest in the macOS Keychain.** Previously your BYOK keys sat in plaintext (`forge_config.json` + SharedPreferences) — readable by any process or backup with file access. They now live in the OS **Keychain** via `flutter_secure_storage`. On first launch after updating, any existing plaintext key is **automatically migrated into the Keychain and the plaintext copies are scrubbed** — all-or-nothing and failure-safe: if a keychain write doesn't succeed, the plaintext copy is kept (never lost) and retried next launch, and keys still work meanwhile. Uses the login Keychain (`usesDataProtectionKeychain: false`) so no `keychain-access-groups` entitlement is needed on the notarized Developer ID build. Addresses the one Medium finding from the Security Check. `SettingsNotifier`.
+
+---
+
 ## v0.4.47 — 2026-09-18
 
 - **Security Check — audit the whole app/repo.** A new **shield** action: **right-click a project on the dashboard → Security check**, or open it from a project's **✨ AI tools ▾ → Security check**. It runs a deterministic **secret pre-scan** (greps the repo's text files for high-signal credential patterns — private keys, AWS/OpenAI/GitHub/Slack/Google tokens, hardcoded `api_key=…`) and feeds those redacted hits, plus the source and docs, to the Architect LLM for a grounded markdown report: **overall risk**, secrets & credentials, permissions & data access, dependencies/supply-chain, unsafe patterns, and an ordered **fix-first** list. Read-only, on-demand, with Re-scan + Copy. `FeatureScanner.securityCheck` + `SecurityCheckScreen`.
