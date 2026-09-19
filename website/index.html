@@ -14,7 +14,9 @@
   <meta property="og:description" content="An AI app builder for macOS. Interview → spec → build with AI → run — without leaving one window." />
   <meta name="twitter:card" content="summary" />
 
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="icon" type="image/svg+xml" href="assets/forge-icon.svg" />
+  <link rel="apple-touch-icon" href="assets/forge-icon-256.png" />
+  <meta property="og:image" content="assets/forge-icon-512.png" />
 
   <!-- Design language adapted from the Sabihin marketing site (same token
        system + fonts). Edit the :root block to change anything sitewide. -->
@@ -136,11 +138,10 @@
     .nav-row { display: flex; align-items: center; justify-content: space-between; padding: var(--space-4) 0; gap: var(--space-5); }
     .lockup { display: flex; align-items: center; gap: var(--space-3); text-decoration: none; flex: none; }
     .lockup-tile {
-      width: 34px; height: 34px; border-radius: 22%;
-      background: var(--fg-panel-bg); border: 1px solid var(--fg-hairline);
-      display: flex; align-items: center; justify-content: center; flex: none;
+      width: 34px; height: 34px; border-radius: 22%; overflow: hidden;
+      border: 1px solid var(--fg-hairline); flex: none;
     }
-    .lockup-tile svg { width: 20px; height: 20px; color: var(--fg-accent); }
+    .lockup-tile img { width: 100%; height: 100%; display: block; }
     .lockup-word { font-family: var(--font-display); font-size: 1.3rem; color: var(--fg-text-primary); }
     nav.primary { display: flex; align-items: center; gap: var(--space-6); }
     nav.primary a { font-size: 0.9375rem; color: var(--fg-text-secondary); text-decoration: none; }
@@ -155,28 +156,22 @@
     .hero h1 { margin: var(--space-4) 0 var(--space-4); }
     .hero .body-lg { max-width: 52ch; margin: 0 auto var(--space-7); }
 
-    /* Signature mark: breathing tile + build-pulse bars */
+    /* Signature mark: the app icon with a soft heat glow + gentle breathe */
     .mark-stage { position: relative; display: flex; flex-direction: column; align-items: center; margin: 0 auto var(--space-7); }
     .mark-glow {
-      position: absolute; width: 320px; height: 320px;
-      background: radial-gradient(circle, rgba(232,160,76,0.16), transparent 70%);
+      position: absolute; width: 340px; height: 340px; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(circle, rgba(255,122,47,0.20), transparent 68%);
       pointer-events: none; z-index: 0;
     }
-    .mark-tile {
+    .mark-img {
       position: relative; z-index: 1;
-      width: clamp(120px, 22vw, 168px); height: clamp(120px, 22vw, 168px);
-      border-radius: 22%; background: var(--fg-panel-bg); border: 1px solid var(--fg-hairline);
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: var(--space-3); padding: var(--space-4); animation: breathe 2.6s ease-in-out infinite;
+      width: clamp(132px, 24vw, 184px); height: auto;
+      border-radius: 22%;
+      animation: breathe 2.8s ease-in-out infinite;
     }
-    .mark-tile svg { width: clamp(40px, 9vw, 56px); height: auto; color: var(--fg-accent); }
-    @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035); } }
-    .pulsebar { display: flex; align-items: flex-end; gap: 3px; height: 24px; }
-    .pulsebar .bar { width: 3px; border-radius: 2px; background: var(--fg-accent); transform-origin: bottom; }
-    @media (prefers-reduced-motion: reduce) {
-      .mark-tile { animation: none; }
-      .pulsebar .bar { animation: none !important; height: 40% !important; }
-    }
+    @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+    @media (prefers-reduced-motion: reduce) { .mark-img { animation: none; } }
     .hero-actions { display: flex; align-items: center; justify-content: center; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-4); }
     .hero-caption { font-family: var(--font-mono); font-size: 0.8125rem; letter-spacing: 0.02em; color: var(--fg-text-faint); }
 
@@ -236,9 +231,7 @@
   <header class="site">
     <div class="wrap nav-row">
       <a class="lockup" href="#top" aria-label="The Forge home">
-        <span class="lockup-tile" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3l7 7-3 3-7-7 3-3z"/><path d="M11.5 5.5L3 14l-1 5 5-1 8.5-8.5"/></svg>
-        </span>
+        <span class="lockup-tile" aria-hidden="true"><img src="assets/forge-icon.svg" alt="" /></span>
         <span class="lockup-word">The Forge</span>
       </a>
       <nav class="primary" aria-label="Primary">
@@ -263,10 +256,7 @@
 
         <div class="mark-stage">
           <div class="mark-glow" aria-hidden="true"></div>
-          <div class="mark-tile" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3l7 7-3 3-7-7 3-3z"/><path d="M11.5 5.5L3 14l-1 5 5-1 8.5-8.5"/></svg>
-            <div class="pulsebar" id="heroPulse"></div>
-          </div>
+          <img class="mark-img" src="assets/forge-icon.svg" alt="The Forge" width="184" height="184" />
         </div>
 
         <div class="hero-actions">
@@ -415,9 +405,7 @@
   <footer class="site">
     <div class="wrap">
       <div class="footer-lockup">
-        <span class="lockup-tile" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3l7 7-3 3-7-7 3-3z"/><path d="M11.5 5.5L3 14l-1 5 5-1 8.5-8.5"/></svg>
-        </span>
+        <span class="lockup-tile" aria-hidden="true"><img src="assets/forge-icon.svg" alt="" /></span>
         <span class="lockup-word">The Forge</span>
       </div>
       <p class="footer-tagline">FROM THE IDEA TO THE SHIP.</p>
@@ -430,34 +418,6 @@
   </footer>
 
   <script>
-    // Hero "build pulse" bars — echoes the app's live build activity.
-    (function buildPulse() {
-      const stage = document.getElementById('heroPulse');
-      if (!stage) return;
-      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const N = 14;
-      for (let i = 0; i < N; i++) {
-        const bar = document.createElement('div');
-        bar.className = 'bar';
-        const dur = (0.9 + Math.random() * 0.7).toFixed(2);
-        const delay = (Math.random() * 0.8).toFixed(2);
-        const peak = Math.round(35 + Math.random() * 55);
-        bar.style.height = reduced ? '40%' : (peak * 0.35) + '%';
-        if (!reduced) bar.style.animation = `pulse-${i % 4} ${dur}s ease-in-out ${delay}s infinite`;
-        stage.appendChild(bar);
-      }
-      if (!reduced) {
-        const tag = document.createElement('style');
-        let rules = '';
-        for (let v = 0; v < 4; v++) {
-          const a = Math.round(30 + Math.random() * 60);
-          const b = Math.round(20 + Math.random() * 50);
-          rules += `@keyframes pulse-${v}{0%,100%{transform:scaleY(${(b/100).toFixed(2)})}50%{transform:scaleY(${(a/100).toFixed(2)})}}`;
-        }
-        tag.textContent = rules;
-        document.head.appendChild(tag);
-      }
-    })();
     document.getElementById('year').textContent = new Date().getFullYear();
   </script>
 </body>
