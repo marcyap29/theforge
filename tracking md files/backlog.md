@@ -528,6 +528,29 @@ LlmProvider.complete({
 
 ## Low Priority
 
+### §WIN — Windows Support
+
+**What it is:** A working, testable Windows build of The Forge so vibecoders on PC can use it (widens the audience well beyond Mac-only). The `windows/` runner is already scaffolded and the key packages (flutter_secure_storage → Credential Manager, drift/sqlite3, path_provider) support Windows, so this is a **modest port, not a rewrite** — mostly guarding the macOS-only subprocess calls and setting up Windows distribution.
+
+**Hard constraint (not fixable):** iOS and macOS apps can **only** be built on a Mac (Apple requirement). A Windows Forge builds **Android, Windows, and web** targets; iOS is simply hidden on Windows. The interview → spec → Build-with-AI → track loop is unaffected (it rides on cross-platform `git` + `flutter`).
+
+**Work:**
+1. Build + smoke-test the `windows/` runner.
+2. Guard the 6 macOS-only external calls behind `Platform.isWindows`:
+   - `open` ×4 (reveal-in-Finder, open Simulator) → Windows `explorer` / `start`, or no-op.
+   - `xcrun` ×2 (iOS Simulator screenshot mirror in `run_controller.dart`) → gracefully unavailable on Windows.
+   - Cross-platform already: `git` ×8, `flutter` ×3, `adb` ×1.
+3. Run & Preview: keep Android emulator + Windows-desktop + web; hide iOS-simulator targets on Windows.
+4. Windows distribution: Authenticode code-signing cert + an installer (MSIX or Inno Setup). No Apple notarization. (Analogue to the macOS Developer-ID + notarize pipeline in `tool/release_macos.sh`.)
+
+**Effort:** ~1–2 days to a testable `.exe`/installer. Requires an actual Windows PC or VM to run/test (only buildable on macOS here).
+
+**Dependencies:** none blocking; best done after the macOS build stabilizes so the port isn't chasing a moving target.
+
+**Status:** Backlog / not started (added 2026-09-20 from a user question about PC support).
+
+---
+
 ### §14 — Monte Carlo Spec Generation
 
 **What it is:** Three architectural variants generated in parallel at different temperatures: Conservative (t=0.2), Balanced (t=0.6), Experimental (t=1.0). All three complete before any is shown. User evaluates them simultaneously and selects one or nominates a hybrid before the spec is locked. Rejected variants are retained in the audit log as the "alternatives considered" record.
