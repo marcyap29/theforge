@@ -11,11 +11,18 @@ No build step; host it as static files anywhere (Vercel, Netlify, S3, GitHub Pag
    FORGE_NOTARY_PROFILE=forge-notary tool/release_macos.sh
    ```
    → `build/dist/TheForge-<version>.dmg`
-2. Put the DMG where the download button points. The button links to
-   `downloads/TheForge-latest.dmg` (relative) — either:
-   - copy the DMG to `website/downloads/TheForge-latest.dmg`, or
-   - change the `href` in `index.html` (search `TheForge-latest.dmg`) to your CDN URL.
-3. Deploy the `website/` folder.
+2. The DMG is hosted on **GitHub Releases** in the public
+   [`theforge-releases`](https://github.com/marcyap29/theforge-releases) repo.
+   The download button points at the stable "latest" URL:
+   `https://github.com/marcyap29/theforge-releases/releases/latest/download/TheForge.dmg`
+   To publish a new build, attach it to a release with the asset named
+   **`TheForge.dmg`** (same name every release, so the URL never changes):
+   ```bash
+   cp build/dist/TheForge-<version>.dmg build/dist/TheForge.dmg
+   gh release create v<version> build/dist/TheForge.dmg \
+     --repo marcyap29/theforge-releases --title "The Forge v<version>"
+   ```
+3. Deploy the `website/` folder (any static host).
 
 > Ship the **latest** version (currently ≥ v0.4.48, which stores API keys in the
 > Keychain). The DMG built before v0.4.48 predates that security fix.
