@@ -159,19 +159,24 @@
     /* Signature mark: the app icon with a soft heat glow + gentle breathe */
     .mark-stage { position: relative; display: flex; flex-direction: column; align-items: center; margin: 0 auto var(--space-7); }
     .mark-glow {
-      position: absolute; width: 340px; height: 340px; top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      background: radial-gradient(circle, rgba(255,122,47,0.20), transparent 68%);
+      position: absolute; width: 360px; height: 360px; top: 50%; left: 50%;
+      background: radial-gradient(circle, rgba(255,122,47,0.26), rgba(255,122,47,0.05) 55%, transparent 70%);
       pointer-events: none; z-index: 0;
+      /* the icon stays put — the heat glow breathes, like a forge glowing */
+      animation: forge-glow 3.4s ease-in-out infinite;
+    }
+    @keyframes forge-glow {
+      0%, 100% { opacity: 0.55; transform: translate(-50%, -50%) scale(0.9); }
+      50%      { opacity: 1;    transform: translate(-50%, -50%) scale(1.08); }
     }
     .mark-img {
       position: relative; z-index: 1;
       width: clamp(132px, 24vw, 184px); height: auto;
       border-radius: 22%;
-      animation: breathe 2.8s ease-in-out infinite;
     }
-    @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
-    @media (prefers-reduced-motion: reduce) { .mark-img { animation: none; } }
+    @media (prefers-reduced-motion: reduce) {
+      .mark-glow { animation: none; transform: translate(-50%, -50%); opacity: 0.8; }
+    }
     .hero-actions { display: flex; align-items: center; justify-content: center; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-4); }
     .hero-caption { font-family: var(--font-mono); font-size: 0.8125rem; letter-spacing: 0.02em; color: var(--fg-text-faint); }
 
