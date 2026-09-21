@@ -333,6 +333,7 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
                           : _DoneBar(
                               alreadyShipped: state.featureShipped,
                               canFix: state.canFix,
+                              completionWarning: state.completionWarning,
                               onShip: () async {
                                 // Shipping does real work (docs + commit + push),
                                 // which takes a few seconds — show a clear
@@ -1471,6 +1472,7 @@ class _DoneBar extends StatelessWidget {
   const _DoneBar({
     required this.alreadyShipped,
     required this.canFix,
+    required this.completionWarning,
     required this.onShip,
     required this.onFix,
     required this.onFollowUp,
@@ -1478,6 +1480,9 @@ class _DoneBar extends StatelessWidget {
   });
   final bool alreadyShipped;
   final bool canFix;
+
+  /// Set by the completion guard when the diff looks like a fake completion.
+  final String? completionWarning;
   final VoidCallback onShip;
   final VoidCallback onFix;
   final VoidCallback onFollowUp;
@@ -1485,7 +1490,15 @@ class _DoneBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final trouble = canFix;
+    final flagged = completionWarning != null;
+    // Either a failed check or a fake-completion flag makes this a cautious
+    // finish: amber bar, and "Ship anyway" instead of a one-click "Mark shipped".
+    final trouble = canFix || flagged;
+    final message = flagged
+        ? completionWarning!
+        : (canFix
+            ? 'Run finished with issues. Let the AI fix them?'
+            : 'Run complete. Mark this feature as shipped?');
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -1502,13 +1515,11 @@ class _DoneBar extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              trouble
-                  ? 'Run finished with issues. Let the AI fix them?'
-                  : 'Run complete. Mark this feature as shipped?',
+              message,
               style: const TextStyle(fontSize: 13, color: Color(0xFFE5E5E7)),
             ),
           ),
-          if (trouble) ...[
+          if (canFix) ...[
             FilledButton.icon(
               onPressed: onFix,
               icon: const Icon(Icons.healing_outlined, size: 16),

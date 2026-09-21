@@ -170,6 +170,7 @@ class ImplRunState {
     this.startedAt,
     this.endedAt,
     this.canFix = false,
+    this.completionWarning,
   });
 
   factory ImplRunState.initial(String runId) => ImplRunState(
@@ -208,6 +209,12 @@ class ImplRunState {
   final String? error;
   final bool featureShipped;
 
+  /// Set by the completion guard when the run's applied diff looks like a fake
+  /// completion (docs/config only, or only stubs/placeholders). Null when the
+  /// build produced a real code artifact. Surfaced in the done bar so the run
+  /// isn't one-click "shipped" without a look. See [CompletionGuard].
+  final String? completionWarning;
+
   int get approvedEditCount =>
       (plan?.edits.length ?? 0) - skippedEdits.length;
   int get approvedCommandCount =>
@@ -226,6 +233,8 @@ class ImplRunState {
     DateTime? startedAt,
     DateTime? endedAt,
     bool? canFix,
+    String? completionWarning,
+    bool clearCompletionWarning = false,
   }) {
     return ImplRunState(
       runId: runId,
@@ -241,6 +250,9 @@ class ImplRunState {
       startedAt: startedAt ?? this.startedAt,
       endedAt: endedAt ?? this.endedAt,
       canFix: canFix ?? this.canFix,
+      completionWarning: clearCompletionWarning
+          ? null
+          : (completionWarning ?? this.completionWarning),
     );
   }
 }

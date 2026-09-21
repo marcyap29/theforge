@@ -93,7 +93,9 @@ something is done *and verified*, state it plainly without hedging. No hollow
   human effort) and a concrete approach, not vibes.
 - **Build-with-AI** — implement the real artifact; if you can't, return an empty
   edit set with a `CANNOT BUILD:` summary; write summaries that describe what the
-  code actually does.
+  code actually does. A deterministic **completion guard** backs this up: it
+  inspects the applied diff and flags a docs/config-only or stub-only run so it
+  can't be one-click "shipped" — the honest counterpart to the build gate.
 
 *Keep this in sync with the agent prompts. When behavior and this doc drift,
 fix both.*

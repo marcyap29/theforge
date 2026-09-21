@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.50 — 2026-09-20
+
+- **Completion guard — a deterministic honesty check on every Build-with-AI run.** The enforcement counterpart to v0.4.49's *NO FAKE COMPLETIONS* prompt rule: after a run applies its edits, the guard inspects the **actual applied diff** and refuses to let the run be passed off as a real build when it isn't. It flags three cases — **nothing changed**, **docs/config only** (the exact shape of the fake ".sh deployment" commit that only touched CHANGELOG + one config line, and the fake "image recognition" commit that only flipped a flag), and **stubs/placeholders only** (a code diff dominated by `TODO`/`simulate`/`"not implemented"` — the `_simulateDetection` toggle pattern). When flagged, the done bar turns amber, shows the plain-English reason ("This build only changed docs/config — did it actually implement the feature, or just describe it?"), and offers **Ship anyway** instead of a one-click **Mark shipped**, so a hollow build can't be shipped without a look. Catches a fake even when the model ignores the prompt rule. The classifier is pure and unit-tested (`CompletionGuard`); it errs toward silence — the docs/config check is precise, and the placeholder check only fires when markers *dominate* the added code, so real code with a stray `// TODO` is never flagged. `CompletionGuard` + `ImplRunNotifier._applyAndRun` + `ImplRunState.completionWarning` + `_DoneBar`.
+
+---
+
 ## v0.4.49 — 2026-09-20
 
 - **Collaboration Playbook + no-fake-completions rule for the build agent.** Captures the working style that makes the Forge cooperate *with* a builder rather than hand them hollow shells — as a reusable template (`templates/COLLABORATION_PLAYBOOK.md`): the *Understand → Propose (with a recommendation) → confirm only if blocked → build small → verify for real → report plainly* loop, and the principles (diagnose first; name the constraint and never fake a completion; offer options with a lean; ship small + verify on the real thing; teach the why; stepping stones; honest reporting). And it wires the enforcement into **Build-with-AI's system prompt** — a **NO FAKE COMPLETIONS** rule: implement the real artifact (a docs/CHANGELOG/config-only change is not an implementation; no stub/`simulate…`/`TODO` disguised as done), and if it genuinely can't be code-generated, return an empty edit set with a `CANNOT BUILD:` summary instead of a cosmetic diff. This is the direct fix for the fake ".sh deployment" and fake "Local AI Image Recognition v1" completions.

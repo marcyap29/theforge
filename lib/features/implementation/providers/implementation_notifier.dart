@@ -10,6 +10,7 @@ import '../../../services/llm/llm_provider.dart';
 import '../../../services/llm/llm_service_provider.dart';
 import '../../projects/providers/providers.dart';
 import '../data/command_runner.dart';
+import '../data/completion_guard.dart';
 import '../data/impl_agent.dart';
 import '../data/impl_workspace.dart';
 import '../models/run_session.dart';
@@ -390,6 +391,9 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
   Future<void> _applyAndRun(ImplBrief brief, AgentPlan plan) async {
     // --- Apply edits ---
     _phase(RunPhase.applying);
+    // Clear any completion warning from a prior attempt in this run (the fix
+    // loop re-enters here) so a stale flag never outlives the build it judged.
+    state = state.copyWith(clearCompletionWarning: true);
     final applied = {...state.appliedEditPaths};
     for (var i = 0; i < plan.edits.length; i++) {
       if (state.skippedEdits.contains(i)) continue;
@@ -477,6 +481,21 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
       state = state.copyWith(verifications: results);
     }
 
+    // --- Completion guard: a deterministic honesty check on the diff ---
+    // The NO FAKE COMPLETIONS prompt tells the agent not to fake a build; this
+    // catches it when the model does anyway. If the applied diff is only
+    // docs/config or only stubs, flag it so the run isn't passed off as done.
+    final appliedEdits = <ProposedEdit>[
+      for (var i = 0; i < plan.edits.length; i++)
+        if (!state.skippedEdits.contains(i) &&
+            state.appliedEditPaths.contains(plan.edits[i].path))
+          plan.edits[i],
+    ];
+    final verdict = CompletionGuard.inspect(appliedEdits);
+    if (verdict.suspicious) {
+      _log(ConsoleLineKind.error, '⚠ Completion check: ${verdict.reason}');
+    }
+
     final report = failures.toString().trim();
     _fixContext = report.isEmpty ? null : report;
     _log(
@@ -484,7 +503,10 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
         report.isEmpty
             ? 'Run complete.'
             : 'Run finished with issues — you can ask the AI to fix them.');
-    state = state.copyWith(canFix: report.isNotEmpty);
+    state = state.copyWith(
+      canFix: report.isNotEmpty,
+      completionWarning: verdict.suspicious ? verdict.reason : null,
+    );
     _phase(RunPhase.done);
   }
 

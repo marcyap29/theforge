@@ -401,10 +401,11 @@ The Forge's first hands-on-keyboard mode: an in-app agent that implements a trac
 
 | Layer | File | Responsibility |
 |---|---|---|
-| **Models** | `models/run_session.dart` | `RunPhase`, `ConsoleLine` (kinds incl. `thinking` / `presentation`), `ProposedEdit`, `ProposedCommand`, `AgentPlan`, `ImplRunState` |
+| **Models** | `models/run_session.dart` | `RunPhase`, `ConsoleLine` (kinds incl. `thinking` / `presentation`), `ProposedEdit`, `ProposedCommand`, `AgentPlan`, `ImplRunState` (incl. `completionWarning` from the completion guard) |
 | **Brains** | `data/impl_agent.dart` | Two-pass scout → plan LLM pipeline; revision block for modify-plan / fix; `buildUserContext` (public/static) assembles the always-on block (ingested reference + build-memory slots, `_refCap`/`_memCap`, visible trim markers); scout offers an overflow-only doc manifest and pulls selected entries via `readDoc` |
 | **Hands (repo)** | `data/impl_workspace.dart` | Gather repo files + `gatherKeyDocs`, apply edits with `.forge/impl_backups/` Undo, checklist verify |
 | **Hands (shell)** | `data/command_runner.dart` | `Process.start` streamed subprocess + denylist + 3-min timeout — the FIRST streamed subprocess in the app |
+| **Honesty check** | `data/completion_guard.dart` | Pure `CompletionGuard.inspect(appliedEdits) → CompletionVerdict`; classifies a run's applied diff (noEdits / docsConfigOnly / placeholderOnly / none). No I/O, unit-tested |
 | **Conductor** | `providers/implementation_notifier.dart` | keepAlive per-feature run state machine; `_plan` shared by start / revise / fix (loads ingested + build-memory pools each round); `shipFeature` writes a build-memory record via `buildMemoryRecord`; generation counter for stale-stream safety |
 | **Registry** | `providers/implementation_providers.dart` | Entitlement stub + `implActiveRunsProvider` registry |
 | **Window** | `screens/implementation_screen.dart` | Streamed console, collapsible thinking, approval / edit / revise controls |
@@ -417,7 +418,8 @@ The Forge's first hands-on-keyboard mode: an in-app agent that implements a trac
 3. **Approve** — nothing touches disk until the user approves. The user can approve, **edit** the plan, or **revise** it (free-text feedback → re-plan via the shared revision block).
 4. **Apply** — approved edits are written; the prior file contents are backed up to `.forge/impl_backups/` so any change is one-click **Undo**-able. Approved commands run through `command_runner` (streamed, denylisted, timed out).
 5. **Verify** — `impl_workspace` runs the checklist verify (e.g. `dart analyze`) against the result.
-6. **Fix-on-failure** — if verify fails, the same `_plan` path runs in fix mode, feeding the failure back to the agent for a corrective plan (subject to the same approval gate).
+6. **Completion guard** — `CompletionGuard.inspect` runs on the **applied** edits (the ones actually written this run) as a deterministic honesty check: it flags a run whose diff is *nothing*, *docs/config only*, or *stubs/placeholders only* into `ImplRunState.completionWarning`. The done bar then requires **Ship anyway** rather than one-click **Mark shipped**. This is the enforcement counterpart to the NO FAKE COMPLETIONS prompt rule — it catches a fake completion even when the model ignores the rule. Pure/unit-tested; conservative (the placeholder check fires only when markers dominate the added code).
+7. **Fix-on-failure** — if verify fails, the same `_plan` path runs in fix mode, feeding the failure back to the agent for a corrective plan (subject to the same approval gate).
 
 ### Grounding, streaming, run lifecycle
 
