@@ -7,6 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
 import '../../../data/filesystem/project_file_repository.dart';
+import '../../../services/llm/llm_provider.dart';
+import '../../../services/llm/llm_service_provider.dart';
+import '../../../services/llm/model_capability.dart';
+import '../../settings/settings_providers.dart';
 import '../../tracker/widgets/active_model_chip.dart';
 import '../../tracker/widgets/relocate_repo.dart';
 import '../models/run_session.dart';
@@ -46,6 +50,10 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
   /// push) before returning to the board — drives a visible "working" bar so the
   /// few-second delay doesn't look like a hang.
   bool _shipping = false;
+
+  /// The user dismissed the "Build model isn't a coding model" nudge for this
+  /// window session (re-appears next time they open a build).
+  bool _modelWarnDismissed = false;
 
   /// Shared prompt/compose text — used by the bottom box AND the right-side
   /// "Build this feature" button.
@@ -112,6 +120,51 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
   void _startAction(String key, String instruction) {
     setState(() => _activeAction = key);
     _action(instruction);
+  }
+
+  /// The "your Build model isn't a coding model" nudge — a thin amber bar shown
+  /// above the console when the executor role is on a reasoning/vision model
+  /// (the recurring cause of stalled/looping builds). Offers a one-click switch
+  /// to the best coder model the user has configured. Returns `const []` when
+  /// the model is a fine fit, the nudge was dismissed, or nothing's configured
+  /// yet — so it never nags on a reasonable default.
+  List<Widget> _modelFitBanner() {
+    if (_modelWarnDismissed) return const [];
+    final exec = ref.watch(llmServiceProvider).resolve(LlmRole.executor);
+    if (exec == null || exec.modelId.isEmpty) return const [];
+    final cap = classifyModel(exec.modelId);
+    if (!warnsForBuildRole(cap)) return const [];
+
+    final settings = ref.watch(llmSettingsProvider);
+    final ollamaModels =
+        ref.watch(settingsProvider).valueOrNull?.ollamaModels ?? const [];
+    final upgrade = pickBuildCoderUpgrade(
+      currentProvider: exec.provider,
+      settings: settings,
+      ollamaModels: ollamaModels,
+    );
+    return [
+      _ModelFitBanner(
+        modelId: exec.modelId,
+        capabilityNoun: capabilityNoun(cap),
+        upgrade: upgrade,
+        onSwitch: upgrade == null
+            ? null
+            : () async {
+                await ref
+                    .read(settingsProvider.notifier)
+                    .setRoleAssignment(LlmRole.executor, upgrade.assignment);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                        content:
+                            Text('Build model set to ${upgrade.displayName}')),
+                  );
+                }
+              },
+        onDismiss: () => setState(() => _modelWarnDismissed = true),
+      ),
+    ];
   }
 
   /// A follow-up round after a run: the AI reviews what it just did and proposes
@@ -301,6 +354,7 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
                 flex: 3,
                 child: Column(
                   children: [
+                    ..._modelFitBanner(),
                     Expanded(
                       child: (state.phase == RunPhase.idle &&
                               state.console.isEmpty)
@@ -1461,6 +1515,82 @@ class _ShippingBar extends StatelessWidget {
               'seconds — the window will close when it\'s done.',
               style: TextStyle(fontSize: 13, color: Color(0xFFE5E5E7)),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Thin amber nudge shown above the console when the Build (executor) role is
+/// assigned a reasoning/vision model — the recurring cause of stalled/looping
+/// builds. Offers a one-click switch to a configured coder model (when one
+/// exists) and a dismiss. Deterministic, informational — nothing auto-changes.
+class _ModelFitBanner extends StatelessWidget {
+  const _ModelFitBanner({
+    required this.modelId,
+    required this.capabilityNoun,
+    required this.upgrade,
+    required this.onSwitch,
+    required this.onDismiss,
+  });
+
+  final String modelId;
+  final String capabilityNoun;
+  final CoderUpgrade? upgrade;
+  final Future<void> Function()? onSwitch;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+      decoration: const BoxDecoration(
+        color: Color(0x33E8A04C),
+        border: Border(bottom: BorderSide(color: Color(0x55E8A04C))),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded,
+              size: 16, color: Color(0xFFE8A04C)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text.rich(
+              TextSpan(children: [
+                TextSpan(
+                    text: modelId,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFE5E5E7))),
+                TextSpan(
+                    text: ' looks like $capabilityNoun. Build works best with '
+                        'a coding model — reasoning models tend to loop on the '
+                        'exact code edits.',
+                    style: const TextStyle(color: Color(0xFFCFCFD2))),
+              ]),
+              style: const TextStyle(fontSize: 12.5),
+            ),
+          ),
+          if (upgrade != null && onSwitch != null) ...[
+            const SizedBox(width: 8),
+            FilledButton.icon(
+              onPressed: onSwitch,
+              icon: const Icon(Icons.swap_horiz, size: 15),
+              label: Text('Switch to ${upgrade!.displayName}'),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFE8A04C),
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                textStyle:
+                    const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+          IconButton(
+            icon: const Icon(Icons.close, size: 16),
+            color: const Color(0xFF8A8A8E),
+            tooltip: 'Dismiss',
+            onPressed: onDismiss,
           ),
         ],
       ),
