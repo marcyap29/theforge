@@ -47,6 +47,23 @@ void main() {
       expect(await repo.readBuildMemory(tmp.path), isNull);
     });
 
+    test('hasBuildMemory reflects whether a feature was shipped (the '
+        'reconciliation ground-truth signal)', () async {
+      expect(ProjectFileRepository.hasBuildMemory(tmp.path, 'feat-1'), isFalse);
+      await repo.writeBuildMemory(tmp.path, 'feat-1', '### Add login\nbody');
+      expect(ProjectFileRepository.hasBuildMemory(tmp.path, 'feat-1'), isTrue);
+      // A different feature is unaffected.
+      expect(ProjectFileRepository.hasBuildMemory(tmp.path, 'feat-2'), isFalse);
+    });
+
+    test('hasBuildMemory matches the same id-sanitisation as writeBuildMemory',
+        () async {
+      // UUID-with-colons or other unsafe chars must resolve to the same file.
+      const messyId = 'proj:1/feat 2';
+      await repo.writeBuildMemory(tmp.path, messyId, '### x');
+      expect(ProjectFileRepository.hasBuildMemory(tmp.path, messyId), isTrue);
+    });
+
     test('write then read round-trips the record', () async {
       await repo.writeBuildMemory(tmp.path, 'feat-1', '### Add login\nbody');
       final out = await repo.readBuildMemory(tmp.path);

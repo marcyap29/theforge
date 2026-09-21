@@ -69,6 +69,29 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     super.initState();
     Future.microtask(_loadStaleness);
     Future.microtask(_loadRepoPath);
+    Future.microtask(_reconcileStatuses);
+  }
+
+  /// On open, self-heal any feature that was shipped but lost its status (the
+  /// pre-v0.4.56 write bug where the shipped→DB write could be skipped on
+  /// navigation). Passes the live-run set so a feature that's currently
+  /// building is never touched; surfaces what it corrected.
+  Future<void> _reconcileStatuses() async {
+    final busy = ref
+        .read(implActiveRunsProvider)
+        .entries
+        .where((e) => e.value != RunPhase.idle)
+        .map((e) => e.key)
+        .toSet();
+    final healed = await ref
+        .read(featureListProvider(project.id).notifier)
+        .reconcileStatuses(busy);
+    if (healed > 0 && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Reconciled $healed feature${healed == 1 ? '' : 's'} to '
+            'shipped — found a build record but the status had been lost.'),
+      ));
+    }
   }
 
   Future<void> _loadRepoPath() async {

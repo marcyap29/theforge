@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../data/filesystem/project_file_repository.dart';
 import '../../../data/local_db/forge_database.dart';
 import '../../projects/providers/providers.dart';
 import '../data/tracker_repository.dart';
@@ -93,6 +94,36 @@ class FeatureListNotifier extends FamilyAsyncNotifier<List<Feature>, String> {
 
   Future<void> setStatus(Feature feature, FeatureStatus status) =>
       updateFeature(feature, status: status);
+
+  /// Self-heals features that were shipped but lost their status — the
+  /// pre-v0.4.56 bug where the shipped→DB write could be skipped if the board
+  /// was navigated away while a build window was open. A feature stuck at
+  /// `in_progress`, with a build-memory record (written only on ship) and no
+  /// live run, is reconciled back to `shipped`. Conservative: only `in_progress`
+  /// features, and never one that's currently building ([busyFeatureIds] — the
+  /// caller passes the live-run set so this file needn't depend on the build
+  /// layer). Returns the count healed so the board can surface it. Best-effort.
+  Future<int> reconcileStatuses(Set<String> busyFeatureIds) async {
+    final path = await _projectPath();
+    if (path == null) return 0;
+    final repo = ref.read(trackerRepositoryProvider);
+    final current =
+        state.valueOrNull ?? await repo.featuresForProject(_projectId);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    var healed = 0;
+    for (final f in current) {
+      if (FeatureStatus.fromWire(f.status) != FeatureStatus.inProgress) continue;
+      if (busyFeatureIds.contains(f.id)) continue;
+      if (!ProjectFileRepository.hasBuildMemory(path, f.id)) continue;
+      await repo.saveFeature(
+        f.copyWith(status: FeatureStatus.shipped.wire, updatedAt: now),
+        projectPath: path,
+      );
+      healed++;
+    }
+    if (healed > 0) ref.invalidateSelf();
+    return healed;
+  }
 
   Future<void> deleteFeature(Feature feature) async {
     final repo = ref.read(trackerRepositoryProvider);

@@ -368,9 +368,20 @@ class ProjectFileRepository {
       String projectPath, String featureId, String content) async {
     final dir = Directory(p.join(projectPath, forgeDirName, 'build_memory'));
     await dir.create(recursive: true);
-    final safe = featureId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+    final safe = _buildMemorySafeId(featureId);
     await File(p.join(dir.path, '$safe.md')).writeAsString(content);
   }
+
+  static String _buildMemorySafeId(String featureId) =>
+      featureId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+
+  /// Whether a build-memory record exists for [featureId] — i.e. this feature
+  /// was shipped at least once (the record is written on ship). Used to
+  /// reconcile a feature that lost its shipped status back to shipped.
+  static bool hasBuildMemory(String projectPath, String featureId) =>
+      File(p.join(projectPath, forgeDirName, 'build_memory',
+              '${_buildMemorySafeId(featureId)}.md'))
+          .existsSync();
 
   /// Concatenates every shipped feature's build-memory record into one block for
   /// the build agent to read back — this is how context "remains" and grows

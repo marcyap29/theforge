@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.57 — 2026-09-20
+
+- **Status reconciliation — the board now self-heals features that lost their "shipped" status.** The companion to v0.4.56's root-cause fix: features that were shipped *before* that fix (and got stuck at `in_progress`) now auto-correct. On opening a project's tracker, `reconcileStatuses` finds any feature that is `in_progress`, has a **build-memory record** (written only when a feature ships — the filesystem ground-truth that it *was* shipped), and is **not currently building**, and moves it back to `shipped`, surfacing a note ("Reconciled N features to shipped — found a build record but the status had been lost"). Conservative by design: it only ever touches `in_progress` features, never one with a live run (the board passes the active-run set so the tracker layer needn't depend on the build layer), so an in-flight build is never mis-healed. New `ProjectFileRepository.hasBuildMemory`; `FeatureListNotifier.reconcileStatuses` called from the board's `initState`. Unit-tested (`hasBuildMemory` ground-truth + id-sanitisation).
+
+---
+
 ## v0.4.56 — 2026-09-20
 
 - **Fixed: shipped features silently reverting to "in progress" after a restart.** The only place that wrote a feature's `shipped` status to the database was the tracker board's *post-build-window* callback (`_handleBuildResult`), which is gated on the board still being `mounted`. If you navigated away from the board while a build window was open (or the board was disposed), that callback was skipped — so the feature stayed at `in_progress` in the DB even though you'd marked it shipped. In-session it still *looked* shipped (the completed run's green dot lives in memory), but a reboot dropped the in-memory state and exposed the real `in_progress`. That's the intermittent "was shipped, now in progress" you saw. Fixed at the source: **`shipFeature()` now writes the `shipped` status to the DB (+ JSON mirror) itself** via a new `_persistShipped`, independent of any screen — so marking shipped persists regardless of navigation. New `ForgeDatabase.getFeatureById`. The board's callback remains as a harmless belt-and-suspenders (it also creates the release row). Note: features *already* mis-marked from before this fix stay `in_progress` until re-shipped or moved by hand — a reconciliation "double-check" to auto-heal those is the planned follow-up. `ImplRunNotifier.shipFeature`/`_persistShipped`.
