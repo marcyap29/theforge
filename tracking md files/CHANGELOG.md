@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.54 — 2026-09-20
+
+- **You can now change a feature's Kind (Buildable / Epic / Manual) by hand.** Until now, `buildKind` was only ever set by the Architect flow — so a mis-tagged item was stuck: you couldn't demote an over-eager epic back to buildable, or promote a `manual` sub-feature, from the board. The **Edit Feature** dialog gains a **Kind** selector (with a one-line hint for each: Buildable = Build-with-AI can do it directly; Epic = break into sub-features first; Manual = needs a human/dataset/model/design/service), threaded through `addFeature`/`updateFeature` (the provider already supported it — only the UI was missing). This unblocks reconciling redundant items — e.g. an epic whose Architect run produced a single near-duplicate `manual` child: reclassify the epic to Buildable and delete the clone. `FeatureEditResult.buildKind` + Kind chips in `feature_edit_dialog.dart`; `_addFeature`/`_editFeature` pass it through.
+
+---
+
 ## v0.4.53 — 2026-09-20
 
 - **Build-model fit warning — a nudge when the Build role is on the wrong kind of model.** Directly targets the recurring failure where a Build run stalls/loops because the executor is a *reasoning* model, not a coder (e.g. `qwen3.5:cloud` got stuck repeating its edit hunks and was stopped). A new pure classifier — `classifyModel(id) → {coder | reasoning | vision | fast | unknown}` — infers a model's best use from its id via a curated map + heuristics (order: vision → fast → coder → reasoning), erring toward `unknown` so it **never nags on a reasonable default** (`gpt-oss` stays unknown; only confident reasoning/vision models are flagged). When the Build (executor) role is on a flagged model, a thin **amber banner** appears above the build console — *"`qwen3.5:cloud` looks like a reasoning model. Build works best with a coding model…"* — with a **one-click "Switch to `<best configured coder>`"** button (`pickBuildCoderUpgrade` chooses the best coder among the models you actually have configured — same provider preferred, `think:false`; the button hides if you have none) and a dismiss. Nothing auto-switches — you stay in control. Foundation for a future opt-in "auto-select model per task". Pure + unit-tested (`test/model_capability_test.dart`, 13 cases). `model_capability.dart` + `_ModelFitBanner` / `_modelFitBanner()` in `implementation_screen.dart`.

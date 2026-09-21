@@ -476,6 +476,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
           status: result.status,
           priority: result.priority,
           targetVersion: result.targetVersion,
+          buildKind: result.buildKind,
         );
     ref.invalidate(portfolioProvider);
   }
@@ -490,6 +491,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
           status: result.status,
           priority: result.priority,
           targetVersion: result.targetVersion,
+          buildKind: result.buildKind,
         );
     ref.invalidate(portfolioProvider);
   }

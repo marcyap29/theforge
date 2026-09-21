@@ -11,6 +11,7 @@ class FeatureEditResult {
     required this.status,
     required this.priority,
     required this.targetVersion,
+    required this.buildKind,
   });
 
   final String title;
@@ -18,6 +19,10 @@ class FeatureEditResult {
   final FeatureStatus status;
   final int? priority;
   final String? targetVersion;
+
+  /// How the item should be built — lets the user re-classify by hand
+  /// (demote a mis-tagged epic, promote a manual sub-feature to buildable).
+  final BuildKind buildKind;
 }
 
 /// Shows a create/edit dialog for a feature. Pass [existing] to edit.
@@ -45,6 +50,7 @@ class _FeatureEditDialogState extends State<_FeatureEditDialog> {
   late final TextEditingController _version;
   late final TextEditingController _priority;
   late FeatureStatus _status;
+  late BuildKind _kind;
 
   @override
   void initState() {
@@ -56,6 +62,7 @@ class _FeatureEditDialogState extends State<_FeatureEditDialog> {
     _priority =
         TextEditingController(text: e?.priority?.toString() ?? '');
     _status = e != null ? FeatureStatus.fromWire(e.status) : FeatureStatus.planned;
+    _kind = e != null ? BuildKind.fromWire(e.buildKind) : BuildKind.standard;
   }
 
   @override
@@ -79,6 +86,7 @@ class _FeatureEditDialogState extends State<_FeatureEditDialog> {
         priority: int.tryParse(_priority.text.trim()),
         targetVersion:
             _version.text.trim().isEmpty ? null : _version.text.trim(),
+        buildKind: _kind,
       ),
     );
   }
@@ -126,6 +134,34 @@ class _FeatureEditDialogState extends State<_FeatureEditDialog> {
                 }).toList(),
               ),
               const SizedBox(height: 12),
+              const Text('Kind',
+                  style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 11)),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: BuildKind.values.map((k) {
+                  final selected = k == _kind;
+                  return ChoiceChip(
+                    label: Text(k.label),
+                    selected: selected,
+                    labelStyle: TextStyle(
+                      fontSize: 11,
+                      color: selected ? Colors.black : k.color,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    selectedColor: k.color,
+                    backgroundColor: k.color.withValues(alpha: 0.15),
+                    side: BorderSide(color: k.color.withValues(alpha: 0.5)),
+                    onSelected: (_) => setState(() => _kind = k),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 6),
+              Text(_kindHint(_kind),
+                  style: const TextStyle(
+                      color: Color(0xFF6B7280), fontSize: 10.5, height: 1.3)),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
@@ -157,6 +193,18 @@ class _FeatureEditDialogState extends State<_FeatureEditDialog> {
       ],
     );
   }
+
+  /// One-line plain-language reminder of what each kind means, so re-classifying
+  /// is an informed choice (it changes the pre-build gate).
+  static String _kindHint(BuildKind k) => switch (k) {
+        BuildKind.standard =>
+          'Buildable — Build-with-AI can implement it directly.',
+        BuildKind.epic =>
+          'Epic — too big for one build; break it into sub-features first.',
+        BuildKind.manual =>
+          'Manual — needs a human, dataset, model, design, or external service '
+              '(not code generation).',
+      };
 
   Widget _field(
     TextEditingController controller,
