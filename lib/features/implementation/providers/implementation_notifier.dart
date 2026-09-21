@@ -9,6 +9,8 @@ import '../../../data/filesystem/project_file_repository.dart';
 import '../../../services/llm/llm_provider.dart';
 import '../../../services/llm/llm_service_provider.dart';
 import '../../projects/providers/providers.dart';
+import '../../tracker/models/tracker_enums.dart';
+import '../../tracker/providers/tracker_providers.dart';
 import '../data/command_runner.dart';
 import '../data/completion_guard.dart';
 import '../data/impl_agent.dart';
@@ -665,8 +667,39 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
       // "docs ship with code" discipline The Forge holds itself to, applied to
       // the app being built.
       await _documentAndCommit(brief, plan, paths);
+      // Durably mark the tracked feature shipped — the source-of-truth write.
+      // Previously the only shipped→DB write lived in the tracker screen's
+      // post-window callback, gated on the board being `mounted`; navigating
+      // away while the build window was open silently skipped it, leaving the
+      // feature stuck at in_progress until a restart exposed it. Writing here
+      // makes shipping persist regardless of navigation.
+      await _persistShipped(brief);
     }
     state = state.copyWith(featureShipped: true);
+  }
+
+  /// Persists the tracked feature's status to `shipped` in the DB (+ JSON
+  /// mirror) and refreshes the board. Best-effort — never blocks the ship.
+  Future<void> _persistShipped(ImplBrief brief) async {
+    try {
+      final db = ref.read(forgeDatabaseProvider);
+      final feature = await db.getFeatureById(brief.featureId);
+      if (feature == null) return;
+      if (FeatureStatus.fromWire(feature.status) == FeatureStatus.shipped) {
+        return; // already shipped — nothing to do
+      }
+      await ref.read(trackerRepositoryProvider).saveFeature(
+            feature.copyWith(
+              status: FeatureStatus.shipped.wire,
+              updatedAt: DateTime.now().millisecondsSinceEpoch,
+            ),
+            projectPath: brief.projectPath,
+          );
+      ref.invalidate(featureListProvider(feature.projectId));
+      _log(ConsoleLineKind.success, '✓ marked shipped on the board');
+    } catch (e) {
+      _log(ConsoleLineKind.info, 'Could not persist shipped status: $e');
+    }
   }
 
   /// On ship: update the linked repo's docs (CHANGELOG + development log + a

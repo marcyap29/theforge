@@ -192,6 +192,9 @@ class ForgeDatabase extends _$ForgeDatabase {
   Future<List<Feature>> getFeaturesForProject(String projectId) =>
       (select(features)..where((t) => t.projectId.equals(projectId))).get();
 
+  Future<Feature?> getFeatureById(String id) =>
+      (select(features)..where((t) => t.id.equals(id))).getSingleOrNull();
+
   Future<void> upsertFeature(FeaturesCompanion entry) =>
       into(features).insertOnConflictUpdate(entry);
 
