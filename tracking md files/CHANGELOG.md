@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.55 — 2026-09-20
+
+- **Shipping features back-to-back no longer spams the repo with duplicate commits** (BUG-IMPL-010). Marking several sub-features shipped in a row was producing near-empty, duplicate-titled commits — e.g. four separate *"feat: Sequential Verification Logic & Reverse Mode + docs"* commits, most touching only `docs/ARCHITECTURE.md`. Root cause: the ship flow (`_documentAndCommit`) **always LLM-rewrites the whole `ARCHITECTURE.md`**, which comes back slightly different every time — so `git add -A` always found *something* to commit even when the code and other docs were unchanged, manufacturing a churn commit that carried the current window's feature title. Fixed with a **redundant-ship guard**: after the deterministic CHANGELOG/dev-log updates but **before** the architecture rewrite, the flow checks `gitHasChanges` (new `git status --porcelain` helper) — if the tree is clean (code already committed, entries deduped), it skips the LLM rewrite *and* the commit ("Already shipped & documented — nothing new to commit"). A real re-build with new code still commits normally. Plus an in-session guard: `shipFeature` no-ops if the window already shipped. One clean commit per feature that actually changes something. Unit-tested (`test/git_has_changes_test.dart`). `_documentAndCommit`/`shipFeature` + `ProjectFileRepository.gitHasChanges`.
+
+---
+
 ## v0.4.54 — 2026-09-20
 
 - **You can now change a feature's Kind (Buildable / Epic / Manual) by hand.** Until now, `buildKind` was only ever set by the Architect flow — so a mis-tagged item was stuck: you couldn't demote an over-eager epic back to buildable, or promote a `manual` sub-feature, from the board. The **Edit Feature** dialog gains a **Kind** selector (with a one-line hint for each: Buildable = Build-with-AI can do it directly; Epic = break into sub-features first; Manual = needs a human/dataset/model/design/service), threaded through `addFeature`/`updateFeature` (the provider already supported it — only the UI was missing). This unblocks reconciling redundant items — e.g. an epic whose Architect run produced a single near-duplicate `manual` child: reclassify the epic to Buildable and delete the clone. `FeatureEditResult.buildKind` + Kind chips in `feature_edit_dialog.dart`; `_addFeature`/`_editFeature` pass it through.

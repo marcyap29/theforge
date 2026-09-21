@@ -643,6 +643,10 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
   /// read it back in [_plan] — context that's gained and remains), then flags
   /// the run shipped. Safe with no plan (nothing to record — just flags).
   Future<void> shipFeature() async {
+    // In-session guard: don't re-run the whole doc+commit flow if this window
+    // already shipped its feature (a double-click or re-entry). The durable
+    // cross-session guard is the gitHasChanges check in _documentAndCommit.
+    if (state.featureShipped) return;
     final brief = _brief;
     final plan = state.plan;
     if (brief != null && plan != null) {
@@ -695,6 +699,19 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
       _log(ConsoleLineKind.success, '✓ docs/DEVELOPMENT_LOG.md');
     } catch (e) {
       _log(ConsoleLineKind.info, 'Could not update development log: $e');
+    }
+
+    // Redundant-ship guard: if, after the deterministic doc updates, the tree
+    // has nothing to commit (code already committed, CHANGELOG/dev-log entries
+    // deduped), this is a repeat ship of an already-shipped feature. Stop here —
+    // do NOT run the ARCHITECTURE refresh, which rewrites the whole doc via the
+    // LLM and would otherwise manufacture a spurious "docs-only" commit with a
+    // duplicate title. (BUG-IMPL-010.) Checked before the refresh so its
+    // churn can't mask an otherwise-clean tree.
+    if (!await ProjectFileRepository.gitHasChanges(repoPath)) {
+      _log(ConsoleLineKind.info,
+          'Already shipped & documented — nothing new to commit (skipping duplicate commit).');
+      return;
     }
 
     // --- Best-effort architecture refresh via the architect model ---

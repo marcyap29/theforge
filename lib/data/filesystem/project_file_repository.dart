@@ -858,6 +858,20 @@ class ProjectFileRepository {
 
   /// Stages all changes and commits them in the linked repo. Returns true on
   /// success. Never throws — a non-repo or a failed commit returns false.
+  /// True if the working tree has any uncommitted change (staged, unstaged, or
+  /// untracked) — i.e. `git add -A && git commit` would produce a commit.
+  /// Returns false (never throws) if it's not a git repo or git errors.
+  static Future<bool> gitHasChanges(String repoPath) async {
+    try {
+      final res = await Process.run('git', ['status', '--porcelain'],
+          workingDirectory: repoPath);
+      if (res.exitCode != 0) return false;
+      return (res.stdout as String).trim().isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Future<bool> gitCommitAll(String repoPath, String message) async {
     try {
       final add =
