@@ -49,13 +49,18 @@ class _ArchitectDialogState extends State<_ArchitectDialog> {
                     style: const TextStyle(
                         fontSize: 12.5, color: Color(0xFF9CA3AF))),
               ),
-            const Padding(
-              padding: EdgeInsets.only(bottom: 6),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
               child: Text(
-                'Kept sub-features become tracked items nested under this feature '
-                '(which becomes an epic). "Manual" items are human/ML/data work — '
-                'the AI won\'t try to code-generate them.',
-                style: TextStyle(fontSize: 11.5, color: Color(0xFF6B7280)),
+                plan.isEpic
+                    ? 'Kept sub-features become tracked items nested under this '
+                        'feature (which becomes an epic). "Manual" items are '
+                        'human/ML/data work — the AI won\'t try to code-generate '
+                        'them.'
+                    : 'This is a single, buildable feature — not an epic. '
+                        'Confirming sharpens its description and marks it ready '
+                        'to Build with AI (no sub-features are created).',
+                style: const TextStyle(fontSize: 11.5, color: Color(0xFF6B7280)),
               ),
             ),
             for (final s in plan.subFeatures) _row(s),
@@ -72,7 +77,9 @@ class _ArchitectDialogState extends State<_ArchitectDialog> {
               ? null
               : () => Navigator.of(context)
                   .pop(plan.subFeatures.where((s) => s.selected).toList()),
-          child: Text('Add $selected to board'),
+          child: Text(plan.isEpic
+              ? 'Add $selected to board'
+              : 'Mark buildable'),
         ),
       ],
     );

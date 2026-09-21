@@ -491,8 +491,34 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     if (kept == null || kept.isEmpty || !mounted) return;
 
     final notifier = ref.read(featureListProvider(project.id).notifier);
-    // Mark the parent as an epic so the board tags it and the build gate steers
-    // to its sub-features.
+
+    // NOT an epic: the architect judged this a single buildable feature. Don't
+    // wrap it in an epic and nest a clone of itself — that's what caused the
+    // architect → build-gate → architect loop. Instead sharpen it in place and
+    // adopt the single sub-feature's buildKind (usually "standard", which the
+    // build gate lets through; "manual" if it's really human/ML work). This
+    // also DEMOTES a feature that was mis-marked as an epic, breaking the loop.
+    if (!plan.isEpic) {
+      final only = kept.first;
+      await notifier.updateFeature(
+        feature,
+        description: only.description ?? feature.description,
+        buildKind: only.buildKind,
+      );
+      if (mounted) {
+        final manual = only.buildKind == BuildKind.manual;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(manual
+                ? '“${feature.title}” is a single feature that needs human/ML '
+                    'work — see “How to build this”.'
+                : '“${feature.title}” is a single buildable feature — ready to '
+                    'Build with AI.')));
+      }
+      return;
+    }
+
+    // A real epic: mark the parent so the board tags it and the build gate
+    // steers to its sub-features, then nest the kept sub-features under it.
     await notifier.updateFeature(feature, buildKind: BuildKind.epic);
     for (final s in kept) {
       await notifier.addFeature(
