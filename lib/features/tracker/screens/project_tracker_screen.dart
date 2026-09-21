@@ -525,6 +525,71 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     ));
   }
 
+  /// Pre-build guards that stop The Forge blindly re-running a build that would
+  /// stack onto leftover work or recreate something already built (the pattern
+  /// behind the duplicate `_HighlightPainter` / `procedure_model.dart` messes).
+  /// Deterministic, no AI call. Returns true to proceed with the build.
+  Future<bool> _preBuildChecks(Feature feature, String repoPath) async {
+    // 1. Leftover uncommitted work — a prior/failed build (or manual edits) not
+    //    yet committed. Building on top of it stacks changes and, if the last
+    //    build failed, recreates code that's already sitting in the tree.
+    if (await ProjectFileRepository.gitHasChanges(repoPath)) {
+      if (!mounted) return false;
+      final proceed = await _confirmProceed(
+        title: 'Uncommitted changes in the repo',
+        body: 'The linked repo has uncommitted changes from a previous build or '
+            'manual edits. Building now stacks new edits onto them — and if the '
+            'last build failed, it can recreate code that\'s already there. '
+            'Commit or discard them in git first, or build anyway.',
+      );
+      if (!proceed) return false;
+    }
+    // 2. Already built before but not marked shipped — a strong sign this work
+    //    exists (status may have been lost, or it was partially built). Building
+    //    from scratch risks duplicating it.
+    if (FeatureStatus.fromWire(feature.status) != FeatureStatus.shipped &&
+        ProjectFileRepository.hasBuildMemory(project.path, feature.id)) {
+      if (!mounted) return false;
+      final proceed = await _confirmProceed(
+        title: 'This feature may already be built',
+        body: 'There\'s a build record for “${feature.title}”, so it was built '
+            'at least once before. Building again can duplicate code (a second '
+            'class or file). Build with AI edits the existing code — make sure '
+            'it isn\'t recreating what\'s already there, or cancel and review.',
+      );
+      if (!proceed) return false;
+    }
+    return true;
+  }
+
+  /// A simple two-button [Cancel]/[Build anyway] confirmation. Returns true only
+  /// on "Build anyway". Non-destructive — nothing is changed for the user.
+  Future<bool> _confirmProceed({
+    required String title,
+    required String body,
+  }) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF141416),
+        title: Text(title),
+        content: Text(body,
+            style: const TextStyle(fontSize: 13, color: Color(0xFFE5E5E7))),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Build anyway'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
   /// The pre-build gate for an epic / manual feature: steer to Architect or
   /// How-to-build. Returns true only if the user chooses "Build anyway".
   Future<bool?> _confirmBuildDespiteKind(Feature feature, BuildKind kind) {
@@ -821,6 +886,11 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
 
     final repoPath = await _ensureRepoPath();
     if (repoPath == null) return; // user cancelled the create/link prompt
+
+    // Pre-build guards: don't blindly re-run a build that stacks onto leftover
+    // work or recreates something already built.
+    if (!mounted) return;
+    if (!await _preBuildChecks(feature, repoPath)) return;
 
     // Load spec/handoff context if a spec has been generated.
     String? lockedSpec;

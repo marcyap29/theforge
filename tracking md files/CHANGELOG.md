@@ -2,6 +2,15 @@
 
 ---
 
+## v0.4.58 — 2026-09-20
+
+- **Pre-build guards — The Forge now looks before it builds, so it stops recreating things that already exist.** Two deterministic checks run before a new Build-with-AI run is dispatched (no AI call), addressing the recurring duplicate-creation pattern (the duplicate `_HighlightPainter` class, the `procedure_model.dart` that duplicated `procedure.dart`):
+  - **Leftover uncommitted work** — if the linked repo has uncommitted changes (from a prior or *failed* build, or manual edits), it warns before building, because building on top stacks new edits onto them and can recreate code that's already sitting in the tree. Uses `gitHasChanges`.
+  - **Already built before** — if the feature has a build-memory record (written only on ship) but isn't marked shipped, it warns that the work likely already exists and building from scratch risks duplicating it. Uses `hasBuildMemory`.
+  Both are conservative and dismissable (Cancel / Build anyway), and only apply to a *new* build — re-attaching to a live run is never gated. `_preBuildChecks` + `_confirmProceed` in `project_tracker_screen.dart`.
+
+---
+
 ## v0.4.57 — 2026-09-20
 
 - **Status reconciliation — the board now self-heals features that lost their "shipped" status.** The companion to v0.4.56's root-cause fix: features that were shipped *before* that fix (and got stuck at `in_progress`) now auto-correct. On opening a project's tracker, `reconcileStatuses` finds any feature that is `in_progress`, has a **build-memory record** (written only when a feature ships — the filesystem ground-truth that it *was* shipped), and is **not currently building**, and moves it back to `shipped`, surfacing a note ("Reconciled N features to shipped — found a build record but the status had been lost"). Conservative by design: it only ever touches `in_progress` features, never one with a live run (the board passes the active-run set so the tracker layer needn't depend on the build layer), so an in-flight build is never mis-healed. New `ProjectFileRepository.hasBuildMemory`; `FeatureListNotifier.reconcileStatuses` called from the board's `initState`. Unit-tested (`hasBuildMemory` ground-truth + id-sanitisation).
