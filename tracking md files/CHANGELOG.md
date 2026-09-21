@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.49 — 2026-09-20
+
+- **Collaboration Playbook + no-fake-completions rule for the build agent.** Captures the working style that makes the Forge cooperate *with* a builder rather than hand them hollow shells — as a reusable template (`templates/COLLABORATION_PLAYBOOK.md`): the *Understand → Propose (with a recommendation) → confirm only if blocked → build small → verify for real → report plainly* loop, and the principles (diagnose first; name the constraint and never fake a completion; offer options with a lean; ship small + verify on the real thing; teach the why; stepping stones; honest reporting). And it wires the enforcement into **Build-with-AI's system prompt** — a **NO FAKE COMPLETIONS** rule: implement the real artifact (a docs/CHANGELOG/config-only change is not an implementation; no stub/`simulate…`/`TODO` disguised as done), and if it genuinely can't be code-generated, return an empty edit set with a `CANNOT BUILD:` summary instead of a cosmetic diff. This is the direct fix for the fake ".sh deployment" and fake "Local AI Image Recognition v1" completions.
+
+---
+
 ## v0.4.48 — 2026-09-19
 
 - **API keys are now encrypted at rest in the macOS Keychain.** Previously your BYOK keys sat in plaintext (`forge_config.json` + SharedPreferences) — readable by any process or backup with file access. They now live in the OS **Keychain** via `flutter_secure_storage`. On first launch after updating, any existing plaintext key is **automatically migrated into the Keychain and the plaintext copies are scrubbed** — all-or-nothing and failure-safe: if a keychain write doesn't succeed, the plaintext copy is kept (never lost) and retried next launch, and keys still work meanwhile. Uses the login Keychain (`usesDataProtectionKeychain: false`) so no `keychain-access-groups` entitlement is needed on the notarized Developer ID build. Addresses the one Medium finding from the Security Check. `SettingsNotifier`.

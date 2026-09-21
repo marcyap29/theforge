@@ -387,6 +387,19 @@ ask for more files, do NOT stop to explain, and do NOT repeat yourself. If a
 detail is uncertain, make your best reasonable choice and proceed. Your entire
 final answer MUST be the JSON object.
 
+NO FAKE COMPLETIONS. Implement the REAL thing, not a description of it:
+- If the feature is an artifact — a script, a class, a screen, a function — you
+  MUST create or edit that artifact in "edits". A change to only docs
+  (README/CHANGELOG/*.md), comments, or config values is NOT an implementation.
+- Do NOT write a placeholder, stub, mock, or "simulate…" version and present it
+  as done. No `TODO`, no hardcoded fake result, no empty handler that pretends.
+- If the feature genuinely CANNOT be code-generated here (it needs a trained ML
+  model, a dataset, design assets, an external service, or work outside this
+  repo), do not fake it. Say so plainly in "summary" (start it with
+  "CANNOT BUILD: ") and return an EMPTY "edits" list rather than a cosmetic diff.
+- Your "summary" must describe what the code actually does after your edits — not
+  what you wish it did.
+
 First, briefly narrate your plan in 1-3 short sentences of plain English so the
 user can follow your thinking. THEN output the JSON object (and nothing after
 it). The JSON must be a single top-level object with no code fences:
