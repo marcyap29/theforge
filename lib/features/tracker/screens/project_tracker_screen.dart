@@ -203,6 +203,9 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
                 if (features.isEmpty) {
                   return _EmptyState(onAdd: _addFeature, onScan: _scanRepo);
                 }
+                // Subtasks nest under their epic, so status columns are built
+                // from top-level features only; children ride along under them.
+                final (topLevel, childrenOf) = _splitEpics(features);
                 return ListView(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   children: [
@@ -210,8 +213,12 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
                       ..._buildOrderGroups(features)
                     else
                       for (final s in FeatureStatus.board)
-                        ..._group(s,
-                            features.where((f) => f.status == s.wire).toList()),
+                        ..._group(
+                            s,
+                            topLevel
+                                .where((f) => f.status == s.wire)
+                                .toList(),
+                            childrenOf),
                     const SizedBox(height: 40),
                   ],
                 );
@@ -267,9 +274,11 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
         ]),
       );
 
-  List<Widget> _group(FeatureStatus status, List<Feature> items) {
-    if (items.isEmpty) return const [];
+  List<Widget> _group(FeatureStatus status, List<Feature> roots,
+      Map<String, List<Feature>> childrenOf) {
+    if (roots.isEmpty) return const [];
     final activeRuns = ref.watch(implActiveRunsProvider);
+    final rows = _withSubtasks(roots, childrenOf);
     return [
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
@@ -277,26 +286,27 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
           children: [
             StatusChip(label: status.label, color: status.color, dense: true),
             const SizedBox(width: 8),
-            Text('${items.length}',
+            Text('${rows.length}',
                 style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12)),
           ],
         ),
       ),
-      ...items.map((f) => _FeatureTile(
-            feature: f,
-            runPhase: activeRuns[f.id],
+      ...rows.map((n) => _FeatureTile(
+            feature: n.feature,
+            indent: n.depth,
+            runPhase: activeRuns[n.feature.id],
             onSetStatus: (s) => ref
                 .read(featureListProvider(project.id).notifier)
-                .setStatus(f, s),
-            onEdit: () => _editFeature(f),
+                .setStatus(n.feature, s),
+            onEdit: () => _editFeature(n.feature),
             onDelete: () => ref
                 .read(featureListProvider(project.id).notifier)
-                .deleteFeature(f),
-            onBuild: () => _buildFeature(f),
-            onAdvice: () => _openBuildAdvice(f),
-            onArchitect: () => _architectFeature(f),
-            selected: f.id == _focusedFeatureId,
-            onFocus: () => setState(() => _focusedFeatureId = f.id),
+                .deleteFeature(n.feature),
+            onBuild: () => _buildFeature(n.feature),
+            onAdvice: () => _openBuildAdvice(n.feature),
+            onArchitect: () => _architectFeature(n.feature),
+            selected: n.feature.id == _focusedFeatureId,
+            onFocus: () => setState(() => _focusedFeatureId = n.feature.id),
           )),
     ];
   }
@@ -308,9 +318,28 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
   /// order" first to assign versions + priority; anything still unversioned
   /// lands in a trailing "Unversioned" group as a nudge to plan it.
   List<Widget> _buildOrderGroups(List<Feature> features) {
-    final unbuilt =
-        features.where((f) => FeatureStatus.fromWire(f.status).isActive).toList();
-    if (unbuilt.isEmpty) {
+    final (topLevel, childrenOf) = _splitEpics(features);
+    bool active(Feature f) => FeatureStatus.fromWire(f.status).isActive;
+
+    // The build queue = the unbuilt work PLUS every epic/subtask that contains
+    // it, so a step never orphans and always renders under its epic. Walk each
+    // active feature up to its root, marking the chain to keep.
+    final byId = {for (final f in features) f.id: f};
+    final keep = <String>{};
+    for (final f in features) {
+      if (!active(f)) continue;
+      var cur = f;
+      while (keep.add(cur.id)) {
+        final pid = cur.parentId;
+        if (pid == null) break;
+        final p = byId[pid];
+        if (p == null) break;
+        cur = p;
+      }
+    }
+
+    final roots = topLevel.where((f) => keep.contains(f.id)).toList();
+    if (roots.isEmpty) {
       return const [
         Padding(
           padding: EdgeInsets.all(32),
@@ -322,7 +351,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
         ),
       ];
     }
-    final byVersion = groupFeaturesByVersion(unbuilt);
+    final byVersion = groupFeaturesByVersion(roots);
     final versions = byVersion.keys.toList()..sort(_compareVersions);
     final activeRuns = ref.watch(implActiveRunsProvider);
 
@@ -330,31 +359,84 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     var firstConcrete = true;
     for (final v in versions) {
       final items = [...byVersion[v]!]..sort(_byBuildOrder);
+      final rows = _withSubtasks(items, childrenOf, keep: keep);
       final isNextUp = firstConcrete && v != 'Unversioned';
       if (v != 'Unversioned') firstConcrete = false;
       widgets.add(_VersionGroupHeader(
         version: v,
-        count: items.length,
+        count: rows.length,
         nextUp: isNextUp,
       ));
-      widgets.addAll(items.map((f) => _FeatureTile(
-            feature: f,
-            runPhase: activeRuns[f.id],
+      widgets.addAll(rows.map((n) => _FeatureTile(
+            feature: n.feature,
+            indent: n.depth,
+            runPhase: activeRuns[n.feature.id],
             onSetStatus: (s) => ref
                 .read(featureListProvider(project.id).notifier)
-                .setStatus(f, s),
-            onEdit: () => _editFeature(f),
+                .setStatus(n.feature, s),
+            onEdit: () => _editFeature(n.feature),
             onDelete: () => ref
                 .read(featureListProvider(project.id).notifier)
-                .deleteFeature(f),
-            onBuild: () => _buildFeature(f),
-            onAdvice: () => _openBuildAdvice(f),
-            onArchitect: () => _architectFeature(f),
-            selected: f.id == _focusedFeatureId,
-            onFocus: () => setState(() => _focusedFeatureId = f.id),
+                .deleteFeature(n.feature),
+            onBuild: () => _buildFeature(n.feature),
+            onAdvice: () => _openBuildAdvice(n.feature),
+            onArchitect: () => _architectFeature(n.feature),
+            selected: n.feature.id == _focusedFeatureId,
+            onFocus: () => setState(() => _focusedFeatureId = n.feature.id),
           )));
     }
     return widgets;
+  }
+
+  /// Splits [all] into top-level features and a map of epic-id → its subtasks.
+  /// A feature whose [parentId] resolves to another feature in this list is a
+  /// subtask (filed under its parent); everything else — including orphans whose
+  /// parent was deleted — stays top-level so nothing ever disappears. Subtasks
+  /// are pre-sorted into build order.
+  static (List<Feature>, Map<String, List<Feature>>) _splitEpics(
+      List<Feature> all) {
+    final ids = {for (final f in all) f.id};
+    final childrenOf = <String, List<Feature>>{};
+    final topLevel = <Feature>[];
+    for (final f in all) {
+      final pid = f.parentId;
+      if (pid != null && ids.contains(pid)) {
+        (childrenOf[pid] ??= []).add(f);
+      } else {
+        topLevel.add(f);
+      }
+    }
+    for (final list in childrenOf.values) {
+      list.sort(_byBuildOrder);
+    }
+    return (topLevel, childrenOf);
+  }
+
+  /// Flattens [roots] into display rows where every epic is immediately followed
+  /// by its own subtasks (recursively), each tagged with its nesting [depth].
+  /// This is what pins a subtask under its epic no matter how the board is
+  /// grouped or sorted — switching views can never restage a step above or away
+  /// from its parent. When [keep] is given, only ids in the set are emitted
+  /// (build-order uses this to drop already-built leaf steps while still
+  /// anchoring the rest under their epic).
+  static List<({Feature feature, int depth})> _withSubtasks(
+    List<Feature> roots,
+    Map<String, List<Feature>> childrenOf, {
+    Set<String>? keep,
+  }) {
+    final out = <({Feature feature, int depth})>[];
+    void emit(Feature f, int depth) {
+      if (keep != null && !keep.contains(f.id)) return;
+      out.add((feature: f, depth: depth));
+      for (final c in childrenOf[f.id] ?? const <Feature>[]) {
+        emit(c, depth + 1);
+      }
+    }
+
+    for (final r in roots) {
+      emit(r, 0);
+    }
+    return out;
   }
 
   /// Within a version: lowest priority number first (nulls last), then by
@@ -1295,10 +1377,15 @@ class _FeatureTile extends StatelessWidget {
     required this.onArchitect,
     required this.selected,
     required this.onFocus,
+    this.indent = 0,
     this.runPhase,
   });
 
   final Feature feature;
+
+  /// Nesting depth: 0 = an epic or standalone feature, 1+ = a subtask rendered
+  /// indented directly under its epic. Drives the left inset and branch glyph.
+  final int indent;
   final ValueChanged<FeatureStatus> onSetStatus;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -1347,6 +1434,8 @@ class _FeatureTile extends StatelessWidget {
       bool hasRun) {
     return ListTile(
       dense: true,
+      // Indent subtasks so they read as nested under their epic.
+      contentPadding: EdgeInsets.only(left: 16.0 + indent * 22, right: 16),
       // Single click focuses (highlights) the row; a feature with a live AI
       // build also re-opens its build window.
       onTap: () {
@@ -1359,6 +1448,11 @@ class _FeatureTile extends StatelessWidget {
           : Icon(Icons.circle, size: 12, color: status.color),
       title: Row(
         children: [
+          if (indent > 0) ...[
+            const Icon(Icons.subdirectory_arrow_right,
+                size: 13, color: Color(0xFF6B7280)),
+            const SizedBox(width: 4),
+          ],
           Flexible(
             child: Text(feature.title,
                 style: const TextStyle(fontSize: 13, color: Color(0xFFE5E5E7))),

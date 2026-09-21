@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.52 — 2026-09-20
+
+- **Subtasks now nest under their epic on the board — in every view.** Architecting an epic already stored each sub-feature's `parentId`, but the board ignored it: every view flattened all features into one list and sorted each independently, so a subtask drifted by *its own* status/priority/version — scattering into other status columns or restaging **above** its own epic when you switched to build-order. Now an epic and its subtasks are treated as **one unit**: subtasks are pulled out of independent placement and always rendered **indented directly under their epic** (with a ↳ branch glyph), in a stable build order. In the **status view**, an epic *anchors* its subtasks in the epic's column (each still shows its own status dot) rather than letting them scatter. In **build-order**, the queue still shows only unbuilt work, but every remaining step stays pinned under its epic via an ancestor **keep-set**, so a step can never orphan even if the epic itself is marked shipped. Nesting is recursive (handles epics-within-epics) and orphan-safe (a subtask whose parent was deleted falls back to top-level, never disappears). `_splitEpics` + `_withSubtasks` + `_group` / `_buildOrderGroups` / `_FeatureTile.indent` in `project_tracker_screen.dart`.
+
+---
+
 ## v0.4.51 — 2026-09-20
 
 - **Fixed: Architect looped on a single (non-epic) feature and never produced anything buildable** (BUG-TRACKER-003). Running **Architect** on a well-scoped feature showed a "Build plan" with one item + "Add 1 to board", then trapped you in a loop: Build → gate → Architect → one clone → Build → … The flow **ignored the model's `isEpic: false` judgment** — it always marked the parent an epic and nested a near-clone of itself, and since epics are steered back to Architect by the build gate, it looped forever, adding a clone each pass. Now the flow **branches on `isEpic`**: a genuine single feature is **sharpened in place** (adopts the architect's cleaner description) and marked **buildable** (`standard`) — or `manual` if it's really human/ML work — with **no sub-features created**; this also **demotes** a feature that was mis-marked as an epic, breaking the loop. Real epics are unchanged (parent tagged epic, sub-features nested). The review sheet now reads honestly for the single-feature case ("This is a single, buildable feature — not an epic"; button **"Mark buildable"**). `_architectFeature` + `architect_review_sheet.dart`.
