@@ -2,6 +2,12 @@
 
 ---
 
+## v0.4.59 — 2026-09-23
+
+- **Behavioral-substitution guard — the build now flags a silent format/encoding change and asks you to confirm it.** A real failure prompted this: a "compress the JPEG before upload" build hit a `dart:ui` limitation (no JPEG encoder) and quietly switched the output to **PNG** to make it compile — which changes upload size, quality, and the MIME contract, but compiled clean and slipped past every existing check. The completion guard gains a deterministic `detectSubstitutions`: it scans the **applied diff** for a curated set of mutually-exclusive format/encoding families (image encode format `ImageByteFormat.jpeg`↔`png`, image **MIME types** `image/jpeg`↔`image/png`/webp/heic, image **encoders** `encodeJpg`↔`encodePng`, audio/video container types) and flags any edit that **removed one member and added a different one** — a genuine swap. It's conservative: same-format-on-both-sides doesn't fire, and a brand-new file merely picking a format doesn't fire (nothing was replaced). When detected, an amber warning rides the done bar alongside any completion warning — *"This build changed a format/encoding … confirm it was intended: image encoding format jpeg → png in main.dart"* — so it can't be one-click shipped without a look. Deterministic, no AI call; pure + unit-tested (6 new cases incl. the exact AR Mechanic JPEG→PNG case). `CompletionGuard.detectSubstitutions` + `_applyAndRun` compose both warnings.
+
+---
+
 ## v0.4.58 — 2026-09-20
 
 - **Pre-build guards — The Forge now looks before it builds, so it stops recreating things that already exist.** Two deterministic checks run before a new Build-with-AI run is dispatched (no AI call), addressing the recurring duplicate-creation pattern (the duplicate `_HighlightPainter` class, the `procedure_model.dart` that duplicated `procedure.dart`):

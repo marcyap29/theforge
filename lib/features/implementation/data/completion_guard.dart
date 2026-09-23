@@ -67,6 +67,29 @@ class CompletionGuard {
     'hard-coded',
   ];
 
+  /// Mutually-exclusive token families where swapping one member for another
+  /// within an edit means the build silently changed a behavioral
+  /// **format/encoding** — the kind of substitution the agent may reach for to
+  /// make code compile (e.g. `dart:ui` has no JPEG encoder → it quietly switches
+  /// to PNG), which changes output size/quality/compatibility and should be
+  /// confirmed, not shipped silently. Lowercased; matched as substrings.
+  static const _substitutionFamilies = <String, List<String>>{
+    'image encoding format': [
+      'imagebyteformat.png', 'imagebyteformat.jpeg', 'imagebyteformat.rawrgba',
+      'imagebyteformat.rawunmodified',
+    ],
+    'image MIME type': [
+      'image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif',
+      'image/gif', 'image/bmp', 'image/tiff',
+    ],
+    'image encoder': [
+      'encodejpg', 'encodepng', 'encodegif', 'encodebmp', 'encodeico',
+      'encodetga',
+    ],
+    'audio format': ['audio/mpeg', 'audio/wav', 'audio/aac', 'audio/ogg'],
+    'video format': ['video/mp4', 'video/webm', 'video/quicktime'],
+  };
+
   /// Classifies the [applied] edits (the ones actually written this run).
   static CompletionVerdict inspect(List<ProposedEdit> applied) {
     if (applied.isEmpty) {
@@ -95,6 +118,35 @@ class CompletionGuard {
     }
 
     return const CompletionVerdict(CompletionIssue.none, '');
+  }
+
+  /// Detects behavioral **format/encoding substitutions** in the [applied] diff
+  /// — an edit that removed one member of a [_substitutionFamilies] group and
+  /// added a *different* member (e.g. JPEG→PNG). This is orthogonal to
+  /// [inspect]: a build can be a real implementation yet still swap a format
+  /// the user should approve. Returns a plain-English warning naming each swap,
+  /// or null when there's none. Conservative — fires only on a genuine
+  /// replacement (a token gone from the old content and a different one arrived
+  /// in the new), so introducing a format in a brand-new file never trips it.
+  static String? detectSubstitutions(List<ProposedEdit> applied) {
+    final findings = <String>[];
+    for (final e in applied) {
+      final oldL = e.oldContent.toLowerCase();
+      final newL = e.newContent.toLowerCase();
+      _substitutionFamilies.forEach((label, tokens) {
+        final gone =
+            tokens.where((t) => oldL.contains(t) && !newL.contains(t)).toList();
+        final arrived =
+            tokens.where((t) => newL.contains(t) && !oldL.contains(t)).toList();
+        if (gone.isNotEmpty && arrived.isNotEmpty) {
+          findings.add(
+              '$label ${gone.join('/')} → ${arrived.join('/')} in ${_base(e.path)}');
+        }
+      });
+    }
+    if (findings.isEmpty) return null;
+    return 'This build changed a format/encoding — which affects size, quality, '
+        'and compatibility. Confirm it was intended: ${findings.join('; ')}.';
   }
 
   /// True when [path] is a documentation or configuration file.

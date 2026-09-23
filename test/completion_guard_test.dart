@@ -97,4 +97,65 @@ void main() {
       expect(v.suspicious, isFalse);
     });
   });
+
+  group('CompletionGuard.detectSubstitutions', () {
+    test('flags the JPEG→PNG encode-format swap (the AR Mechanic case)', () {
+      final w = CompletionGuard.detectSubstitutions([
+        _edit(
+          'lib/main.dart',
+          'final data = await image.toByteData('
+              'format: ui.ImageByteFormat.png);',
+          old: 'final data = await image.toByteData('
+              'format: ui.ImageByteFormat.jpeg);',
+        ),
+      ]);
+      expect(w, isNotNull);
+      expect(w, contains('image encoding format'));
+      expect(w, contains('imagebyteformat.jpeg'));
+      expect(w, contains('imagebyteformat.png'));
+      expect(w, contains('main.dart'));
+    });
+
+    test('flags a MIME type swap (image/jpeg → image/png)', () {
+      final w = CompletionGuard.detectSubstitutions([
+        _edit('lib/api.dart', "mime: 'image/png',", old: "mime: 'image/jpeg',"),
+      ]);
+      expect(w, isNotNull);
+      expect(w, contains('image MIME type'));
+    });
+
+    test('does NOT fire when a format is merely present, not swapped', () {
+      // Same format on both sides → no substitution.
+      final w = CompletionGuard.detectSubstitutions([
+        _edit('lib/a.dart', "mime: 'image/jpeg'; // tweaked",
+            old: "mime: 'image/jpeg';"),
+      ]);
+      expect(w, isNull);
+    });
+
+    test('does NOT fire for a brand-new file that just picks a format', () {
+      // Empty old content → nothing "gone" → not a substitution of prior code.
+      final w = CompletionGuard.detectSubstitutions([
+        _edit('lib/new.dart', "const mime = 'image/png';"),
+      ]);
+      expect(w, isNull);
+    });
+
+    test('flags an encoder swap (encodeJpg → encodePng)', () {
+      final w = CompletionGuard.detectSubstitutions([
+        _edit('lib/enc.dart', 'return img.encodePng(bitmap);',
+            old: 'return img.encodeJpg(bitmap, quality: 85);'),
+      ]);
+      expect(w, isNotNull);
+      expect(w, contains('image encoder'));
+    });
+
+    test('clean refactor with no format change returns null', () {
+      final w = CompletionGuard.detectSubstitutions([
+        _edit('lib/x.dart', 'int add(int a, int b) => a + b;',
+            old: 'int add(int a, int b) { return a + b; }'),
+      ]);
+      expect(w, isNull);
+    });
+  });
 }

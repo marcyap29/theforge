@@ -497,6 +497,16 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     if (verdict.suspicious) {
       _log(ConsoleLineKind.error, '⚠ Completion check: ${verdict.reason}');
     }
+    // Behavioral-substitution guard: flag a silent format/encoding swap (e.g.
+    // JPEG→PNG) so it can't ship without the user confirming the change.
+    final substitution = CompletionGuard.detectSubstitutions(appliedEdits);
+    if (substitution != null) {
+      _log(ConsoleLineKind.error, '⚠ Format change: $substitution');
+    }
+    final warnings = <String>[
+      if (verdict.suspicious) verdict.reason,
+      if (substitution != null) substitution,
+    ];
 
     final report = failures.toString().trim();
     _fixContext = report.isEmpty ? null : report;
@@ -507,7 +517,8 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
             : 'Run finished with issues — you can ask the AI to fix them.');
     state = state.copyWith(
       canFix: report.isNotEmpty,
-      completionWarning: verdict.suspicious ? verdict.reason : null,
+      completionWarning: warnings.isEmpty ? null : warnings.join('\n\n'),
+      clearCompletionWarning: warnings.isEmpty,
     );
     _phase(RunPhase.done);
   }

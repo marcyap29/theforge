@@ -210,9 +210,11 @@ class ImplRunState {
   final bool featureShipped;
 
   /// Set by the completion guard when the run's applied diff looks like a fake
-  /// completion (docs/config only, or only stubs/placeholders). Null when the
-  /// build produced a real code artifact. Surfaced in the done bar so the run
-  /// isn't one-click "shipped" without a look. See [CompletionGuard].
+  /// completion (docs/config only, or only stubs/placeholders) and/or made a
+  /// significant behavioral **format/encoding substitution** (e.g. JPEG→PNG).
+  /// Null when the build produced a real code artifact with no such swap.
+  /// Surfaced in the done bar so the run isn't one-click "shipped" without a
+  /// look. Multiple warnings are joined with a blank line. See [CompletionGuard].
   final String? completionWarning;
 
   int get approvedEditCount =>
