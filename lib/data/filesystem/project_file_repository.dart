@@ -883,6 +883,23 @@ class ProjectFileRepository {
     }
   }
 
+  /// The porcelain status lines of the repo's uncommitted changes — e.g.
+  /// ` M lib/x.dart`, `?? new.dart`. Empty when clean or not a git repo.
+  static Future<List<String>> gitChangedFiles(String repoPath) async {
+    try {
+      final res = await Process.run('git', ['status', '--porcelain'],
+          workingDirectory: repoPath);
+      if (res.exitCode != 0) return const [];
+      return (res.stdout as String)
+          .split('\n')
+          .map((l) => l.trimRight())
+          .where((l) => l.isNotEmpty)
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
   static Future<bool> gitCommitAll(String repoPath, String message) async {
     try {
       final add =

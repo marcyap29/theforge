@@ -535,13 +535,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     //    build failed, recreates code that's already sitting in the tree.
     if (await ProjectFileRepository.gitHasChanges(repoPath)) {
       if (!mounted) return false;
-      final proceed = await _confirmProceed(
-        title: 'Uncommitted changes in the repo',
-        body: 'The linked repo has uncommitted changes from a previous build or '
-            'manual edits. Building now stacks new edits onto them — and if the '
-            'last build failed, it can recreate code that\'s already there. '
-            'Commit or discard them in git first, or build anyway.',
-      );
+      final proceed = await _handleUncommittedChanges(repoPath);
       if (!proceed) return false;
     }
     // 2. Already built before but not marked shipped — a strong sign this work
@@ -588,6 +582,98 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
       ),
     );
     return result ?? false;
+  }
+
+  /// Handles the "uncommitted changes" pre-build case with real options: the
+  /// user can **Commit & push** the leftover work right here (so it's saved and
+  /// the tree is clean before building), **Build anyway** (stack onto it), or
+  /// **Cancel**. Shows the changed files so the choice is informed. Returns true
+  /// to proceed with the build. Best-effort git — push is skipped gracefully
+  /// when there's no remote.
+  Future<bool> _handleUncommittedChanges(String repoPath) async {
+    final changed = await ProjectFileRepository.gitChangedFiles(repoPath);
+    if (!mounted) return false;
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF141416),
+        title: const Text('Uncommitted changes in the repo'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'The linked repo has uncommitted changes from a previous build or '
+              'manual edits. Building now stacks new edits onto them — and if the '
+              'last build failed, it can recreate code that\'s already there. '
+              'Commit & push them first, or build anyway.',
+              style: TextStyle(fontSize: 13, color: Color(0xFFE5E5E7)),
+            ),
+            if (changed.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text('${changed.length} changed file'
+                  '${changed.length == 1 ? '' : 's'}:',
+                  style: const TextStyle(
+                      fontSize: 11, color: Color(0xFF9CA3AF))),
+              const SizedBox(height: 4),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 140),
+                width: double.maxFinite,
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F0F10),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: SingleChildScrollView(
+                  child: Text(changed.join('\n'),
+                      style: const TextStyle(
+                          fontFamily: 'Menlo',
+                          fontSize: 11,
+                          color: Color(0xFFCFCFD2))),
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'cancel'),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'build'),
+            child: const Text('Build anyway',
+                style: TextStyle(color: Color(0xFF8A8A8E))),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, 'commit'),
+            child: const Text('Commit & push'),
+          ),
+        ],
+      ),
+    );
+
+    if (choice == 'build') return true;
+    if (choice != 'commit') return false; // cancel / dismissed
+
+    // Commit & push the leftover work, then proceed with the build.
+    final messenger = ScaffoldMessenger.of(context);
+    _showBlockingSpinner('Committing & pushing…');
+    final committed = await ProjectFileRepository.gitCommitAll(
+        repoPath, 'chore: commit work in progress before AI build');
+    final pushed =
+        committed ? await ProjectFileRepository.gitPush(repoPath) : false;
+    if (mounted) Navigator.of(context, rootNavigator: true).pop(); // spinner
+    if (!mounted) return false;
+    messenger.showSnackBar(SnackBar(
+      content: Text(!committed
+          ? 'Nothing was committed (or not a git repo).'
+          : pushed
+              ? 'Committed & pushed the leftover changes.'
+              : 'Committed locally — not pushed (no remote / auth).'),
+    ));
+    // Proceed with the build only if the tree is actually clean now.
+    return !await ProjectFileRepository.gitHasChanges(repoPath);
   }
 
   /// The pre-build gate for an epic / manual feature: steer to Architect or

@@ -60,4 +60,28 @@ void main() {
       plain.deleteSync(recursive: true);
     }
   });
+
+  test('gitChangedFiles lists uncommitted files, empty when clean', () async {
+    expect(await ProjectFileRepository.gitChangedFiles(tmp.path), isEmpty);
+    File('${tmp.path}/a.txt').writeAsStringSync('hello');
+    File('${tmp.path}/b.dart').writeAsStringSync('void main() {}');
+    final changed = await ProjectFileRepository.gitChangedFiles(tmp.path);
+    expect(changed.length, 2);
+    expect(changed.any((l) => l.contains('a.txt')), isTrue);
+    expect(changed.any((l) => l.contains('b.dart')), isTrue);
+    // After committing, the list is empty again.
+    await git(['add', '-A']);
+    await git(['commit', '-m', 'init']);
+    expect(await ProjectFileRepository.gitChangedFiles(tmp.path), isEmpty);
+  });
+
+  test('gitChangedFiles on a non-git dir returns empty (never throws)',
+      () async {
+    final plain = Directory.systemTemp.createTempSync('forge_nogit2_');
+    try {
+      expect(await ProjectFileRepository.gitChangedFiles(plain.path), isEmpty);
+    } finally {
+      plain.deleteSync(recursive: true);
+    }
+  });
 }
