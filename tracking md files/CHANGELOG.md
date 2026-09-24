@@ -2,6 +2,12 @@
 
 ---
 
+## v0.5.0 — 2026-09-23 — Base View game (v1) · branch `feat/base-view-game` (pending verify/merge)
+
+- **Base View — a StarCraft-style game over the build pipeline (points 1–4).** A new game-mode screen (castle icon in the project toolbar) that visualizes a project as a *base*: each **feature is a building** (styled by status, with an epic/manual marker), each **active Build-with-AI run is a builder-bot** parked at its building and colored by `RunPhase` (amber working / blue awaiting / green done / red failed), and **tapping a bot** opens a live status panel (phase + streamed console tail + elapsed) while **tapping a building** shows the feature. The project's "one key thing" is **distilled by the architect LLM into a metaphor** (transcription → 📢 bullhorn, car repair → 🚗 car) that themes the base header; it's cached under `.forge/project_metaphor.json` so it's distilled once. Free pan/zoom via `InteractiveViewer`. This is a pure wrapper over data The Forge already produces (`featureListProvider`, `implActiveRunsProvider`, `implRunProvider`) — it adds no backend capability, it makes the pipeline *legible*. New `lib/features/game/` (`base_layout.dart` pure grid math + `base_view_screen.dart`); `FeatureScanner.distillMetaphor` + `ProjectMetaphor`; `ProjectFileRepository.read/writeProjectMetaphor`. v1 is Flutter widgets — **no Flame yet**; the RTS input layer (select/move/right-click, camera, drag-a-bot-to-assign) and multi-base portfolio map are v2+. Built on a branch per the new §BRANCH auto-branch-epics idea; not merged/deployed until verified on the real app. `dart analyze` clean; 99 tests green (8 new for `BaseLayout`).
+
+---
+
 ## v0.4.60 — 2026-09-23
 
 - **The "uncommitted changes" pre-build guard can now commit & push for you.** The v0.4.58 guard warned about leftover uncommitted work before a build but only offered *Cancel* / *Build anyway* — leaving you to drop to git yourself. Now the dialog lists the changed files and adds a **Commit & push** button: it commits the leftover work (`chore: commit work in progress before AI build`) and pushes best-effort (skipped gracefully with a note if there's no remote), then proceeds with the build only once the tree is actually clean. You get all three real options — commit & push, build anyway, or cancel — without leaving the app. New `ProjectFileRepository.gitChangedFiles`; `_handleUncommittedChanges` replaces the plain confirm for this case. Unit-tested.

@@ -455,6 +455,40 @@ Lets the user run the app-under-construction and watch it inside The Forge — "
 
 ---
 
+## Base View — game-mode wrapper (v0.5.0, branch `feat/base-view-game`)
+
+A StarCraft-style visualization *over data The Forge already produces* — it adds
+no backend capability, it makes the build pipeline legible. Module lives in
+`lib/features/game/`.
+
+- **The mapping.** A **project = a base**; each **feature = a building**; each
+  **active Build-with-AI run = a builder-bot** at its building. The screen reads
+  existing providers only: `featureListProvider(projectId)` (buildings),
+  `implActiveRunsProvider` (`Map<featureId, RunPhase>` → which bots exist + their
+  colour), and `implRunProvider(featureId)` (a bot's live `ImplRunState` — phase,
+  console, elapsed) when tapped. Read-mostly; the write path (command a bot →
+  start/ship a build) is v2.
+- **`base_layout.dart`** — pure, unit-tested grid math (`BaseLayout.place` →
+  `BuildingSlot`s, `columnsFor`, `canvasSize`). No widgets/IO, deterministic in
+  feature order so the scene never jumps between rebuilds. This is the testable
+  core; the widget layer is a thin renderer over it.
+- **`base_view_screen.dart`** — a `Stack` of positioned building + bot widgets
+  over a `_GroundPainter`, inside an `InteractiveViewer` for free pan/zoom. Tap a
+  building → feature sheet; tap a bot → live status sheet (a `Consumer` watching
+  `implRunProvider`). **No Flame in v1** — points 1–4 are display + tap-inspect,
+  which want free hit-testing, not a game loop. Flame arrives with the RTS input
+  layer (select/move/right-click, drag-to-assign, camera) in v2.
+- **Metaphor (point 1).** `FeatureScanner.distillMetaphor` → `ProjectMetaphor
+  {noun, emoji, tagline}` (architect LLM, JSON, `think:false` via the shared
+  `_parseWithRetry`); cached to `.forge/project_metaphor.json`
+  (`ProjectFileRepository.read/writeProjectMetaphor`, mirroring the capability-
+  summary cache) so it's distilled once. Themes the base header; degrades to a
+  default 🏗️ base on failure — flavor, not function.
+- **Delivery.** Built on branch `feat/base-view-game` (dogfooding the §BRANCH
+  auto-branch-epics idea); not merged/deployed until verified on the real app.
+
+---
+
 ## Design System — Forge v2 (v0.4.0)
 
 A cohesive visual identity replacing the original monospace shell.
