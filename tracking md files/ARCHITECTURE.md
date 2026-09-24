@@ -468,16 +468,22 @@ no backend capability, it makes the build pipeline legible. Module lives in
   colour), and `implRunProvider(featureId)` (a bot's live `ImplRunState` — phase,
   console, elapsed) when tapped. Read-mostly; the write path (command a bot →
   start/ship a build) is v2.
-- **`base_layout.dart`** — pure, unit-tested grid math (`BaseLayout.place` →
-  `BuildingSlot`s, `columnsFor`, `canvasSize`). No widgets/IO, deterministic in
-  feature order so the scene never jumps between rebuilds. This is the testable
-  core; the widget layer is a thin renderer over it.
-- **`base_view_screen.dart`** — a `Stack` of positioned building + bot widgets
-  over a `_GroundPainter`, inside an `InteractiveViewer` for free pan/zoom. Tap a
-  building → feature sheet; tap a bot → live status sheet (a `Consumer` watching
-  `implRunProvider`). **No Flame in v1** — points 1–4 are display + tap-inspect,
-  which want free hit-testing, not a game loop. Flame arrives with the RTS input
-  layer (select/move/right-click, drag-to-assign, camera) in v2.
+- **`base_layout.dart`** — pure, unit-tested **radial** layout math
+  (`BaseLayout.scene` → `BaseScene {hub, buildings, canvas}`): a command-center
+  hub at the middle with feature buildings clustered on concentric rings around
+  it (inner ring fills first, alternate rings staggered), sized by build kind
+  (epics larger, manual smaller). No widgets/IO, deterministic in feature order.
+  This is the testable core; the widget layer is a thin renderer over it. Chosen
+  over a grid so it reads as a StarCraft-style *base*, not rows of features.
+- **`base_view_screen.dart`** — a `Stack` over a `_GroundPainter` (rounded
+  "creep" pad + concentric rings + supply lines hub→building + per-building
+  pads), with a glowing `_Hub` (metaphor emoji + project name) at center and
+  positioned building + bot widgets around it, inside an `InteractiveViewer` for
+  free pan/zoom. Tap a building → feature sheet; tap a bot → live status sheet
+  (a `Consumer` watching `implRunProvider`). **No Flame in v1** — points 1–4 are
+  display + tap-inspect, which want free hit-testing, not a game loop. Flame
+  arrives with the RTS input layer (select/move/right-click, drag-to-assign,
+  isometric sprites + terrain) in v2.
 - **Metaphor (point 1).** `FeatureScanner.distillMetaphor` → `ProjectMetaphor
   {noun, emoji, tagline}` (architect LLM, JSON, `think:false` via the shared
   `_parseWithRetry`); cached to `.forge/project_metaphor.json`

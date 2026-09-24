@@ -137,31 +137,38 @@ class _BaseViewScreenState extends ConsumerState<BaseViewScreen> {
   }
 
   Widget _scene(List<Feature> features, Map<String, RunPhase> activeRuns) {
-    final slots = BaseLayout.place(features);
-    final size = BaseLayout.canvasSize(features.length);
-    final byId = {for (final s in slots) s.feature.id: s};
+    final scene = BaseLayout.scene(features);
+    final byId = {for (final b in scene.buildings) b.feature.id: b};
 
     return InteractiveViewer(
       constrained: false,
-      minScale: 0.5,
+      minScale: 0.4,
       maxScale: 2.5,
-      boundaryMargin: const EdgeInsets.all(400),
+      boundaryMargin: const EdgeInsets.all(600),
       child: SizedBox(
-        width: size.width,
-        height: size.height,
+        width: scene.canvas.width,
+        height: scene.canvas.height,
         child: Stack(
           children: [
-            Positioned.fill(child: CustomPaint(painter: _GroundPainter(slots))),
-            // Buildings (one per feature).
-            for (final s in slots)
+            Positioned.fill(child: CustomPaint(painter: _GroundPainter(scene))),
+            // The hub — command center, themed by the project metaphor.
+            Positioned(
+              left: scene.hub.dx - scene.hubRadius,
+              top: scene.hub.dy - scene.hubRadius,
+              width: scene.hubRadius * 2,
+              height: scene.hubRadius * 2,
+              child: _Hub(name: project.name, emoji: _metaphor?.emoji ?? '🏗️'),
+            ),
+            // Buildings (one per feature), clustered on rings around the hub.
+            for (final b in scene.buildings)
               Positioned(
-                left: s.rect.left,
-                top: s.rect.top,
-                width: s.size.width,
-                height: s.size.height,
+                left: b.rect.left,
+                top: b.rect.top,
+                width: b.size.width,
+                height: b.size.height,
                 child: _Building(
-                  feature: s.feature,
-                  onTap: () => _showBuilding(s.feature),
+                  feature: b.feature,
+                  onTap: () => _showBuilding(b.feature),
                 ),
               ),
             // Builder-bots (one per active run), parked at their building.
@@ -317,34 +324,106 @@ class _BaseViewScreenState extends ConsumerState<BaseViewScreen> {
       );
 }
 
-/// Draws the base ground: a subtle grid + a platform pad under each building.
+/// Draws the base ground: a rounded "creep" pad + concentric rings under the
+/// hub, supply lines from the hub out to every building, and a platform pad
+/// under each building — so it reads as a base radiating from a command center,
+/// not a grid of rows.
 class _GroundPainter extends CustomPainter {
-  _GroundPainter(this.slots);
-  final List<BuildingSlot> slots;
+  _GroundPainter(this.scene);
+  final BaseScene scene;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final grid = Paint()
-      ..color = const Color(0xFF161C24)
-      ..strokeWidth = 1;
-    const step = 40.0;
-    for (var x = 0.0; x < size.width; x += step) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), grid);
+    final hub = scene.hub;
+    final maxR = scene.buildings.isEmpty
+        ? scene.hubRadius
+        : scene.buildings
+                .map((b) => (b.center - hub).distance)
+                .reduce((a, b) => a > b ? a : b) +
+            56;
+
+    // Base platform ("creep"): a filled disc + faint radial glow at the hub.
+    canvas.drawCircle(hub, maxR, Paint()..color = const Color(0x120E1826));
+    canvas.drawCircle(
+        hub,
+        scene.hubRadius + 40,
+        Paint()
+          ..shader = const RadialGradient(
+            colors: [Color(0x22E8A04C), Color(0x00E8A04C)],
+          ).createShader(
+              Rect.fromCircle(center: hub, radius: scene.hubRadius + 40)));
+
+    // Concentric rings.
+    final ring = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = const Color(0xFF1A2532);
+    for (var rr = scene.hubRadius + 34.0; rr < maxR; rr += 46) {
+      canvas.drawCircle(hub, rr, ring);
     }
-    for (var y = 0.0; y < size.height; y += step) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
+
+    // Supply lines: hub → each building.
+    final line = Paint()
+      ..strokeWidth = 1.5
+      ..color = const Color(0x1FE8A04C);
+    for (final b in scene.buildings) {
+      canvas.drawLine(hub, b.center, line);
     }
+
+    // Platform pad under each building.
     final pad = Paint()..color = const Color(0xFF11161D);
-    for (final s in slots) {
+    for (final b in scene.buildings) {
       canvas.drawRRect(
-        RRect.fromRectAndRadius(s.rect.inflate(10), const Radius.circular(14)),
+        RRect.fromRectAndRadius(b.rect.inflate(9), const Radius.circular(14)),
         pad,
       );
     }
   }
 
   @override
-  bool shouldRepaint(_GroundPainter old) => old.slots != slots;
+  bool shouldRepaint(_GroundPainter old) => old.scene != scene;
+}
+
+/// The command center at the heart of the base — a glowing hub themed by the
+/// project's metaphor emoji, with the project name.
+class _Hub extends StatelessWidget {
+  const _Hub({required this.name, required this.emoji});
+  final String name;
+  final String emoji;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF201A12),
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0xFFE8A04C), width: 2),
+        boxShadow: const [
+          BoxShadow(color: Color(0x33E8A04C), blurRadius: 24, spreadRadius: 2),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 30)),
+          const SizedBox(height: 2),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  fontSize: 10,
+                  color: Color(0xFFE8A04C),
+                  fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// A feature rendered as a building: roof + body, colored by status, with an
