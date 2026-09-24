@@ -206,6 +206,10 @@
     .availability-card .chip { margin-bottom: var(--space-3); }
     .availability-card p { margin: 0; font-size: 0.9375rem; color: var(--fg-text-secondary); }
     .availability-platform { font-weight: 500; color: var(--fg-text-primary); font-size: 1.0625rem; margin-bottom: var(--space-2); }
+    .availability-card.is-soon { opacity: 0.6; }
+    .section-lead { color: var(--fg-text-secondary); max-width: 60ch; font-size: 1rem; margin: var(--space-3) 0 var(--space-7); }
+    .availability-row.faq { margin-top: var(--space-5); }
+    .faq-q { font-weight: 600; color: var(--fg-text-primary); font-size: 0.9375rem; margin: 0 0 var(--space-2); }
 
     /* Download */
     .durability { text-align: center; font-family: var(--font-display); font-size: clamp(1.4rem, 3vw, 1.9rem); color: var(--fg-text-primary); max-width: 44ch; margin: 0 auto var(--space-8); }
@@ -243,6 +247,7 @@
         <div class="nav-links">
           <a href="#how">How it works</a>
           <a href="#features">Features</a>
+          <a href="#pricing">Pricing</a>
           <a href="#download">Download</a>
         </div>
         <a class="btn btn-primary" href="#download">Download for macOS</a>
@@ -370,6 +375,59 @@
             <span class="chip"><span class="chip-dot is-live"></span>Bring your own</span>
             <p class="availability-platform">AI key</p>
             <p>Point it at Ollama Cloud, Claude, or OpenAI. You choose the models; you own the usage.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ PRICING ============ -->
+    <section id="pricing">
+      <div class="wrap">
+        <p class="eyebrow">Pricing</p>
+        <h2>Free. You bring the key.</h2>
+        <p class="section-lead">The Forge is free — every feature, no account, no server. You connect your own AI key and pay your provider directly for what you build. We never see your usage or take a cut.</p>
+
+        <div class="availability-row">
+          <div class="availability-card">
+            <span class="chip"><span class="chip-dot is-live"></span>Free forever</span>
+            <p class="availability-platform">$0 &middot; every feature</p>
+            <ul class="req-list">
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg><span>No account, no sign-up.</span></li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg><span>No Orbital&nbsp;AI markup — you pay your provider, not us.</span></li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg><span>Your keys stay in your Mac's Keychain.</span></li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg><span>Nothing to cancel — it's your key, your account.</span></li>
+            </ul>
+          </div>
+
+          <div class="availability-card">
+            <span class="chip"><span class="chip-dot is-live"></span>Your provider</span>
+            <p class="availability-platform">What building costs</p>
+            <p>You pay your AI provider for the tokens a build uses — usually cents to a couple of dollars per feature. Run a cheap, fast model for most of it, and switch to a stronger one for the hard parts.</p>
+          </div>
+
+          <div class="availability-card is-soon">
+            <span class="chip"><span class="chip-dot"></span>Coming later</span>
+            <p class="availability-platform">Managed — no key</p>
+            <p>A paid option where we run the AI for you: no provider account, no keys, one bill. For when you'd rather not manage a key. Not here yet.</p>
+          </div>
+        </div>
+
+        <div class="availability-row faq">
+          <div class="availability-card">
+            <p class="faq-q">Do I pay Orbital&nbsp;AI anything?</p>
+            <p>No. The app is free — you only pay your AI provider for what you build.</p>
+          </div>
+          <div class="availability-card">
+            <p class="faq-q">How much will building cost?</p>
+            <p>Usually cents per feature. You watch spend in your provider's dashboard, and a cheap cloud model keeps it low.</p>
+          </div>
+          <div class="availability-card">
+            <p class="faq-q">Which key should I get?</p>
+            <p>Any of Ollama&nbsp;Cloud, Claude, or OpenAI. Ollama&nbsp;Cloud is the easiest cheap start; Claude or OpenAI for top quality.</p>
+          </div>
+          <div class="availability-card">
+            <p class="faq-q">Are my keys safe?</p>
+            <p>They live in your Mac's Keychain and never leave your machine. No Forge server ever sees them.</p>
           </div>
         </div>
       </div>
