@@ -248,6 +248,8 @@ All implementations use `package:http` directly — no SDK dependencies. **API k
 
 Diagnosing an `Ollama error 401: {"error":"Unauthorized"}` (see BUG-LLM-002): it's almost always a bad/expired **key**, not the app — **regenerate the key** at ollama.com. Two traps that mislead the diagnosis: (1) `ollama.com/api/tags` is **public** — it returns 200 with no auth, so it is *not* a valid key test; use `/api/chat`. (2) The keychain item's ACL is tied to the app's **code signature**, so a key saved by an ad-hoc-signed local build (`deploy_macos.sh` default) is unreadable by the Developer ID–signed release DMG (and vice-versa) → null read → 401; use `FORGE_SIGN_IDENTITY` to sign local builds with the release identity so they share one keychain entry.
 
+**Friendly key errors (v0.5.1, §LLMKEY).** `lib/services/llm/key_check.dart` holds pure, unit-tested `keyErrorGuidance(type, {status, error})` and `friendlyLlmError(error, {type})` that rewrite a provider 401/404/429/5xx/network failure into plain, actionable text — and pass a non-key/non-network error (a JSON/compile failure) through **unchanged** so real errors aren't masked. `SettingsNotifier.testProvider` returns this text, and `ImplRunNotifier` runs planning/run failures through `friendlyLlmError` (log + error bar). The Settings Ollama card's **Test key** button uses `testProvider` (authenticated `/api/chat`), distinct from **Refresh models** (`/api/tags`, public).
+
 ### Streaming LLM Layer (v0.4.0)
 
 `LlmProvider` now exposes a streaming path alongside `complete()`:

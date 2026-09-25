@@ -112,7 +112,7 @@ Every §N that brings The Forge closer to a working interview-to-spec run unbloc
 
 **Architecture (sketch):** A `validateKey(provider)` in `LlmService`/each provider returning `{ok, httpStatus, message}`; a Test-key control in `settings_screen.dart`; map common statuses (401 → key/plan, 404 → model tag, connection reset → network) to guidance. Surface the same friendly mapping where builds fail (`implementation_notifier` error path).
 
-**Status:** Backlog / not started (added 2026-09-25 from BUG-LLM-002).
+**Status:** ✅ v1 shipped v0.5.1 (2026-09-25, branch `feat/llmkey-test-key`) — friendly `keyErrorGuidance`/`friendlyLlmError` mapping (`key_check.dart`, unit-tested) wired into the Settings key test + Build-with-AI failure logs; real "Test key" button on the Ollama card (`/api/chat`, not public `/api/tags`). Follow-up (not done): per-status guidance for Claude/OpenAI-specific quirks; a "Test key" affordance surfaced at the point a build fails.
 
 ---
 

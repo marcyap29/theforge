@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 
 import '../../../data/filesystem/ios_deployment.dart';
 import '../../../data/filesystem/project_file_repository.dart';
+import '../../../services/llm/key_check.dart';
 import '../../../services/llm/llm_provider.dart';
 import '../../../services/llm/llm_service_provider.dart';
 import '../../projects/providers/providers.dart';
@@ -322,8 +323,8 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
           _log(ConsoleLineKind.stderr, line);
         }
       }
-      _log(ConsoleLineKind.error, 'Planning failed: $e');
-      state = state.copyWith(error: e.toString());
+      _log(ConsoleLineKind.error, 'Planning failed: ${friendlyLlmError(e)}');
+      state = state.copyWith(error: friendlyLlmError(e));
       _phase(RunPhase.failed);
     } finally {
       if (gen == _gen) _waitTimer?.cancel();
@@ -384,8 +385,8 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     try {
       await _applyAndRun(brief, plan);
     } catch (e) {
-      _log(ConsoleLineKind.error, 'Run failed: $e');
-      state = state.copyWith(error: e.toString());
+      _log(ConsoleLineKind.error, 'Run failed: ${friendlyLlmError(e)}');
+      state = state.copyWith(error: friendlyLlmError(e));
       _phase(RunPhase.failed);
     }
   }
