@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../services/llm/key_check.dart';
 import '../../services/llm/llm_model_config.dart';
 import '../../services/llm/llm_provider.dart';
 import '../../services/llm/providers/claude_provider.dart';
@@ -386,7 +387,7 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
       );
       return null;
     } catch (e) {
-      return e.toString();
+      return friendlyLlmError(e, type: type);
     }
   }
 

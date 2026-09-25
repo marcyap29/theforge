@@ -3,7 +3,7 @@
 **ID:** BUG-LLM-002
 **Area:** LLM
 **Severity:** Low (operational, not a code defect) — but high time-cost to diagnose
-**Status:** Resolved 2026-09-25 (user regenerated the key) — Forge-side UX improvements backlogged
+**Status:** Resolved 2026-09-25 (user regenerated the key). Forge-side UX improvements **built in v0.5.1 (§LLMKEY)** — friendly key-error mapping + a real "Test key" button.
 
 ---
 
@@ -38,9 +38,9 @@ Contributing red herring earlier in the session: the **keychain-vs-code-signatur
 
 User generated a **new** key at ollama.com and pasted it into Settings → builds work. No code change.
 
-## Forge-side improvements (backlogged, not built)
+## Forge-side improvements (BUILT — v0.5.1, §LLMKEY)
 
-The raw `Ollama error 401: {"error":"Unauthorized"}` gave the user nothing to act on. Backlogged (`§LLMKEY`): a **clear message** ("Ollama rejected your key (401) — regenerate it or check your Cloud plan at ollama.com") and a **"Test key" button** in Settings that runs the exact `/api/chat` auth check, so this self-diagnoses in one click instead of a multi-round debugging session.
+The raw `Ollama error 401: {"error":"Unauthorized"}` gave the user nothing to act on. Now fixed: `lib/services/llm/key_check.dart` (`keyErrorGuidance`/`friendlyLlmError`, unit-tested) rewrites the 401 into *"Regenerate the key at ollama.com and check your Cloud plan…"* — shown in the Settings key test and in Build-with-AI failure logs/error bar. The Settings Ollama card gained a real **"Test key"** button (authenticated `/api/chat`, not the public `/api/tags` that 200s on a bad key). So the next time this happens it self-diagnoses in one click instead of a multi-round debug.
 
 ## Prevention Rule
 

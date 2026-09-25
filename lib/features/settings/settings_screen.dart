@@ -178,6 +178,9 @@ class _OllamaCardState extends ConsumerState<_OllamaCard> {
   late final TextEditingController _urlController;
   final _keyController = TextEditingController();
   bool _isChecking = false;
+  bool _testingKey = false;
+  bool? _keyOk;
+  String _keyMsg = '';
 
   @override
   void initState() {
@@ -206,6 +209,34 @@ class _OllamaCardState extends ConsumerState<_OllamaCard> {
     setState(() => _isChecking = true);
     await ref.read(settingsProvider.notifier).refreshOllama();
     if (mounted) setState(() => _isChecking = false);
+  }
+
+  /// Real key check: runs an authenticated `/api/chat` probe (via testProvider),
+  /// NOT the public `/api/tags` model list — so a bad/expired key actually fails
+  /// here instead of silently "connecting" (BUG-LLM-002). Saves the typed key
+  /// first if there is one, so you test exactly what's in the field.
+  Future<void> _testKey() async {
+    if (_testingKey) return;
+    final typed = _keyController.text.trim();
+    if (typed.isNotEmpty) {
+      await ref
+          .read(settingsProvider.notifier)
+          .setApiKey(LlmProviderType.ollama, typed);
+      _keyController.clear();
+    }
+    setState(() {
+      _testingKey = true;
+      _keyOk = null;
+    });
+    final error = await ref
+        .read(settingsProvider.notifier)
+        .testProvider(LlmProviderType.ollama);
+    if (!mounted) return;
+    setState(() {
+      _testingKey = false;
+      _keyOk = error == null;
+      _keyMsg = error ?? 'Key works — Ollama accepted an inference request.';
+    });
   }
 
   Future<void> _saveUrl() async {
@@ -324,17 +355,57 @@ class _OllamaCardState extends ConsumerState<_OllamaCard> {
           ),
           const SizedBox(height: 12),
         ],
-        OutlinedButton.icon(
-          onPressed: _isChecking ? null : _checkConnection,
-          icon: _isChecking
-              ? const SizedBox(
-                  width: 12,
-                  height: 12,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.refresh, size: 14),
-          label: Text(_isChecking ? 'Checking…' : 'Test connection'),
+        Row(
+          children: [
+            OutlinedButton.icon(
+              onPressed: _isChecking ? null : _checkConnection,
+              icon: _isChecking
+                  ? const SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh, size: 14),
+              label: Text(_isChecking ? 'Checking…' : 'Refresh models'),
+            ),
+            const SizedBox(width: 8),
+            FilledButton.tonalIcon(
+              onPressed: _testingKey ? null : _testKey,
+              icon: _testingKey
+                  ? const SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.vpn_key_outlined, size: 14),
+              label: Text(_testingKey ? 'Testing…' : 'Test key'),
+            ),
+          ],
         ),
+        if (_keyOk != null) ...[
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(_keyOk! ? Icons.check_circle : Icons.error_outline,
+                  size: 15,
+                  color: _keyOk!
+                      ? const Color(0xFF22C55E)
+                      : const Color(0xFFEF4444)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  _keyMsg,
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: _keyOk!
+                          ? const Color(0xFF22C55E)
+                          : const Color(0xFFEF4444)),
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }
