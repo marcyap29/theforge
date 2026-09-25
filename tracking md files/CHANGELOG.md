@@ -2,12 +2,12 @@
 
 ---
 
-## v0.5.1 — 2026-09-25 — Self-diagnosing API-key errors (§LLMKEY) · branch `feat/llmkey-test-key`
+## v0.5.1 — 2026-09-25 — Self-diagnosing API-key errors (§LLMKEY)
 
 - **A bad API key now tells you what to do — and Settings can test a key in place.** Direct fix for the BUG-LLM-002 debugging marathon (a dead Ollama key surfacing as an opaque `Ollama error 401: {"error":"Unauthorized"}` mid-build). Two parts:
   - **Friendly key errors.** New pure `keyErrorGuidance` / `friendlyLlmError` (`lib/services/llm/key_check.dart`) map a provider + HTTP status (or thrown error) to plain, actionable text — e.g. *"Rejected (401). Your Ollama key is invalid/expired, or your account isn't cleared to run cloud models. Regenerate the key at ollama.com and check your Cloud plan…"*; 404 → model, 429 → rate/quota, 5xx → their side, connection-reset → network. It's conservative: a non-key/non-network error (a JSON/compile failure) is returned **unchanged** so real errors are never masked. Wired into the Settings key test (`testProvider`) and into Build-with-AI's planning/run failure logs + the error bar (`implementation_notifier`), so the same guidance shows wherever a key fails.
   - **Real "Test key" button for Ollama.** The Ollama card's old "Test connection" only refreshed the model list via the **public `/api/tags`** — which returns 200 even with a garbage key (the exact trap that made BUG-LLM-002 so slow). It's now relabeled **"Refresh models"**, and a new **"Test key"** button runs the authenticated `/api/chat` probe (via the existing `testProvider`) with an inline ✓/✗ + message. Claude/OpenAI already had a real test; they now show the friendly message too.
-- Pure `key_check` logic is unit-tested (10 cases incl. the exact BUG-LLM-002 401 and the "don't mask a real error" guarantee). `dart analyze lib` clean; `flutter build macos` ok; 110 tests green. On branch `feat/llmkey-test-key` — pending verify + merge.
+- Pure `key_check` logic is unit-tested (10 cases incl. the exact BUG-LLM-002 401 and the "don't mask a real error" guarantee). `dart analyze lib` clean; `flutter build macos` ok; 110 tests green. Merged to `main`; deployed as a Developer ID–signed v0.5.1.
 
 ---
 

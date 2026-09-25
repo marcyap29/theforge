@@ -103,6 +103,8 @@ Every §N that brings The Forge closer to a working interview-to-spec run unbloc
 
 **Status:** ✅ v1 shipped v0.5.0 (2026-09-24, merged to `main`) — points 1–4 (base with command-center hub + metaphor + buildings clustered on rings + bots + click-to-inspect). v2+ = pts 5–6, drag-to-assign, Flame RTS engine + isometric sprites, multi-base portfolio map.
 
+**North star (ref, 2026-09-25):** the Instagram/TikTok build by **@jarrenrocks** — a low-poly **3D hex planet** where each hexagon is a project, agents are **cute little robots with faces** that walk out of a central space station as projects grow, you **pan/rotate the whole world**, and clicking a robot that's "blocked / needs help" opens the agent (he wires it to **Claude Code**); multiple **planets** (Earth/Moon/Mars) group different sets. That is exactly the Base View concept at full fidelity. Honest gap: that's a real **3D game** (Unity/Godot/Three-class engine + animated character art), well beyond Flutter widgets. Realistic path: v2 = **Flame isometric + Rive robots-with-faces + walk-out-of-station + blocked→open** to approach the look in-app; true 3D-planet fidelity would need a 3D engine (Godot, or Three.js in a webview) — a separate track to evaluate. Key Forge mapping: robot = a Build-with-AI run; "needs help" = a run awaiting approval / blocked; click → open the build window (our Claude-Code equivalent); hex = feature/project; planet = a portfolio grouping.
+
 ---
 
 ### §LLMKEY — Self-diagnosing API-key errors (friendly 401 + "Test key")
@@ -112,7 +114,7 @@ Every §N that brings The Forge closer to a working interview-to-spec run unbloc
 
 **Architecture (sketch):** A `validateKey(provider)` in `LlmService`/each provider returning `{ok, httpStatus, message}`; a Test-key control in `settings_screen.dart`; map common statuses (401 → key/plan, 404 → model tag, connection reset → network) to guidance. Surface the same friendly mapping where builds fail (`implementation_notifier` error path).
 
-**Status:** ✅ v1 shipped v0.5.1 (2026-09-25, branch `feat/llmkey-test-key`) — friendly `keyErrorGuidance`/`friendlyLlmError` mapping (`key_check.dart`, unit-tested) wired into the Settings key test + Build-with-AI failure logs; real "Test key" button on the Ollama card (`/api/chat`, not public `/api/tags`). Follow-up (not done): per-status guidance for Claude/OpenAI-specific quirks; a "Test key" affordance surfaced at the point a build fails.
+**Status:** ✅ v1 shipped v0.5.1 (2026-09-25, merged to `main`) — friendly `keyErrorGuidance`/`friendlyLlmError` mapping (`key_check.dart`, unit-tested) wired into the Settings key test + Build-with-AI failure logs; real "Test key" button on the Ollama card (`/api/chat`, not public `/api/tags`). Follow-up (not done): per-status guidance for Claude/OpenAI-specific quirks; a "Test key" affordance surfaced at the point a build fails.
 
 ---
 
