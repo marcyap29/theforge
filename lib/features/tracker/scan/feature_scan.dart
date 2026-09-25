@@ -90,10 +90,92 @@ class FeatureScanException implements Exception {
 /// inferred status (built code → shipped, TODOs → planned). Reuses the shared
 /// [LlmService] (architect role) — same one-shot synthesis pattern as the Watch
 /// briefing generator.
+/// A project distilled into one concrete physical metaphor object for the Base
+/// View game (transcription → bullhorn, car repair → car). Themes the base.
+class ProjectMetaphor {
+  const ProjectMetaphor({
+    required this.noun,
+    required this.emoji,
+    required this.tagline,
+  });
+
+  final String noun; // lowercase object, e.g. "bullhorn"
+  final String emoji; // e.g. "📢"
+  final String tagline; // one short playful line
+
+  factory ProjectMetaphor.fromMap(Map<String, dynamic> m) => ProjectMetaphor(
+        noun: (m['noun'] ?? '').toString().trim(),
+        emoji: (m['emoji'] ?? '🏗️').toString().trim(),
+        tagline: (m['tagline'] ?? '').toString().trim(),
+      );
+}
+
 class FeatureScanner {
   FeatureScanner(this._llm);
 
   final LlmService _llm;
+
+  /// Distills the project down to ONE concrete physical metaphor object for the
+  /// Base View game — the single tangible thing the app is "about" (a
+  /// transcription app → a bullhorn, a car-repair app → a car). Grounded in the
+  /// project's docs + tracked features. Short JSON, cached by the caller.
+  Future<ProjectMetaphor> distillMetaphor({
+    required String projectPath,
+    String? repoPath,
+    String projectName = '',
+    List<Feature> features = const [],
+  }) async {
+    final docs = await _readProjectDocs(projectPath);
+    String? readme;
+    if (repoPath != null && Directory(repoPath).existsSync()) {
+      readme = await _readReadme(repoPath);
+    }
+    String clip(String s, int n) => s.length > n ? s.substring(0, n) : s;
+    final b = StringBuffer()
+      ..writeln('# Project: $projectName')
+      ..writeln();
+    if (features.isNotEmpty) {
+      b.writeln('## Tracked features');
+      for (final f in features.take(30)) {
+        b.writeln('- ${f.title}');
+      }
+      b.writeln();
+    }
+    if (docs != null) {
+      b..writeln('## Project documents')..writeln(clip(docs, 4000))..writeln();
+    }
+    if (readme != null) {
+      b..writeln('## README')..writeln(clip(readme, 2000));
+    }
+    return _parseWithRetry(
+        _metaphorSystemPrompt, b.toString(), 0.5, 400, _parseMetaphor);
+  }
+
+  ProjectMetaphor _parseMetaphor(String raw) {
+    dynamic decoded;
+    try {
+      decoded = jsonDecode(_extractJsonObject(raw));
+    } catch (_) {
+      throw FeatureScanException('Could not parse the metaphor as JSON.');
+    }
+    if (decoded is! Map) {
+      throw FeatureScanException('The metaphor was not a JSON object.');
+    }
+    final m = ProjectMetaphor.fromMap(decoded.cast<String, dynamic>());
+    if (m.noun.isEmpty) {
+      throw FeatureScanException('The metaphor had no noun.');
+    }
+    return m;
+  }
+
+  static const _metaphorSystemPrompt = '''
+You turn a software project into ONE concrete physical METAPHOR OBJECT for a
+building-themed game — the single tangible thing the app is "about."
+Examples: a transcription app → a bullhorn; a car-repair app → a car; a
+budgeting app → a piggy bank; a chat app → a telephone; a maps app → a compass.
+Pick something visual, iconic, and physical (not an abstract concept).
+Respond with ONLY this JSON, no prose, no code fences:
+{"noun":"one lowercase physical object","emoji":"one representative emoji","tagline":"a playful line of 6 words or fewer"}''';
 
   /// Derives features from a project's own Forge documents (spec, handoff,
   /// goal, seeds…) AND/OR a linked code repo. Either source alone is enough —

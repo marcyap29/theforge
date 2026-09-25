@@ -684,6 +684,40 @@ class ProjectFileRepository {
     }));
   }
 
+  /// Reads the cached Base View metaphor ({noun, emoji, tagline}). Null if the
+  /// project hasn't been distilled yet.
+  static Future<Map<String, dynamic>?> readProjectMetaphor(
+      String projectPath) async {
+    try {
+      final f =
+          File(p.join(projectPath, forgeDirName, 'project_metaphor.json'));
+      if (!f.existsSync()) return null;
+      final data = jsonDecode(await f.readAsString());
+      return data is Map<String, dynamic> ? data : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Caches the Base View metaphor under `.forge/` so it's distilled once and
+  /// reused (it rarely changes for a project).
+  static Future<void> writeProjectMetaphor(
+    String projectPath, {
+    required String noun,
+    required String emoji,
+    required String tagline,
+  }) async {
+    final dir = Directory(p.join(projectPath, forgeDirName));
+    if (!dir.existsSync()) dir.createSync(recursive: true);
+    final f = File(p.join(dir.path, 'project_metaphor.json'));
+    await f.writeAsString(jsonEncode({
+      'noun': noun,
+      'emoji': emoji,
+      'tagline': tagline,
+      'generatedAt': DateTime.now().toIso8601String(),
+    }));
+  }
+
   /// The default place a user's code lives (`~/Development`). New code folders
   /// created from within The Forge go here, so a non-technical user never has
   /// to make or find a repo folder themselves.

@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/filesystem/project_file_repository.dart';
 import '../../../data/local_db/forge_database.dart';
 import '../../../services/diag_log.dart';
+import '../../game/base_view_screen.dart';
 import '../../implementation/models/run_session.dart';
 import '../../implementation/providers/implementation_notifier.dart';
 import '../../implementation/providers/implementation_providers.dart';
@@ -182,6 +183,11 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
                 Icons.shield_outlined, 'Security check', _openSecurityCheck),
             _menuEntry(Icons.fact_check_outlined, 'Run check-in', _runCheckin),
           ]),
+          IconButton(
+            icon: const Icon(Icons.castle_outlined),
+            tooltip: 'Base view (game)',
+            onPressed: _openBaseView,
+          ),
           IconButton(
             icon: const Icon(Icons.play_circle_outline),
             tooltip: 'Run & preview',
@@ -833,6 +839,15 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     if (repoPath == null || !mounted) return;
     await Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => RunPreviewScreen(project: project, repoPath: repoPath),
+    ));
+  }
+
+  /// Opens the Base View game — the project as a base, features as buildings,
+  /// active builds as bots. Read-only, so it doesn't force a repo link (the
+  /// already-loaded [_repoPath] is passed for metaphor grounding when present).
+  void _openBaseView() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => BaseViewScreen(project: project, repoPath: _repoPath),
     ));
   }
 

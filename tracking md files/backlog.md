@@ -83,6 +83,28 @@ Every §N that brings The Forge closer to a working interview-to-spec run unbloc
 
 ## High Priority
 
+### §BRANCH — Auto-branch epics (branch on build, merge on done)
+**What it is:** When The Forge builds a feature classified as an **epic** (`BuildKind.epic`) — or, optionally, any feature — it should automatically `git checkout -b` a work branch in the linked repo before applying edits, do all the code work there, and only **merge back to `main` when the epic is marked done and its builds verified** (analyze clean + checklist passing). If a build fails or is abandoned, the branch isolates the mess from `main`.
+
+**Why it matters:** Epics span many builds over time; doing that directly on `main` risks leaving the trunk half-built between sessions. Branch-per-epic gives a clean, revertible unit of work and matches how a human would tackle a big feature. It's the delivery-hygiene counterpart to the architect decomposition (BUG-TRACKER-003) and the completion guard.
+
+**Architecture (sketch):** A git helper in `impl_workspace` (create/switch/merge/delete branch), invoked from `implementation_notifier` around the run lifecycle; branch name derived from the epic (`forge/epic-<slug>`); merge gated on the epic's sub-features all being shipped + a clean analyze; surface the current branch in the build window. Reuses the existing `command_runner`. Needs a conflict-handling story (fall back to leaving the branch for manual merge).
+
+**Status:** Backlog / not started (added 2026-09-23 from a user request). Pairs naturally with §GAME (each base = a project; an epic building = a branch under construction).
+
+---
+
+### §GAME — Base View (StarCraft-style RTS wrapper over Forge data)
+**What it is:** A game-mode visualization layered over the data The Forge already produces. A **project = a base**; each **feature = a building** on the base (styled by status/buildKind); each **active Build-with-AI run = a builder-bot** working at its building (colored by `RunPhase`); the user **clicks a bot to see live progress** (phase + console + elapsed). The project's "one key thing" is **distilled by an LLM into a metaphor** (transcription→bullhorn, car repair→car) that themes the base. Later stepping-stones: idle/wave animations when a bot finishes (pt 5), a next-action menu on a ready bot (pt 6), **drag-a-bot-onto-a-building = assign/reassign** to that feature, a small RTS input layer (select/move/right-click, camera pan/zoom via Flame), and **multiple bases = the portfolio**.
+
+**Why it matters:** Makes the build pipeline *legible and delightful* for vibecoders — you watch real agents build real features. Pure wrapper (mostly read, some write into existing actions); adds no new backend capability, it visualizes what's there.
+
+**Architecture:** New `lib/features/game/` — `base_layout.dart` (pure grid math, testable), `base_view_screen.dart` (Stack of positioned buildings + bots over a painted ground; taps via GestureDetector). Reads `featureListProvider`, `implActiveRunsProvider`, `implRunProvider(featureId)`. Metaphor via `FeatureScanner.distillMetaphor` cached under `.forge/`. v1 is Flutter widgets (no Flame); Flame arrives with the RTS input layer in v2.
+
+**Status:** 🚧 v1 in progress on branch `feat/base-view-game` (2026-09-23) — points 1–4 (base + metaphor + buildings + bots + click-to-inspect). v2+ = pts 5–6, drag-to-assign, Flame RTS engine, multi-base portfolio map.
+
+---
+
 ### §BWAI — Build with AI (Feature-Driven Implementation Agent)
 **What it is:** From a tracked feature (status `planned`), "Build with AI" has The Forge itself call the LLM to implement it — a propose-&-approve loop of file diffs + shell commands, applied edits with per-step Undo, commands run with live streamed output in an in-app console, and verification against the Handoff checklist. Plus release tracking: a new `Releases` table, a per-version Releases view, and "Cut release" (deterministic notes → CHANGELOG, optional git tag). Pro-gated (entitlement stub).
 
