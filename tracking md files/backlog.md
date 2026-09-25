@@ -101,7 +101,7 @@ Every §N that brings The Forge closer to a working interview-to-spec run unbloc
 
 **Architecture:** New `lib/features/game/` — `base_layout.dart` (pure grid math, testable), `base_view_screen.dart` (Stack of positioned buildings + bots over a painted ground; taps via GestureDetector). Reads `featureListProvider`, `implActiveRunsProvider`, `implRunProvider(featureId)`. Metaphor via `FeatureScanner.distillMetaphor` cached under `.forge/`. v1 is Flutter widgets (no Flame); Flame arrives with the RTS input layer in v2.
 
-**Status:** 🚧 v1 in progress on branch `feat/base-view-game` (2026-09-23) — points 1–4 (base + metaphor + buildings + bots + click-to-inspect). v2+ = pts 5–6, drag-to-assign, Flame RTS engine, multi-base portfolio map.
+**Status:** ✅ v1 shipped v0.5.0 (2026-09-24, merged to `main`) — points 1–4 (base with command-center hub + metaphor + buildings clustered on rings + bots + click-to-inspect). v2+ = pts 5–6, drag-to-assign, Flame RTS engine + isometric sprites, multi-base portfolio map.
 
 ---
 
