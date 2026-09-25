@@ -107,6 +107,29 @@ Every §N that brings The Forge closer to a working interview-to-spec run unbloc
 
 ---
 
+### §GAME-v2 — Base View v2 (the Flame layer)
+**What it is:** The isometric Flame world that approaches the @jarrenrocks north star inside the app — robots build feature-buildings, walk out of a station, wave when blocked, click to open the build. Full plan: `DOCS/forge/base_view_v2_plan.md`.
+
+**Decisions (locked):** Flame isometric (3D deferred to v3) · Rive robots (state machine keyed to `RunPhase`) · stub art with shapes until Phase B feels right · Claude builds the engine (Ollama models thrash on Flame), Build-with-AI does thin wiring only · branch `feat/base-view-v2`, ship as `v0.6.x`.
+
+**Tracked sub-items (ordered):**
+- [ ] **A1** — add `flame`; embed an empty `GameWidget` in `BaseViewScreen` behind a view toggle.
+- [ ] **A2** — isometric hex grid + camera pan/zoom; port `BaseLayout` ring math to iso coords.
+- [ ] **A3** — Riverpod→Flame **sync adapter** (features→buildings, runs→robots; add/remove/update on change). *[hardest engineering]*
+- [ ] **B1** — robot component (placeholder shape) at its building; state/colour by `RunPhase`.
+- [ ] **B2** — tap robot → open build window; tap building → feature sheet.
+- [ ] **B3** — blocked/awaiting robot → "!" bubble + attention → click jumps to the approval. *(pts 5–6)*
+- [ ] **B4** — walk-out-of-station: new run → robot spawns at hub, walks to its building.
+- [ ] **C1** — add `flame_rive`; Rive robot **with a face** + idle/work/wave/blocked states. *[needs art]*
+- [ ] **C2** — low-poly building/hex art (per category or metaphor). *[needs art]*
+- [ ] **C3** — station/hub + ambient art. *[needs art]*
+- [ ] **D1** *(v2.5)* — multiple bases = portfolio (zoom out to islands/planets).
+- [ ] **D2** *(v2.5)* — drag-a-robot-onto-a-building = reassign (two-way write).
+
+**Status:** 🚧 Started 2026-09-25 (branch `feat/base-view-v2`) — Phase A. Effort: playable interactive Flame v2 with placeholder art ≈ 4–5 sessions; video-fidelity gated on art (Phase C), not code.
+
+---
+
 ### §LLMKEY — Self-diagnosing API-key errors (friendly 401 + "Test key")
 **What it is:** Turn the raw `Ollama error 401: {"error":"Unauthorized"}` (and the equivalent for Claude/OpenAI) into an actionable message — e.g. *"Ollama rejected your key (401). Regenerate it at ollama.com, or check your Cloud plan."* — and add a **"Test key"** button in Settings next to each provider's key field that runs a real auth probe (Ollama → `POST /api/chat` with a 1-token request, **not** the public `/api/tags`; Claude/OpenAI → their cheapest authed endpoint) and reports ✓/✗ inline.
 
