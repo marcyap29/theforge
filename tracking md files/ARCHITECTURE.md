@@ -238,9 +238,15 @@ abstract class LlmProvider {
 | Gemini | `GeminiProvider` | Google Generative Language REST |
 | Claude | `ClaudeProvider` | Anthropic Messages REST |
 | OpenAI | `OpenAiProvider` | OpenAI Chat Completions REST |
-| Ollama | `OllamaProvider` | Local HTTP (`/api/chat`) |
+| Ollama | `OllamaProvider` | Local HTTP **or Ollama Cloud** (`/api/chat`) |
 
-All implementations use `package:http` directly — no SDK dependencies. API keys live in `forge_config.json` (Application Support). Model IDs are validated on load; retired IDs fall back to first valid model for that provider.
+All implementations use `package:http` directly — no SDK dependencies. **API keys are stored encrypted at rest in the macOS login Keychain** (via `flutter_secure_storage`, item `forge_api_key_<provider>`, service `flutter_secure_storage_service`), not in `forge_config.json` — see v0.4.48. Model IDs are validated on load; retired IDs fall back to first valid model for that provider.
+
+### Ollama Cloud auth (and the 401 trap)
+
+`OllamaProvider` targets a `baseUrl` — a local `ollama serve` (no auth) or **Ollama Cloud** (`https://ollama.com`, the default). For Cloud it authenticates with `Authorization: Bearer <apiKey>`, where `apiKey` is the keychain-stored key (trimmed on save), sent on every `/api/chat` and `/api/tags` request.
+
+Diagnosing an `Ollama error 401: {"error":"Unauthorized"}` (see BUG-LLM-002): it's almost always a bad/expired **key**, not the app — **regenerate the key** at ollama.com. Two traps that mislead the diagnosis: (1) `ollama.com/api/tags` is **public** — it returns 200 with no auth, so it is *not* a valid key test; use `/api/chat`. (2) The keychain item's ACL is tied to the app's **code signature**, so a key saved by an ad-hoc-signed local build (`deploy_macos.sh` default) is unreadable by the Developer ID–signed release DMG (and vice-versa) → null read → 401; use `FORGE_SIGN_IDENTITY` to sign local builds with the release identity so they share one keychain entry.
 
 ### Streaming LLM Layer (v0.4.0)
 

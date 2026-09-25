@@ -105,6 +105,17 @@ Every §N that brings The Forge closer to a working interview-to-spec run unbloc
 
 ---
 
+### §LLMKEY — Self-diagnosing API-key errors (friendly 401 + "Test key")
+**What it is:** Turn the raw `Ollama error 401: {"error":"Unauthorized"}` (and the equivalent for Claude/OpenAI) into an actionable message — e.g. *"Ollama rejected your key (401). Regenerate it at ollama.com, or check your Cloud plan."* — and add a **"Test key"** button in Settings next to each provider's key field that runs a real auth probe (Ollama → `POST /api/chat` with a 1-token request, **not** the public `/api/tags`; Claude/OpenAI → their cheapest authed endpoint) and reports ✓/✗ inline.
+
+**Why it matters:** A bad/expired key (BUG-LLM-002) cost a long multi-round debugging session because the failure surfaced as an opaque 401 mid-build and there was no way to test a key in place. One-click validation + a plain-English error makes it self-service. Pairs with the keychain-vs-signature gotcha (a null keychain read also 401s).
+
+**Architecture (sketch):** A `validateKey(provider)` in `LlmService`/each provider returning `{ok, httpStatus, message}`; a Test-key control in `settings_screen.dart`; map common statuses (401 → key/plan, 404 → model tag, connection reset → network) to guidance. Surface the same friendly mapping where builds fail (`implementation_notifier` error path).
+
+**Status:** Backlog / not started (added 2026-09-25 from BUG-LLM-002).
+
+---
+
 ### §BWAI — Build with AI (Feature-Driven Implementation Agent)
 **What it is:** From a tracked feature (status `planned`), "Build with AI" has The Forge itself call the LLM to implement it — a propose-&-approve loop of file diffs + shell commands, applied edits with per-step Undo, commands run with live streamed output in an in-app console, and verification against the Handoff checklist. Plus release tracking: a new `Releases` table, a per-version Releases view, and "Cut release" (deterministic notes → CHANGELOG, optional git tag). Pro-gated (entitlement stub).
 
