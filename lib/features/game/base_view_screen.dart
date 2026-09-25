@@ -1,3 +1,4 @@
+import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,6 +10,7 @@ import '../implementation/providers/implementation_providers.dart';
 import '../tracker/models/tracker_enums.dart';
 import '../tracker/providers/tracker_providers.dart';
 import '../tracker/scan/feature_scan.dart';
+import 'base_flame_game.dart';
 import 'base_layout.dart';
 
 /// The Base View — a StarCraft-style visualization of a project as a *base*:
@@ -32,6 +34,11 @@ class _BaseViewScreenState extends ConsumerState<BaseViewScreen> {
 
   ProjectMetaphor? _metaphor;
   bool _loadingMetaphor = true;
+
+  /// v2: switch between the v1 widget scene and the Flame world (WIP). The game
+  /// is created once and reused so the world isn't rebuilt on every setState.
+  bool _flameView = false;
+  BaseFlameGame? _flameGame;
 
   @override
   void initState() {
@@ -83,6 +90,15 @@ class _BaseViewScreenState extends ConsumerState<BaseViewScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF12161C),
         title: _title(),
+        actions: [
+          IconButton(
+            icon: Icon(_flameView
+                ? Icons.grid_view_outlined
+                : Icons.videogame_asset_outlined),
+            tooltip: _flameView ? 'Classic view' : 'Flame world (v2, WIP)',
+            onPressed: () => setState(() => _flameView = !_flameView),
+          ),
+        ],
       ),
       body: featuresAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -90,6 +106,7 @@ class _BaseViewScreenState extends ConsumerState<BaseViewScreen> {
             child: Text('Could not load the base: $e',
                 style: const TextStyle(color: Color(0xFFE57373)))),
         data: (all) {
+          if (_flameView) return _flameBody();
           final features = all
               .where((f) =>
                   FeatureStatus.fromWire(f.status) != FeatureStatus.archived)
@@ -134,6 +151,13 @@ class _BaseViewScreenState extends ConsumerState<BaseViewScreen> {
         ),
       ],
     );
+  }
+
+  /// The Flame world (v2, WIP). Created lazily and reused. Phase A1 renders an
+  /// empty world; A2/A3/B add the iso grid, the data bridge, and robots.
+  Widget _flameBody() {
+    _flameGame ??= BaseFlameGame();
+    return GameWidget(game: _flameGame!);
   }
 
   Widget _scene(List<Feature> features, Map<String, RunPhase> activeRuns) {

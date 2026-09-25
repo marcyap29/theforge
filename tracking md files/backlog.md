@@ -113,7 +113,7 @@ Every §N that brings The Forge closer to a working interview-to-spec run unbloc
 **Decisions (locked):** Flame isometric (3D deferred to v3) · Rive robots (state machine keyed to `RunPhase`) · stub art with shapes until Phase B feels right · Claude builds the engine (Ollama models thrash on Flame), Build-with-AI does thin wiring only · branch `feat/base-view-v2`, ship as `v0.6.x`.
 
 **Tracked sub-items (ordered):**
-- [ ] **A1** — add `flame`; embed an empty `GameWidget` in `BaseViewScreen` behind a view toggle.
+- [x] **A1** — add `flame` (1.35.1); empty `GameWidget` (`BaseFlameGame`) in `BaseViewScreen` behind a toolbar toggle. ✅ 2026-09-25
 - [ ] **A2** — isometric hex grid + camera pan/zoom; port `BaseLayout` ring math to iso coords.
 - [ ] **A3** — Riverpod→Flame **sync adapter** (features→buildings, runs→robots; add/remove/update on change). *[hardest engineering]*
 - [ ] **B1** — robot component (placeholder shape) at its building; state/colour by `RunPhase`.

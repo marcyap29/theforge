@@ -37,6 +37,7 @@ dependencies:
   flutter_markdown: ^0.7.6
   file_picker: ^8.0.0
   fl_chart: ^0.70.0  # requires flutter pub get after adding
+  flame: ^1.35.1
 
 dev_dependencies:
   flutter_test:
