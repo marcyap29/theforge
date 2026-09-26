@@ -2,6 +2,17 @@
 
 ---
 
+## v0.6.1 — 2026-09-25 — Base View v2: Phase B (robots come alive) · branch `feat/base-view-v2` (WIP, not merged)
+
+- **The Flame world's robots now behave like agents.** Building on Phase A's iso hex world:
+  - **B4 — walk-out-of-the-station.** When a build starts, its robot **spawns at the hub and walks out** to its feature-hex (`MoveToEffect`) — the "agents leave the base as projects grow" moment.
+  - **B3 — "I need help."** A robot whose run is **awaiting approval** (or failed) **pulses with a "!" bubble** so you can spot at a glance which agent is blocked and waiting on you.
+  - **B2 — click to inspect.** Tap a robot → its **live status** (phase + streamed console tail + elapsed); tap a hex → the **feature sheet**. Tap hit-testing is done manually (screen→world via the camera) so it never fights the pan/zoom gesture.
+  - **B1** — robots already carry a two-eye face and phase colour (from A3).
+- Still placeholder art (shapes + dot-eyes) — Phase C swaps in Rive robots-with-faces + low-poly tiles/station to reach the @jarrenrocks look. One honest gap: tapping a *blocked* robot opens the status sheet, not yet the build's approval UI (that needs the tracker's `ImplBrief`-building shared — a deferred follow-up). `dart analyze lib` clean; `flutter build macos` ok; 117 tests green. On branch `feat/base-view-v2`.
+
+---
+
 ## v0.6.0 — 2026-09-25 — Base View v2: the Flame world, Phase A · branch `feat/base-view-v2` (WIP, not merged)
 
 - **Base View gets a real game world (Flame), Phase A.** The first step toward the @jarrenrocks north star (see `DOCS/forge/base_view_v2_plan.md`): a toolbar toggle in Base View swaps the v1 radial widget scene for a **Flame** world.

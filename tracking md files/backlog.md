@@ -116,17 +116,17 @@ Every §N that brings The Forge closer to a working interview-to-spec run unbloc
 - [x] **A1** — add `flame` (1.35.1); empty `GameWidget` (`BaseFlameGame`) in `BaseViewScreen` behind a toolbar toggle. ✅ 2026-09-25
 - [x] **A2** — isometric hex grid (`HexGrid` spiral + axial→iso, unit-tested) rendered as `_HexTile` components; camera pan/zoom via Flutter gestures → `camera.viewfinder`. ✅ 2026-09-25
 - [x] **A3** — Riverpod→Flame **sync bridge** (`BaseFlameGame.syncWorld` diffs features→hex tiles, runs→robots; pushed from `BaseViewScreen` on every provider change). ✅ 2026-09-25
-- [ ] **B1** — robot component (placeholder shape) at its building; state/colour by `RunPhase`.
-- [ ] **B2** — tap robot → open build window; tap building → feature sheet.
-- [ ] **B3** — blocked/awaiting robot → "!" bubble + attention → click jumps to the approval. *(pts 5–6)*
-- [ ] **B4** — walk-out-of-station: new run → robot spawns at hub, walks to its building.
+- [x] **B1** — `_Robot` at its building, body + two-eye face, coloured by `RunPhase` (landed with A3). ✅ 2026-09-25
+- [x] **B2** — tap building → feature sheet (`_showBuilding`), tap robot → live-status sheet (`_showBot`). Manual screen→world hit-testing (`handleTapAtScreen`) avoids Flame gesture-arena conflicts. ✅ 2026-09-25 *(note: opens the inspect sheet, not the full build window — see B3 caveat)*
+- [x] **B3** — awaiting-approval / failed robot **pulses with a "!" bubble** (the "I need help" signal); tap → the status sheet. ✅ 2026-09-25 *(follow-up: jump straight into the build's approval UI needs the tracker's `ImplBrief`-building shared/extracted — deferred)*
+- [x] **B4** — **walk-out-of-station:** a new run's robot spawns at the hub (0,0) and animates (`MoveToEffect`) to its building. ✅ 2026-09-25
 - [ ] **C1** — add `flame_rive`; Rive robot **with a face** + idle/work/wave/blocked states. *[needs art]*
 - [ ] **C2** — low-poly building/hex art (per category or metaphor). *[needs art]*
 - [ ] **C3** — station/hub + ambient art. *[needs art]*
 - [ ] **D1** *(v2.5)* — multiple bases = portfolio (zoom out to islands/planets).
 - [ ] **D2** *(v2.5)* — drag-a-robot-onto-a-building = reassign (two-way write).
 
-**Status:** 🚧 In progress (branch `feat/base-view-v2`) — **Phase A complete** (A1–A3): Flame embedded behind a toggle, isometric hex world (one hex per feature, spiralling from the hub), camera pan/zoom, and the live Riverpod→Flame data bridge (buildings from features, placeholder robots from active runs). Next: Phase B (robot interaction, blocked→open, walk-out-of-station). Effort: playable interactive Flame v2 with placeholder art ≈ 4–5 sessions; video-fidelity gated on art (Phase C), not code.
+**Status:** 🚧 In progress (branch `feat/base-view-v2`) — **Phases A + B complete**. A: Flame embedded behind a toggle, isometric hex world, camera pan/zoom, live Riverpod→Flame data bridge. B: robots walk out of the station to their building, a blocked/awaiting-approval robot pulses with a "!", tap a robot/building to inspect (live status / feature sheet). Remaining: **Phase C** (Rive robots-with-faces + low-poly tiles/station — the art that closes the gap to the @jarrenrocks look) and the B3 follow-up (tap-blocked → jump into the approval UI, needs shared `ImplBrief`-building). Effort: video-fidelity gated on art (Phase C), not code.
 
 ---
 

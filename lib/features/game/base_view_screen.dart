@@ -40,6 +40,9 @@ class _BaseViewScreenState extends ConsumerState<BaseViewScreen> {
   /// is created once and reused so the world isn't rebuilt on every setState.
   bool _flameView = false;
   BaseFlameGame? _flameGame;
+  // Latest snapshot, so the game's id-based tap callbacks can resolve a feature.
+  Map<String, Feature> _byId = const {};
+  Map<String, RunPhase> _lastRuns = const {};
 
   @override
   void initState() {
@@ -159,13 +162,25 @@ class _BaseViewScreenState extends ConsumerState<BaseViewScreen> {
   /// drives camera pan/zoom from Flutter gestures. A2 = iso hex grid + camera;
   /// A3 = data sync; robots + art follow in B/C.
   Widget _flameBody(List<Feature> features, Map<String, RunPhase> activeRuns) {
-    final game = _flameGame ??= BaseFlameGame();
+    _byId = {for (final f in features) f.id: f};
+    _lastRuns = activeRuns;
+    final game = _flameGame ??= (BaseFlameGame()
+      ..onTapFeatureId = ((id) {
+        final f = _byId[id];
+        if (f != null) _showBuilding(f);
+      })
+      ..onTapBotId = ((id) {
+        final f = _byId[id];
+        final ph = _lastRuns[id];
+        if (f != null && ph != null) _showBot(f, ph);
+      }));
     game.syncWorld(features, activeRuns);
     return Listener(
       onPointerSignal: (e) {
         if (e is PointerScrollEvent) game.zoomBy(e.scrollDelta.dy);
       },
       child: GestureDetector(
+        onTapUp: (d) => game.handleTapAtScreen(d.localPosition),
         onScaleStart: (_) => game.onScaleStart(),
         onScaleUpdate: (d) => game.onScaleUpdate(d.focalPointDelta, d.scale),
         child: GameWidget(game: game),
