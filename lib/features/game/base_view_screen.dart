@@ -1,4 +1,5 @@
 import 'package:flame/game.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -106,11 +107,11 @@ class _BaseViewScreenState extends ConsumerState<BaseViewScreen> {
             child: Text('Could not load the base: $e',
                 style: const TextStyle(color: Color(0xFFE57373)))),
         data: (all) {
-          if (_flameView) return _flameBody();
           final features = all
               .where((f) =>
                   FeatureStatus.fromWire(f.status) != FeatureStatus.archived)
               .toList();
+          if (_flameView) return _flameBody(features, activeRuns);
           if (features.isEmpty) {
             return const Center(
               child: Text(
@@ -153,11 +154,23 @@ class _BaseViewScreenState extends ConsumerState<BaseViewScreen> {
     );
   }
 
-  /// The Flame world (v2, WIP). Created lazily and reused. Phase A1 renders an
-  /// empty world; A2/A3/B add the iso grid, the data bridge, and robots.
-  Widget _flameBody() {
-    _flameGame ??= BaseFlameGame();
-    return GameWidget(game: _flameGame!);
+  /// The Flame world (v2, WIP). Created lazily and reused. Pushes the live
+  /// feature/run snapshot into the game (the Riverpod→Flame bridge, A3) and
+  /// drives camera pan/zoom from Flutter gestures. A2 = iso hex grid + camera;
+  /// A3 = data sync; robots + art follow in B/C.
+  Widget _flameBody(List<Feature> features, Map<String, RunPhase> activeRuns) {
+    final game = _flameGame ??= BaseFlameGame();
+    game.syncWorld(features, activeRuns);
+    return Listener(
+      onPointerSignal: (e) {
+        if (e is PointerScrollEvent) game.zoomBy(e.scrollDelta.dy);
+      },
+      child: GestureDetector(
+        onScaleStart: (_) => game.onScaleStart(),
+        onScaleUpdate: (d) => game.onScaleUpdate(d.focalPointDelta, d.scale),
+        child: GameWidget(game: game),
+      ),
+    );
   }
 
   Widget _scene(List<Feature> features, Map<String, RunPhase> activeRuns) {

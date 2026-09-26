@@ -114,8 +114,8 @@ Every §N that brings The Forge closer to a working interview-to-spec run unbloc
 
 **Tracked sub-items (ordered):**
 - [x] **A1** — add `flame` (1.35.1); empty `GameWidget` (`BaseFlameGame`) in `BaseViewScreen` behind a toolbar toggle. ✅ 2026-09-25
-- [ ] **A2** — isometric hex grid + camera pan/zoom; port `BaseLayout` ring math to iso coords.
-- [ ] **A3** — Riverpod→Flame **sync adapter** (features→buildings, runs→robots; add/remove/update on change). *[hardest engineering]*
+- [x] **A2** — isometric hex grid (`HexGrid` spiral + axial→iso, unit-tested) rendered as `_HexTile` components; camera pan/zoom via Flutter gestures → `camera.viewfinder`. ✅ 2026-09-25
+- [x] **A3** — Riverpod→Flame **sync bridge** (`BaseFlameGame.syncWorld` diffs features→hex tiles, runs→robots; pushed from `BaseViewScreen` on every provider change). ✅ 2026-09-25
 - [ ] **B1** — robot component (placeholder shape) at its building; state/colour by `RunPhase`.
 - [ ] **B2** — tap robot → open build window; tap building → feature sheet.
 - [ ] **B3** — blocked/awaiting robot → "!" bubble + attention → click jumps to the approval. *(pts 5–6)*
@@ -126,7 +126,7 @@ Every §N that brings The Forge closer to a working interview-to-spec run unbloc
 - [ ] **D1** *(v2.5)* — multiple bases = portfolio (zoom out to islands/planets).
 - [ ] **D2** *(v2.5)* — drag-a-robot-onto-a-building = reassign (two-way write).
 
-**Status:** 🚧 Started 2026-09-25 (branch `feat/base-view-v2`) — Phase A. Effort: playable interactive Flame v2 with placeholder art ≈ 4–5 sessions; video-fidelity gated on art (Phase C), not code.
+**Status:** 🚧 In progress (branch `feat/base-view-v2`) — **Phase A complete** (A1–A3): Flame embedded behind a toggle, isometric hex world (one hex per feature, spiralling from the hub), camera pan/zoom, and the live Riverpod→Flame data bridge (buildings from features, placeholder robots from active runs). Next: Phase B (robot interaction, blocked→open, walk-out-of-station). Effort: playable interactive Flame v2 with placeholder art ≈ 4–5 sessions; video-fidelity gated on art (Phase C), not code.
 
 ---
 

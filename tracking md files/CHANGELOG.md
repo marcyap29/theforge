@@ -2,6 +2,16 @@
 
 ---
 
+## v0.6.0 — 2026-09-25 — Base View v2: the Flame world, Phase A · branch `feat/base-view-v2` (WIP, not merged)
+
+- **Base View gets a real game world (Flame), Phase A.** The first step toward the @jarrenrocks north star (see `DOCS/forge/base_view_v2_plan.md`): a toolbar toggle in Base View swaps the v1 radial widget scene for a **Flame** world.
+  - **A1** — `flame` 1.35.1; `BaseFlameGame` embedded via `GameWidget` behind the toggle (created once, reused).
+  - **A2** — an **isometric hex grid**: one flat-top, vertically-squashed hex per feature, spiralling out from a hub, with **camera pan/zoom** (Flutter gestures → `camera.viewfinder`; drag/trackpad to pan, scroll/pinch to zoom). Pure `HexGrid` (spiral + axial→iso) is unit-tested.
+  - **A3** — the **Riverpod→Flame sync bridge**: `BaseFlameGame.syncWorld` diffs the live snapshot (`featureListProvider` → hex tiles coloured by status, epics larger; `implActiveRunsProvider` → placeholder builder-bots with faces, coloured by `RunPhase`) into components, so the world tracks reality without being rebuilt. Pushed from `BaseViewScreen` on every provider change.
+- Placeholder art only (shapes + a two-eye face) — Phase B adds robot interaction (tap → open build, blocked→wave→open, walk-out-of-station); Phase C swaps in Rive robots-with-faces + low-poly tiles. `dart analyze lib` clean; `flutter build macos` ok; 117 tests green (7 new for `HexGrid`). On branch `feat/base-view-v2`.
+
+---
+
 ## v0.5.1 — 2026-09-25 — Self-diagnosing API-key errors (§LLMKEY)
 
 - **A bad API key now tells you what to do — and Settings can test a key in place.** Direct fix for the BUG-LLM-002 debugging marathon (a dead Ollama key surfacing as an opaque `Ollama error 401: {"error":"Unauthorized"}` mid-build). Two parts:
