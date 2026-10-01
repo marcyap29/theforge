@@ -12,6 +12,7 @@ import '../../services/llm/key_check.dart';
 import '../../services/llm/llm_model_config.dart';
 import '../../services/llm/llm_provider.dart';
 import '../../services/llm/providers/claude_provider.dart';
+import '../../services/llm/providers/gemini_provider.dart';
 import '../../services/llm/providers/ollama_provider.dart';
 import '../../services/llm/providers/openai_provider.dart';
 
@@ -365,6 +366,10 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
         if (key == null || key.isEmpty) return 'No API key configured.';
         provider = OpenAiProvider(apiKey: key);
         modelId = 'gpt-4o-mini';
+      case LlmProviderType.gemini:
+        if (key == null || key.isEmpty) return 'No API key configured.';
+        provider = GeminiProvider(apiKey: key);
+        modelId = 'gemini-2.0-flash';
       case LlmProviderType.ollama:
         // Cloud (https://ollama.com) needs a key; a local server does not.
         final isCloud = baseUrl.contains('ollama.com');

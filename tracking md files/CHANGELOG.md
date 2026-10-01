@@ -2,6 +2,12 @@
 
 ---
 
+## v0.5.2 — 2026-10-01 — Gemini is back as a provider (four BYOK providers)
+
+- **Added Google Gemini as a first-class LLM provider.** The Forge now supports **all four** BYOK providers — Ollama, Claude, OpenAI, **and Gemini** — for both the Architect and Executor roles. New `GeminiProvider` (`lib/services/llm/providers/gemini_provider.dart`) calls the Google Generative Language REST API (`generativelanguage.googleapis.com/v1beta/…:generateContent`, `Authorization` via `?key=`, system prompt as `systemInstruction`, JSON mode via `responseMimeType`). Wired through everywhere the provider type is handled: `LlmProviderType.gemini` + a seeded model catalog (`gemini-2.5-pro`/`-flash`, `gemini-2.0-flash`) in `llm_model_config.dart`; `LlmService._buildProvider`; a **Gemini BYOK card** in Settings (paste key → **Test key** runs a real `generateContent` probe); the friendly key-error mapper (`key_check.dart` → `aistudio.google.com`); and the coder-upgrade candidate list. Non-streaming for now (one `generateContent` per call; `completeStream` falls back to a single chunk). `dart analyze lib` clean; `flutter build macos` ok; 110 tests green (+ key_check covers Gemini). Get a free key at aistudio.google.com.
+
+---
+
 ## v0.5.1 — 2026-09-25 — Self-diagnosing API-key errors (§LLMKEY)
 
 - **A bad API key now tells you what to do — and Settings can test a key in place.** Direct fix for the BUG-LLM-002 debugging marathon (a dead Ollama key surfacing as an opaque `Ollama error 401: {"error":"Unauthorized"}` mid-build). Two parts:

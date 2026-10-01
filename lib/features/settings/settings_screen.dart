@@ -72,6 +72,11 @@ class SettingsScreen extends ConsumerWidget {
                 providerType: LlmProviderType.openai,
                 displayName: 'OpenAI',
               ),
+              const SizedBox(height: 12),
+              const _ByokCard(
+                providerType: LlmProviderType.gemini,
+                displayName: 'Gemini',
+              ),
               const SizedBox(height: 24),
               const _SectionHeader('Model Roles'),
               const _RoleCard(

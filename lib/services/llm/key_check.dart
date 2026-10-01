@@ -5,6 +5,7 @@ String providerKeyHome(LlmProviderType type) => switch (type) {
       LlmProviderType.ollama => 'ollama.com',
       LlmProviderType.claude => 'console.anthropic.com',
       LlmProviderType.openai => 'platform.openai.com',
+      LlmProviderType.gemini => 'aistudio.google.com',
     };
 
 /// Maps a provider + HTTP status (or a thrown error) from a key test or a
@@ -85,5 +86,8 @@ LlmProviderType _guessProvider(String low) {
     return LlmProviderType.claude;
   }
   if (low.contains('openai')) return LlmProviderType.openai;
+  if (low.contains('gemini') || low.contains('google')) {
+    return LlmProviderType.gemini;
+  }
   return LlmProviderType.ollama; // default (and the common case)
 }

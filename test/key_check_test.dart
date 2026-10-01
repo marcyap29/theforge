@@ -11,11 +11,13 @@ void main() {
       expect(m.toLowerCase(), contains('cloud'));
     });
 
-    test('Claude/OpenAI 401 points at their console', () {
+    test('Claude/OpenAI/Gemini 401 points at their console', () {
       expect(keyErrorGuidance(LlmProviderType.claude, status: 401),
           contains('console.anthropic.com'));
       expect(keyErrorGuidance(LlmProviderType.openai, status: 403),
           contains('platform.openai.com'));
+      expect(keyErrorGuidance(LlmProviderType.gemini, status: 401),
+          contains('aistudio.google.com'));
     });
 
     test('404 is about the model, 429 about rate/quota, 5xx is their side', () {
@@ -48,6 +50,8 @@ void main() {
           contains('console.anthropic.com'));
       expect(friendlyLlmError(Exception('OpenAI error 401: bad key')),
           contains('platform.openai.com'));
+      expect(friendlyLlmError(Exception('Gemini error 401: bad key')),
+          contains('aistudio.google.com'));
     });
 
     test('honors an explicit provider type over the guess', () {

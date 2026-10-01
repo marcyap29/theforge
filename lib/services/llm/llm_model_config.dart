@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import 'llm_provider.dart';
 
-enum LlmProviderType { ollama, claude, openai }
+enum LlmProviderType { ollama, claude, openai, gemini }
 
 @immutable
 class ModelInfo {
@@ -23,6 +23,16 @@ const openAiModels = <ModelInfo>[
   ModelInfo(id: 'gpt-4o-mini', displayName: 'GPT-4o mini'),
 ];
 
+/// Google Gemini (Generative Language API) models. BYOK key from
+/// aistudio.google.com. The picker just seeds common ids; any other model
+/// name can be typed. Avoid `-image`/imagen/tts/veo tags — they generate
+/// media, not text.
+const geminiModels = <ModelInfo>[
+  ModelInfo(id: 'gemini-2.5-pro', displayName: 'Gemini 2.5 Pro'),
+  ModelInfo(id: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash'),
+  ModelInfo(id: 'gemini-2.0-flash', displayName: 'Gemini 2.0 Flash'),
+];
+
 /// Curated Ollama Cloud models (the `-cloud`/`:cloud` tags run on Ollama's
 /// hosted infrastructure via https://ollama.com with an API key). Users can
 /// also type any other Ollama model id; this list just seeds the picker.
@@ -40,6 +50,7 @@ List<ModelInfo> modelsFor(LlmProviderType type) {
     LlmProviderType.ollama => ollamaCloudModels,
     LlmProviderType.claude => claudeModels,
     LlmProviderType.openai => openAiModels,
+    LlmProviderType.gemini => geminiModels,
   };
 }
 
@@ -112,6 +123,7 @@ class LlmSettings {
       LlmProviderType.ollama: null,
       LlmProviderType.claude: null,
       LlmProviderType.openai: null,
+      LlmProviderType.gemini: null,
     },
     ollamaBaseUrl: 'https://ollama.com',
   );
