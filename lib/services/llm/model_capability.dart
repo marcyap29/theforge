@@ -133,6 +133,11 @@ CoderUpgrade? pickBuildCoderUpgrade({
       candidates.add((model: m, provider: LlmProviderType.openai));
     }
   }
+  if (keyed(LlmProviderType.gemini)) {
+    for (final m in geminiModels) {
+      candidates.add((model: m, provider: LlmProviderType.gemini));
+    }
+  }
 
   final coders = candidates
       .where((c) => classifyModel(c.model.id) == ModelCapability.coder)
