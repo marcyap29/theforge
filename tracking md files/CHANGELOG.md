@@ -2,6 +2,12 @@
 
 ---
 
+## v0.5.3 — 2026-10-02 — Fixed: relocating code into a nested folder duplicated the repo (BUG-DATA-002)
+
+- **Fixed a data-duplication bug when moving a project's code to a new location.** If you created a new folder **inside** the current code repo and told The Forge to move the code there (a natural "I changed my mind about the location" move), it **duplicated the entire repo into the new folder** instead of relocating it. Root cause: `relocateRepo` moved each child of the source into the destination, but had no guard against the destination being *nested inside the source* — so it eventually tried to move the new folder into itself, the rename failed, and the copy-fallback recursively copied the (now-populated) folder into itself. Fixed with a **nesting guard** (on canonicalized paths, both directions — dest-in-source and source-in-dest) that **refuses before anything moves** and tells you to pick a folder outside the current one; the project config is left untouched on refusal, and a normal sibling move is unchanged. `RepoRelocation.refused`/`error`; unit-tested (`test/relocate_repo_test.dart`, incl. "source untouched, no copy made"). `dart analyze lib` clean; 114 tests green. Same family as BUG-IMPL-006 / BUG-DATA-001 — a relocate guard that was too narrow.
+
+---
+
 ## v0.5.2 — 2026-10-01 — Gemini is back as a provider (four BYOK providers)
 
 - **Added Google Gemini as a first-class LLM provider.** The Forge now supports **all four** BYOK providers — Ollama, Claude, OpenAI, **and Gemini** — for both the Architect and Executor roles. New `GeminiProvider` (`lib/services/llm/providers/gemini_provider.dart`) calls the Google Generative Language REST API (`generativelanguage.googleapis.com/v1beta/…:generateContent`, `Authorization` via `?key=`, system prompt as `systemInstruction`, JSON mode via `responseMimeType`). Wired through everywhere the provider type is handled: `LlmProviderType.gemini` + a seeded model catalog (`gemini-2.5-pro`/`-flash`, `gemini-2.0-flash`) in `llm_model_config.dart`; `LlmService._buildProvider`; a **Gemini BYOK card** in Settings (paste key → **Test key** runs a real `generateContent` probe); the friendly key-error mapper (`key_check.dart` → `aistudio.google.com`); and the coder-upgrade candidate list. Non-streaming for now (one `generateContent` per call; `completeStream` falls back to a single chunk). `dart analyze lib` clean; `flutter build macos` ok; 110 tests green (+ key_check covers Gemini). Get a free key at aistudio.google.com.
