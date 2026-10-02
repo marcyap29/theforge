@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 
 import '../../../data/filesystem/ios_deployment.dart';
 import '../../../data/filesystem/project_file_repository.dart';
+import '../../../services/diag_log.dart';
 import '../../../services/llm/key_check.dart';
 import '../../../services/llm/llm_provider.dart';
 import '../../../services/llm/llm_service_provider.dart';
@@ -156,6 +157,9 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     state = state.copyWith(startedAt: DateTime.now(), error: null);
     _log(ConsoleLineKind.narration, 'Building: "${brief.featureTitle}"');
     _log(ConsoleLineKind.info, 'Repo: ${brief.repoPath}');
+    // Breadcrumbs (synchronous, flushed) bisect the switch-then-build hard crash
+    // (BUG-IMPL-011): whichever CRUMB is LAST in diag.log is where it died.
+    DiagLog.breadcrumb('start: resolve executor model');
     final resolved = ref.read(llmServiceProvider).resolve(LlmRole.executor);
     if (resolved != null) {
       _log(ConsoleLineKind.info,
@@ -216,15 +220,18 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     _partial = '';
     _streamStarted = false;
     _partialKind = ConsoleLineKind.thinking;
+    DiagLog.breadcrumb('plan: enter (phase→planning)');
     _phase(RunPhase.planning);
 
     // Load the project's ingested reference context — the SAME pool the
     // interview and spec stages already read — so the build starts with the
     // intake docs, not just code. Re-read each round so docs added mid-session
     // are picked up, and surface a line so the user can SEE context was loaded.
+    DiagLog.breadcrumb('plan: read repo provider');
     final repo = ref.read(projectFileRepositoryProvider);
     String? ingestedContext;
     try {
+      DiagLog.breadcrumb('plan: readIngestedSummary');
       ingestedContext = await repo.readIngestedSummary(brief.projectPath);
     } catch (_) {}
     if (ingestedContext != null && ingestedContext.trim().isNotEmpty) {
@@ -239,6 +246,7 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     // build accumulates context across features instead of starting cold.
     String? buildMemory;
     try {
+      DiagLog.breadcrumb('plan: readBuildMemory');
       buildMemory = await repo.readBuildMemory(brief.projectPath);
     } catch (_) {}
     if (buildMemory != null && buildMemory.trim().isNotEmpty) {
@@ -251,6 +259,7 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     // for pools too large to sit fully in the always-on context above.
     var docManifest = const <DocPoolEntry>[];
     try {
+      DiagLog.breadcrumb('plan: gatherDocManifest');
       docManifest = await repo.gatherDocManifest(brief.projectPath);
     } catch (_) {}
 
@@ -270,7 +279,9 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     });
 
     try {
+      DiagLog.breadcrumb('plan: read implAgentProvider');
       final agent = ref.read(implAgentProvider);
+      DiagLog.breadcrumb('plan: agent.proposePlan (→ LLM call)');
       final plan = await agent.proposePlan(
         featureTitle: brief.featureTitle,
         featureDescription: brief.featureDescription,

@@ -2,6 +2,12 @@
 
 ---
 
+## v0.5.4 — 2026-10-02 — Crash breadcrumbs to catch the switch-model→Build hard crash (BUG-IMPL-011)
+
+- **Diagnostic build for the "switch Ollama model then Build crashes the app" bug (BUG-IMPL-011, still open).** The crash is *native* (quit-to-desktop, instant, before the model responds) — it leaves no Dart error and no macOS crash report, so there was nothing to go on. Added `DiagLog.breadcrumb()` which writes **synchronously and flushed to disk** (so a crumb survives a native abort that an async write would lose), and dropped breadcrumbs through the whole build-start sequence (resolve model → load context → load build memory → doc manifest → read agent → LLM call). After this update, reproducing the crash leaves the **last `CRUMB` line in `diag.log`** pointing at the exact operation that died — which tells us where to fix it. No behavior change otherwise. **Workaround for the crash itself:** switch the model, then quit & relaunch The Forge before building. `dart analyze lib` clean; 114 tests green.
+
+---
+
 ## v0.5.3 — 2026-10-02 — Fixed: relocating code into a nested folder duplicated the repo (BUG-DATA-002)
 
 - **Fixed a data-duplication bug when moving a project's code to a new location.** If you created a new folder **inside** the current code repo and told The Forge to move the code there (a natural "I changed my mind about the location" move), it **duplicated the entire repo into the new folder** instead of relocating it. Root cause: `relocateRepo` moved each child of the source into the destination, but had no guard against the destination being *nested inside the source* — so it eventually tried to move the new folder into itself, the rename failed, and the copy-fallback recursively copied the (now-populated) folder into itself. Fixed with a **nesting guard** (on canonicalized paths, both directions — dest-in-source and source-in-dest) that **refuses before anything moves** and tells you to pick a folder outside the current one; the project config is left untouched on refusal, and a normal sibling move is unchanged. `RepoRelocation.refused`/`error`; unit-tested (`test/relocate_repo_test.dart`, incl. "source untouched, no copy made"). `dart analyze lib` clean; 114 tests green. Same family as BUG-IMPL-006 / BUG-DATA-001 — a relocate guard that was too narrow.

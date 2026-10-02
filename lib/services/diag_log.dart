@@ -47,4 +47,27 @@ class DiagLog {
     final s = stack == null ? '' : '\n$stack';
     return log('ERROR [$context] $error$s');
   }
+
+  /// Writes a breadcrumb **synchronously and flushed to disk**, so it survives a
+  /// hard/native crash (a SIGABRT from an FFI/isolate abort can kill the process
+  /// before an async write flushes — which is why a native crash leaves no trace
+  /// in the async [log]). Used to bisect such crashes: the LAST `CRUMB` line in
+  /// `diag.log` names the operation that was running when the process died.
+  ///
+  /// No-op until the log file has been resolved — which happens at startup when
+  /// `main` calls [log] for the "app start" line, so it is always ready by the
+  /// time a build runs.
+  static void breadcrumb(String line) {
+    final file = _file;
+    if (file == null) return;
+    try {
+      file.writeAsStringSync(
+        '${DateTime.now().toIso8601String()} CRUMB $line\n',
+        mode: FileMode.append,
+        flush: true,
+      );
+    } catch (_) {
+      // Diagnostics must never break the app.
+    }
+  }
 }
