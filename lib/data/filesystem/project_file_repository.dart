@@ -15,10 +15,18 @@ class RepoRelocation {
     required this.moved,
     required this.skipped,
     required this.failed,
+    this.error,
   });
   final List<String> moved;
   final List<String> skipped;
   final List<String> failed;
+
+  /// Non-null when the relocation was REFUSED outright (nothing moved) — e.g.
+  /// the destination is nested inside the source, which would duplicate the
+  /// repo into itself. The UI shows this instead of a "moved N items" message.
+  final String? error;
+
+  bool get refused => error != null;
 }
 
 class ProjectAlreadyExistsException implements Exception {
@@ -844,6 +852,34 @@ class ProjectFileRepository {
     final failed = <String>[];
     if (p.equals(fromPath, toPath)) {
       return RepoRelocation(moved: moved, skipped: skipped, failed: failed);
+    }
+    // Refuse a nested relocation. If [toPath] is INSIDE [fromPath], moving the
+    // source's children into it eventually tries to move the destination folder
+    // into itself; the rename fails and the copy fallback recursively copies the
+    // (now-populated) destination into itself → the repo is DUPLICATED (the
+    // "copied the whole drive into the new folder" bug). The reverse nesting
+    // (source inside destination) is just as unsafe. Guard both. Compared on
+    // canonicalized paths so `foo/./bar` / symlinks can't slip past.
+    final fromC = p.canonicalize(fromPath);
+    final toC = p.canonicalize(toPath);
+    if (p.isWithin(fromC, toC)) {
+      return RepoRelocation(
+        moved: moved,
+        skipped: skipped,
+        failed: failed,
+        error: 'The new location is inside the current code folder — moving '
+            'would copy it into itself. Pick a folder outside '
+            '"${p.basename(fromPath)}".',
+      );
+    }
+    if (p.isWithin(toC, fromC)) {
+      return RepoRelocation(
+        moved: moved,
+        skipped: skipped,
+        failed: failed,
+        error: 'The current code folder is inside the new location — moving '
+            'that way is unsafe. Pick a separate folder.',
+      );
     }
     await Directory(toPath).create(recursive: true);
     final from = Directory(fromPath);

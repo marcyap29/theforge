@@ -97,6 +97,15 @@ Future<String?> relocateRepoFlow({
       fromPath: currentRepoPath,
       toPath: newPath,
     );
+    // Refused (nested destination → would duplicate the repo): abort without
+    // moving anything OR repointing the config, and tell the user why.
+    if (r.refused) {
+      messenger.showSnackBar(SnackBar(
+        content: Text(r.error!),
+        backgroundColor: const Color(0xFF3F0A0A),
+      ));
+      return null;
+    }
     final parts = <String>[];
     if (r.moved.isNotEmpty) parts.add('moved ${r.moved.length} item(s)');
     if (r.skipped.isNotEmpty) parts.add('skipped ${r.skipped.length}');

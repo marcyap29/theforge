@@ -33,4 +33,4 @@ void main() {
   );
 }
 
-const _appVersion = '0.5.2';
+const _appVersion = '0.5.3';
