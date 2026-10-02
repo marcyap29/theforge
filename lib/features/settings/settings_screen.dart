@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../services/crash_diagnostics.dart';
 import '../../services/llm/llm_model_config.dart';
 import '../../services/llm/llm_provider.dart';
 import 'settings_notifier.dart';
@@ -88,6 +89,9 @@ class SettingsScreen extends ConsumerWidget {
                 role: LlmRole.executor,
                 description: 'Interview turns',
               ),
+              const SizedBox(height: 24),
+              const _SectionHeader('Diagnostics'),
+              const _DiagnosticsCard(),
             ],
           );
         },
@@ -785,6 +789,55 @@ class _RoleCard extends ConsumerWidget {
                 : 'Off — full output budget goes to the answer. More reliable for building (no thinking-driven truncation/loops).',
             style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Crash-diagnostics controls: surfaces a prior-crash flag and a one-click
+/// "Reveal diagnostics" so the user can hand off `diag.log` + `crashes/` when
+/// something breaks (BUG-IMPL-011 was invisible because there was no trail).
+class _DiagnosticsCard extends StatelessWidget {
+  const _DiagnosticsCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final priorCrash = CrashDiagnostics.priorCrashDetected;
+    final harvested = CrashDiagnostics.harvestedThisLaunch;
+    return _ProviderCardShell(
+      title: 'Crash diagnostics',
+      status: priorCrash ? '● Prior crash detected' : '● OK',
+      statusColor:
+          priorCrash ? const Color(0xFFE8A04C) : const Color(0xFF22C55E),
+      children: [
+        const Text(
+          'Logs failures to diag.log and captures native crash reports, so a '
+          'crash can be sent for a fix — no telemetry, nothing leaves your Mac '
+          'until you share it.',
+          style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+        ),
+        if (priorCrash) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0x22E8A04C),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              'The previous session ended unexpectedly (a possible crash).'
+              '${harvested > 0 ? ' Captured $harvested native report(s).' : ''}'
+              ' Reveal diagnostics and send the folder to get it fixed.',
+              style: const TextStyle(fontSize: 12, color: Color(0xFFE8A04C)),
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: CrashDiagnostics.revealInFinder,
+          icon: const Icon(Icons.folder_open_outlined, size: 16),
+          label: const Text('Reveal diagnostics in Finder'),
         ),
       ],
     );

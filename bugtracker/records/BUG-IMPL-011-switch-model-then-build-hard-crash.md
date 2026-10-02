@@ -71,3 +71,14 @@ at a provider read (`read implAgentProvider`), or in the LLM call.
 
 Fix once the breadcrumb/stderr trace pins the operation. Until then, the
 quit-and-relaunch workaround is the documented guidance.
+
+## Update (v0.5.5) — durable capture so it can't be invisible again
+
+Since this crash was intermittent (a tester hit it; the owner couldn't
+re-trigger it), chasing a live repro is unreliable. Added `CrashDiagnostics`
+(see CHANGELOG v0.5.5): abnormal-exit detection (a sentinel that survives a
+native crash → next launch logs it), native crash-report harvest into
+`crashes/`, and a Settings **Reveal diagnostics in Finder** button. So the next
+occurrence — on any machine — leaves a trail (the last `CRUMB` line + the
+abnormal-exit marker + any harvested `.ips`) that the user can hand off, and the
+fix follows from that trace.

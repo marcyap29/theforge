@@ -2,6 +2,17 @@
 
 ---
 
+## v0.5.5 — 2026-10-02 — Durable crash diagnostics (so any crash leaves a trail to hand off)
+
+- **Every crash now leaves a trail you can send for a fix — no telemetry, nothing leaves your Mac until you share it.** Motivated by BUG-IMPL-011 (a tester's app crashed on model-switch, but the crash was *invisible* — native, no Dart error, no findable report). New `CrashDiagnostics` service does three best-effort things:
+  - **Abnormal-exit detection.** A `session.running` sentinel is written at startup and removed on a clean shutdown (`AppLifecycleListener.onDetach`). If it's still there next launch, the previous session **died hard** — logged as *"⚠ PREVIOUS SESSION ENDED ABNORMALLY (possible crash)"*, even for a native crash that logged nothing else.
+  - **Native crash-report harvest.** On startup it copies this app's macOS `.ips`/`.crash` reports (from `~/Library/Logs/DiagnosticReports`) into its own `crashes/` folder, so the real native stack travels next to `diag.log`.
+  - **One-click hand-off.** A new **Diagnostics** section in Settings shows a *"Prior crash detected"* flag when relevant and a **Reveal diagnostics in Finder** button that opens the folder (`diag.log` + `crashes/`) to send.
+  - Plus `main()` now wraps startup in `runZonedGuarded` (the third leg of Dart error capture, alongside `FlutterError.onError` + `platformDispatcher.onError`), so no async Dart failure goes unlogged either.
+- Builds on v0.5.4's synchronous breadcrumbs. `dart analyze lib` clean; `flutter build macos` ok; 114 tests green. Verified live: sentinel + `crashes/` created on launch, breadcrumbs flush. Workaround for BUG-IMPL-011 itself (switch model → quit & relaunch → build) still stands until the captured trace pins the fix.
+
+---
+
 ## v0.5.4 — 2026-10-02 — Crash breadcrumbs to catch the switch-model→Build hard crash (BUG-IMPL-011)
 
 - **Diagnostic build for the "switch Ollama model then Build crashes the app" bug (BUG-IMPL-011, still open).** The crash is *native* (quit-to-desktop, instant, before the model responds) — it leaves no Dart error and no macOS crash report, so there was nothing to go on. Added `DiagLog.breadcrumb()` which writes **synchronously and flushed to disk** (so a crumb survives a native abort that an async write would lose), and dropped breadcrumbs through the whole build-start sequence (resolve model → load context → load build memory → doc manifest → read agent → LLM call). After this update, reproducing the crash leaves the **last `CRUMB` line in `diag.log`** pointing at the exact operation that died — which tells us where to fix it. No behavior change otherwise. **Workaround for the crash itself:** switch the model, then quit & relaunch The Forge before building. `dart analyze lib` clean; 114 tests green.
