@@ -21,6 +21,22 @@ User: "Let's have these be two separate mode buttons — Architect Mode and Buil
 
 ---
 
+## Session: 2026-10-03 — Claude Code [Architect Mode / Build Mode — v0.5.15]
+
+**Branch:** main · **App:** v0.5.15
+
+### Why
+"Work on the app" was a single ambiguous entry point. Split it into two explicitly named modes so users understand exactly what each does.
+
+### Done
+- `project_tracker_screen.dart`: "Work on the app" button removed; two AppBar buttons added — **Architect** (`OutlinedButton`, `forum_outlined`, blue, tooltip explaining it's for planning/refining) and **Build** (`FilledButton`, amber, `construction`, tooltip explaining it's the code agent). Per-tile: `_FeatureTile` gains `onArchitectChat` callback + two small `IconButton`s before the ⋮ menu (blue forum = Architect, amber construction = Build) that bypass the fork card and go directly to the chosen mode. New `_architectChat(feature)` (opens chat with `autoDiscuss: true`) and `_openBuildMode()` (opens chat with `buildMode: true`).
+- `refine_features_screen.dart`: `autoDiscuss: bool` param — when true + `initialFeature` set, auto-sends discussion message instead of showing fork card. `buildMode: bool` param — when true, shows a static "Build Mode" intro (no LLM greeting call); AppBar title changes to "Build Mode". Fork card button labels updated: "Architect Mode" / "Build Mode".
+
+### Verify
+`dart analyze lib` clean · commit `4413a87` · pushed.
+
+---
+
 ## Session: 2026-10-03 — Claude Code [Fork card: unified Discuss & Build entry point — v0.5.14]
 
 **Branch:** main · **App:** v0.5.14
