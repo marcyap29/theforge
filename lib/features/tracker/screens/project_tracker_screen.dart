@@ -772,6 +772,30 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
 
   /// The pre-build gate for an epic / manual feature: steer to Architect or
   /// How-to-build. Returns true only if the user chooses "Build anyway".
+  /// Shown when the user taps Build on an epic that has no subtasks yet.
+  Future<bool?> _offerBreakdown(Feature feature) => showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF141416),
+          title: Text('"${feature.title}" needs subtasks first'),
+          content: const Text(
+            'This feature hasn\'t been broken into subtasks yet. '
+            'Should the AI decompose it into buildable steps first?',
+            style: TextStyle(fontSize: 13, color: Color(0xFFE5E5E7)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Not yet'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Break it down'),
+            ),
+          ],
+        ),
+      );
+
   Future<bool?> _confirmBuildDespiteKind(Feature feature, BuildKind kind) {
     final epic = kind == BuildKind.epic;
     return showDialog<bool>(
@@ -1064,10 +1088,34 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
       return;
     }
 
-    // Build gate: don't silently code-generate (and stub) an epic or work that
-    // isn't a code-gen task. Steer to Architect / How-to-build instead; allow an
-    // explicit override.
+    // Epic routing: if the feature is an epic, never build it directly.
+    // Instead, check for existing subtasks and either start with the first
+    // unbuilt one (transparent redirect) or offer to break it down first.
     final kind = BuildKind.fromWire(feature.buildKind);
+    if (kind == BuildKind.epic) {
+      final all =
+          ref.read(featureListProvider(project.id)).valueOrNull ?? const [];
+      final unbuiltChildren = all.where((f) {
+        if (f.parentId != feature.id) return false;
+        final s = FeatureStatus.fromWire(f.status);
+        return s != FeatureStatus.shipped && s != FeatureStatus.archived;
+      }).toList()
+        ..sort((a, b) =>
+            (a.priority ?? 1 << 30).compareTo(b.priority ?? 1 << 30));
+
+      if (unbuiltChildren.isNotEmpty) {
+        // Subtasks already exist — build the first unbuilt one directly.
+        return _buildFeature(unbuiltChildren.first);
+      } else {
+        // No subtasks yet — ask to break it down.
+        if (!mounted) return;
+        final yes = await _offerBreakdown(feature);
+        if (yes == true && mounted) _architectFeature(feature);
+        return;
+      }
+    }
+
+    // Non-buildable kinds (manual, etc.) — let user override or see advice.
     if (!kind.isDirectlyBuildable) {
       final proceed = await _confirmBuildDespiteKind(feature, kind);
       if (proceed != true) return;
@@ -1286,11 +1334,17 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
   }
 
   /// AppBar "Build" button → bottom sheet listing unbuilt features in build
-  /// order; tapping one goes straight to ImplementationScreen (no chat).
+  /// order. Epics with subtasks appear as non-clickable group headers; epics
+  /// without subtasks offer "Break down"; leaf tasks have a "Build" button.
   Future<void> _openBuildMode() async {
     final all =
         ref.read(featureListProvider(project.id)).valueOrNull ?? const [];
     final ordered = buildOrderUnbuilt(all);
+    // Ids of features that have at least one child (i.e. are acted as epics).
+    final epicIdsWithChildren = <String>{
+      for (final f in all)
+        if (f.parentId != null) f.parentId!,
+    };
     if (!mounted) return;
     await showModalBottomSheet<void>(
       context: context,
@@ -1331,36 +1385,99 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
                   itemCount: ordered.length,
                   itemBuilder: (_, i) {
                     final f = ordered[i];
+                    final isEpic =
+                        BuildKind.fromWire(f.buildKind) == BuildKind.epic;
+                    final hasChildren = epicIdsWithChildren.contains(f.id);
+                    final isSubtask = f.parentId != null;
                     final ver = f.targetVersion?.isNotEmpty == true
                         ? f.targetVersion!
                         : 'Unversioned';
+
+                    // Epic with subtasks → non-actionable group header.
+                    if (isEpic && hasChildren) {
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 2),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.folder_outlined,
+                                size: 13, color: Color(0xFFBA68C8)),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                f.title,
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFFBA68C8),
+                                    letterSpacing: 0.3),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Text(ver,
+                                style: const TextStyle(
+                                    fontSize: 10, color: Colors.white24)),
+                          ],
+                        ),
+                      );
+                    }
+
+                    // Epic with no subtasks → offer breakdown.
+                    // Leaf task or subtask → Build button.
+                    final leftPad = isSubtask ? 36.0 : 20.0;
                     return ListTile(
                       dense: true,
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+                      contentPadding: EdgeInsets.fromLTRB(
+                          leftPad, 2, 20, 2),
                       title: Text(f.title,
                           style: const TextStyle(fontSize: 13),
                           overflow: TextOverflow.ellipsis),
-                      subtitle: Text(ver,
-                          style: const TextStyle(
-                              fontSize: 11, color: Colors.white38)),
-                      trailing: FilledButton.icon(
-                        icon: const Icon(Icons.bolt, size: 14),
-                        label: const Text('Build',
-                            style: TextStyle(fontSize: 12)),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFFE8A04C),
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          _buildFeature(f);
-                        },
+                      subtitle: Text(
+                        isEpic ? '$ver  ·  needs subtasks' : ver,
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: isEpic
+                                ? const Color(0xFFE8A04C).withAlpha(180)
+                                : Colors.white38),
                       ),
+                      trailing: isEpic
+                          ? OutlinedButton.icon(
+                              icon: const Icon(Icons.account_tree_outlined,
+                                  size: 13),
+                              label: const Text('Break down',
+                                  style: TextStyle(fontSize: 12)),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFFE8A04C),
+                                side: const BorderSide(
+                                    color: Color(0xFFE8A04C), width: 1),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 5),
+                                minimumSize: Size.zero,
+                                tapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                _architectFeature(f);
+                              },
+                            )
+                          : FilledButton.icon(
+                              icon: const Icon(Icons.bolt, size: 14),
+                              label: const Text('Build',
+                                  style: TextStyle(fontSize: 12)),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: const Color(0xFFE8A04C),
+                                foregroundColor: Colors.black,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
+                                minimumSize: Size.zero,
+                                tapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                _buildFeature(f);
+                              },
+                            ),
                     );
                   },
                 ),

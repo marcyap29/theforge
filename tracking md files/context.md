@@ -4,6 +4,23 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-10-03 — Claude Code [Epic Build routing + bottom sheet visual clarity — v0.5.17]
+
+**Branch:** main · **App:** v0.5.17
+
+### Why
+Clicking "Build" on an epic (task group) in the Build Mode picker was ambiguous — it opened ImplementationScreen directly for the epic, with no indication of subtasks. User: "if the tasks are broken out already it should just get started on building; if not, notify the user asking if it should break them down."
+
+### Done
+- `project_tracker_screen.dart`: `_buildFeature()` now branches on `BuildKind.epic` BEFORE the existing `_confirmBuildDespiteKind` check. If unbuilt subtasks exist → `_buildFeature(firstSubtask)` (priority-sorted). If none → `_offerBreakdown()` dialog → yes calls `_architectFeature()`. New `_offerBreakdown(Feature)` helper.
+- `_openBuildMode()` bottom sheet: computes `epicIdsWithChildren` set; renders epics-with-children as purple non-clickable group headers, epics-without-children as "Break down" outlined button, subtasks left-padded, leaf tasks normal "⚡ Build" button.
+- Docs: CHANGELOG v0.5.17 entry, this context block.
+
+### Verify
+`dart analyze lib` clean.
+
+---
+
 ## Session: 2026-10-03 — Claude Code [Build Mode AppBar fix: feature picker bottom sheet — v0.5.16]
 
 **Branch:** main · **App:** v0.5.16

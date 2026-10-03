@@ -2,6 +2,17 @@
 
 ---
 
+## v0.5.17 — 2026-10-03 — Epic "Build" routing: redirect to subtask or offer breakdown
+
+- **Building an epic now does the right thing automatically.** Tapping "Build" on an epic (from the Build Mode bottom sheet, the per-tile button, or anywhere else) no longer ambiguously opens the implementation screen for the epic itself.
+  - **Epic has unbuilt subtasks** → transparently redirects to `_buildFeature(firstUnbuiltSubtask)` (sorted by priority). The app just gets on with building.
+  - **Epic has no subtasks yet** → dialog: *"Should the AI decompose it into buildable steps first?"* Yes → runs `_architectFeature` (existing decomposition flow). No → dismisses.
+- **Build Mode bottom sheet visual clarity.** Epics with subtasks already broken out now render as purple non-clickable group headers (`folder_outlined` icon, no button) — the subtasks appear indented beneath them. Epics with no subtasks get an amber "Break down" outlined button instead of "Build". Leaf tasks and subtasks keep the amber "⚡ Build" button.
+- New `_offerBreakdown(Feature)` helper dialog; `_buildFeature()` now branches on `kind == BuildKind.epic` before the existing `_confirmBuildDespiteKind` path.
+- `dart analyze lib` clean.
+
+---
+
 ## v0.5.16 — 2026-10-03 — Build Mode: AppBar button now opens a feature picker, not the chat
 
 - **Bug fix: AppBar "Build" opened the same screen as "Architect".** `_openBuildMode()` previously pushed `RefineFeaturesScreen(buildMode: true)`, which was identical to Architect Mode except for the AppBar title. Clicking Build Mode looked the same as Architect Mode.
