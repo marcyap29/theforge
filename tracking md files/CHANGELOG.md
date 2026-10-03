@@ -2,6 +2,13 @@
 
 ---
 
+## v0.5.8 — 2026-10-03 — Refine features by talking (conversational re-interview)
+
+- **New: "Refine features (chat)" — re-open a conversation on an existing project and add features by talking.** The natural-language counterpart to the one-shot "Recommend features": the first interview sets a project up; later you re-activate a chat to *refine and extend* it. In the tracker's **AI tools ▾ → Refine features (chat)**, the architect greets you, asks what you want to add, asks a clarifying question when your intent is vague, and proposes concrete features — which you **Review & add** straight to the board (reusing the scan-review sheet + dedup against existing). Multi-turn: keep talking to add more. Afterward, the existing **Plan build order** step orders them into sensible versions (foundational features first). New `FeatureScanner.refineFeatures` (+ `RefineTurn`/`RefineResult`, JSON `{reply, proposals}`) and `RefineFeaturesScreen` (chat UI, selectable bubbles, proposals bar). `dart analyze lib` clean; `flutter build macos` ok; 114 tests green.
+  - *Out of scope for v1 (noted):* true drag-to-reorder features between versions on the board — today you re-order via right-click status/priority + the build-order view + Plan-build-order; drag is a later enhancement.
+
+---
+
 ## v0.5.7 — 2026-10-02 — Two real bugs: builds on large files, and the missing interview
 
 - **Fixed: Build-with-AI failed on any file larger than ~24k chars — every model, every time (BUG-IMPL-012).** This was the *real* cause behind "the coding model keeps looping/breaking the file" on AR Mechanic. The Forge truncated each file it sent the model to **24,000 characters** before editing. AR Mechanic's `main.dart` is **56k chars**, and the method the model needed to edit sat at line 685 — but char 24,000 is line 735, so the method body was **cut off mid-way with `…(truncated)`**. The model saw the method *start* but not its body, couldn't build a matching find/replace hunk, guessed, and produced unbalanced brackets — then "Fix it" also couldn't see the break (still past the cut) and **looped forever**. It wasn't the model (kimi, minimax all failed identically because none could see the code); it was the truncation. Raised the per-file cap 24k → **80k** and the total read budget 90k → **150k** (the budget is the real context-window guardrail), so real-world files arrive whole. `impl_agent.dart`.

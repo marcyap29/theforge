@@ -33,6 +33,7 @@ import '../widgets/scan_review_sheet.dart';
 import '../widgets/status_chip.dart';
 import 'build_advice_screen.dart';
 import 'capability_summary_screen.dart';
+import 'refine_features_screen.dart';
 import 'releases_screen.dart';
 import 'security_check_screen.dart';
 
@@ -173,6 +174,8 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             _menuEntry(Icons.auto_awesome_outlined, 'What this app can do',
                 _openCapabilitySummary),
             _menuEntry(Icons.radar, 'Scan repo & documents', _scanRepo),
+            _menuEntry(Icons.forum_outlined, 'Refine features (chat)',
+                _refineFeatures),
             _menuEntry(
                 Icons.lightbulb_outline, 'Recommend features', _recommendFeatures),
             _menuEntry(Icons.route_outlined, 'Plan build order', _planBuildOrder),
@@ -1171,6 +1174,16 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
   /// The virtual-PM move: analyze what's already built/tracked (+ docs + code)
   /// and recommend NEW features/enhancements to build next. Dedups against the
   /// board and imports the ones you accept (source 'recommend').
+  /// Conversational "refine features": re-open a chat on this project and add
+  /// features by talking. Features land on the board; ordering is the separate
+  /// Plan-build-order step.
+  void _refineFeatures() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) =>
+          RefineFeaturesScreen(project: project, repoPath: _repoPath),
+    ));
+  }
+
   Future<void> _recommendFeatures() async {
     final messenger = ScaffoldMessenger.of(context);
     final config = await ProjectFileRepository.readProjectConfig(project.path);
