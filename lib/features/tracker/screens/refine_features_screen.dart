@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/local_db/forge_database.dart';
 import '../data/conversation_store.dart';
+import '../models/tracker_enums.dart';
 import '../providers/tracker_providers.dart';
+import '../releases/release_providers.dart';
 import '../scan/feature_scan.dart';
 import '../widgets/scan_review_sheet.dart';
 
@@ -18,10 +20,15 @@ class RefineFeaturesScreen extends ConsumerStatefulWidget {
     super.key,
     required this.project,
     this.repoPath,
+    this.initialPrompt,
   });
 
   final Project project;
   final String? repoPath;
+
+  /// Pre-fills the chat input (e.g. "Let's work on: <feature>" when a feature is
+  /// double-clicked on the board). Not auto-sent — the builder edits/sends it.
+  final String? initialPrompt;
 
   @override
   ConsumerState<RefineFeaturesScreen> createState() =>
@@ -60,11 +67,20 @@ class _RefineFeaturesScreenState extends ConsumerState<RefineFeaturesScreen> {
             ..addAll(c.turns.map((t) => RefineTurn(isUser: t.isUser, text: t.text)));
           _loading = false;
         });
+        _maybePrefill();
         _jump();
         return;
       }
     }
     _startNew();
+  }
+
+  /// Prefill the input once (e.g. a double-clicked feature) — not auto-sent.
+  void _maybePrefill() {
+    final p = widget.initialPrompt?.trim();
+    if (p != null && p.isNotEmpty && _input.text.isEmpty) {
+      _input.text = p;
+    }
   }
 
   void _startNew() {
@@ -425,6 +441,14 @@ class _RefineFeaturesScreenState extends ConsumerState<RefineFeaturesScreen> {
                   onScan: _toolScan,
                   onRecommend: _toolRecommend,
                   onSecurity: _toolSecurity,
+                  buildOrder: buildOrderUnbuilt(
+                      ref.watch(featureListProvider(widget.project.id))
+                              .valueOrNull ??
+                          const []),
+                  onPickFeature: (f) {
+                    _input.text = 'Let\'s work on: ${f.title}';
+                    setState(() {});
+                  },
                 ),
               ],
             ),
@@ -539,8 +563,34 @@ class _Bubble extends StatelessWidget {
   }
 }
 
+/// Features not yet built, in build order: by target version (ascending,
+/// unversioned last), then by priority within a version. Drives the rail's
+/// "Build order" panel so the builder can see what to work on next right in the
+/// chat. Shipped/archived features are excluded (nothing left to build).
+List<Feature> buildOrderUnbuilt(List<Feature> all) {
+  final unbuilt = all.where((f) {
+    final s = FeatureStatus.fromWire(f.status);
+    return s != FeatureStatus.shipped && s != FeatureStatus.archived;
+  }).toList();
+  final byVersion = groupFeaturesByVersion(unbuilt);
+  final versions = byVersion.keys.toList()
+    ..sort((a, b) {
+      final au = a.trim().isEmpty, bu = b.trim().isEmpty; // unversioned last
+      if (au != bu) return au ? 1 : -1;
+      return a.compareTo(b);
+    });
+  final out = <Feature>[];
+  for (final v in versions) {
+    final group = [...byVersion[v]!]
+      ..sort((a, b) => (a.priority ?? 1 << 30).compareTo(b.priority ?? 1 << 30));
+    out.addAll(group);
+  }
+  return out;
+}
+
 /// The right-side action rail — tools that run INLINE in the chat (their result
-/// arrives as a message or proposals). Mirrors Build-with-AI's action panel.
+/// arrives as a message or proposals), plus a "Build order" panel of what to
+/// work on next. Mirrors Build-with-AI's action panel.
 class _ToolRail extends StatelessWidget {
   const _ToolRail({
     required this.busy,
@@ -548,6 +598,8 @@ class _ToolRail extends StatelessWidget {
     required this.onScan,
     required this.onRecommend,
     required this.onSecurity,
+    required this.buildOrder,
+    required this.onPickFeature,
   });
 
   final bool busy;
@@ -555,11 +607,13 @@ class _ToolRail extends StatelessWidget {
   final VoidCallback onScan;
   final VoidCallback onRecommend;
   final VoidCallback onSecurity;
+  final List<Feature> buildOrder;
+  final void Function(Feature) onPickFeature;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 168,
+      width: 190,
       decoration: const BoxDecoration(
         color: Color(0xFF101319),
         border: Border(left: BorderSide(color: Color(0xFF1C1C1E))),
@@ -582,9 +636,88 @@ class _ToolRail extends StatelessWidget {
               busy ? null : onRecommend),
           _btn(Icons.shield_outlined, 'Security check',
               busy ? null : onSecurity),
+          const SizedBox(height: 12),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(4, 4, 4, 6),
+            child: Text('BUILD ORDER',
+                style: TextStyle(
+                    fontSize: 11,
+                    letterSpacing: 1.2,
+                    color: Color(0xFF6B7280))),
+          ),
+          if (buildOrder.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(6),
+              child: Text(
+                'Nothing queued. Add features (chat or tools), then "Plan build '
+                'order" to sequence them.',
+                style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+              ),
+            )
+          else
+            ..._orderedList(),
         ],
       ),
     );
+  }
+
+  List<Widget> _orderedList() {
+    final widgets = <Widget>[];
+    String? lastVersion;
+    var first = true;
+    for (final f in buildOrder) {
+      final v = (f.targetVersion ?? '').trim();
+      final label = v.isEmpty ? 'Unversioned' : v;
+      if (label != lastVersion) {
+        lastVersion = label;
+        widgets.add(Padding(
+          padding: const EdgeInsets.fromLTRB(4, 8, 4, 4),
+          child: Row(
+            children: [
+              Text(label,
+                  style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFFE8A04C))),
+              if (first) ...[
+                const SizedBox(width: 6),
+                const Text('NEXT UP',
+                    style: TextStyle(
+                        fontSize: 9,
+                        letterSpacing: 0.5,
+                        color: Color(0xFF6BD69A))),
+              ],
+            ],
+          ),
+        ));
+        first = false;
+      }
+      final status = FeatureStatus.fromWire(f.status);
+      widgets.add(InkWell(
+        onTap: () => onPickFeature(f),
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 3, right: 6),
+                child: Icon(Icons.circle, size: 8, color: status.color),
+              ),
+              Expanded(
+                child: Text(f.title,
+                    style: const TextStyle(
+                        fontSize: 11.5, color: Color(0xFFD5D8DD)),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis),
+              ),
+            ],
+          ),
+        ),
+      ));
+    }
+    return widgets;
   }
 
   Widget _btn(IconData icon, String label, VoidCallback? onTap) => Padding(

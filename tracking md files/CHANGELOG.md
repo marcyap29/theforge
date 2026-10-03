@@ -2,6 +2,14 @@
 
 ---
 
+## v0.5.12 — 2026-10-03 — Double-click a feature to open chat hub + Build-order panel in chat rail
+
+- **Double-click any feature tile** on the tracker board to open the "Work on the app" chat hub pre-filled with "Let's work on: \<title>". The same action is available from the build-order list in the rail. Completes the WIP wiring from v0.5.10: `_FeatureTile.onWorkOn` (outer `GestureDetector.onDoubleTap`), `_workOnFeature` helper (opens `RefineFeaturesScreen` with `initialPrompt`), wired in both status-view and build-order-view tile call sites.
+- **Build-order panel in the chat rail.** The right-side action rail now includes a scrollable ordered list of unbuilt features (grouped by version, "NEXT UP" badge on the first group, status dot per feature) — tap any row to prefill the chat with "Let's work on: \<title>". `buildOrderUnbuilt()` sorts by target version then priority. `_ToolRail` gains `buildOrder` + `onPickFeature` params; `initialPrompt` added to `RefineFeaturesScreen` (`_maybePrefill` on load).
+- `dart analyze lib` clean; `flutter test` 123/123 green.
+
+---
+
 ## v0.5.11 — 2026-10-03 — Never commit un-analyzed AI output: pre-build commit gate + Discard broken edits (BUG-IMPL-013)
 
 - **The Forge no longer offers to commit code that doesn't compile.** The pre-build "Uncommitted changes" dialog now runs the analyzer (the same `error •` gate the Build run uses) on the leftover work *before* presenting options:

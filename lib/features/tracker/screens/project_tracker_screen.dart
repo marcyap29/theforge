@@ -344,6 +344,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             onBuild: () => _buildFeature(n.feature),
             onAdvice: () => _openBuildAdvice(n.feature),
             onArchitect: () => _architectFeature(n.feature),
+            onWorkOn: () => _workOnFeature(n.feature),
             selected: n.feature.id == _focusedFeatureId,
             onFocus: () => setState(() => _focusedFeatureId = n.feature.id),
           )),
@@ -420,6 +421,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             onBuild: () => _buildFeature(n.feature),
             onAdvice: () => _openBuildAdvice(n.feature),
             onArchitect: () => _architectFeature(n.feature),
+            onWorkOn: () => _workOnFeature(n.feature),
             selected: n.feature.id == _focusedFeatureId,
             onFocus: () => setState(() => _focusedFeatureId = n.feature.id),
           )));
@@ -1249,6 +1251,18 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     ));
   }
 
+  /// Double-click a feature tile → open the chat hub with that feature
+  /// pre-filled so the builder can immediately ask the AI about it.
+  void _workOnFeature(Feature feature) {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => RefineFeaturesScreen(
+        project: project,
+        repoPath: _repoPath,
+        initialPrompt: 'Let\'s work on: ${feature.title}',
+      ),
+    ));
+  }
+
   Future<void> _recommendFeatures() async {
     final messenger = ScaffoldMessenger.of(context);
     final config = await ProjectFileRepository.readProjectConfig(project.path);
@@ -1651,6 +1665,7 @@ class _FeatureTile extends StatelessWidget {
     required this.onArchitect,
     required this.selected,
     required this.onFocus,
+    required this.onWorkOn,
     this.indent = 0,
     this.runPhase,
   });
@@ -1664,6 +1679,8 @@ class _FeatureTile extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onBuild;
+  // Double-click → open the "Work on" chat focused on this feature.
+  final VoidCallback onWorkOn;
   final VoidCallback onAdvice;
   final VoidCallback onArchitect;
 
@@ -1689,6 +1706,8 @@ class _FeatureTile extends StatelessWidget {
         onFocus();
         _showContextMenu(context, status, d.globalPosition);
       },
+      // Double-click → open the chat hub pre-filled with this feature's title.
+      onDoubleTap: onWorkOn,
       child: Container(
         decoration: BoxDecoration(
           color: selected ? const Color(0x2264B5F6) : null,
