@@ -21,18 +21,19 @@ class RefineFeaturesScreen extends ConsumerStatefulWidget {
     super.key,
     required this.project,
     this.repoPath,
-    this.initialPrompt,
+    this.initialFeature,
     this.onBuildFeature,
   });
 
   final Project project;
   final String? repoPath;
 
-  /// Pre-fills the chat input (e.g. "Let's work on: <feature>" when a feature is
-  /// double-clicked on the board). Not auto-sent — the builder edits/sends it.
-  final String? initialPrompt;
+  /// When set, the fork card is shown immediately: two buttons let the user
+  /// choose between "Discuss & refine" (starts a chat turn) and "Build now"
+  /// (fires [onBuildFeature]).
+  final Feature? initialFeature;
 
-  /// Called when the user taps the ⚡ Build button on a feature row in the rail.
+  /// Called when the user taps "Build now" on the fork card.
   /// Provided by [ProjectTrackerScreen] so the full build-guard flow runs there.
   final Future<void> Function(Feature)? onBuildFeature;
 
@@ -54,6 +55,11 @@ class _RefineFeaturesScreenState extends ConsumerState<RefineFeaturesScreen> {
   late Conversation _convo;
   bool _loading = true;
 
+  /// The feature currently selected via rail tap or double-click. When non-null
+  /// the fork card is shown above the composer so the user can choose to discuss
+  /// or build. Cleared on choice or dismiss.
+  Feature? _forkFeature;
+
   @override
   void initState() {
     super.initState();
@@ -73,7 +79,7 @@ class _RefineFeaturesScreenState extends ConsumerState<RefineFeaturesScreen> {
             ..addAll(c.turns.map((t) => RefineTurn(isUser: t.isUser, text: t.text)));
           _loading = false;
         });
-        _maybePrefill();
+        _maybeShowFork();
         _jump();
         return;
       }
@@ -81,11 +87,9 @@ class _RefineFeaturesScreenState extends ConsumerState<RefineFeaturesScreen> {
     _startNew();
   }
 
-  /// Prefill the input once (e.g. a double-clicked feature) — not auto-sent.
-  void _maybePrefill() {
-    final p = widget.initialPrompt?.trim();
-    if (p != null && p.isNotEmpty && _input.text.isEmpty) {
-      _input.text = p;
+  void _maybeShowFork() {
+    if (widget.initialFeature != null && mounted) {
+      setState(() => _forkFeature = widget.initialFeature);
     }
   }
 
@@ -106,6 +110,7 @@ class _RefineFeaturesScreenState extends ConsumerState<RefineFeaturesScreen> {
     }
     // Greet + ask what to add.
     _send(null);
+    _maybeShowFork();
   }
 
   Future<void> _save() async {
@@ -437,6 +442,7 @@ class _RefineFeaturesScreenState extends ConsumerState<RefineFeaturesScreen> {
                         ),
                       ),
                       if (_pending.isNotEmpty && !_thinking) _proposalsBar(),
+                      if (_forkFeature != null) _forkCard(),
                       _composer(),
                     ],
                   ),
@@ -451,11 +457,7 @@ class _RefineFeaturesScreenState extends ConsumerState<RefineFeaturesScreen> {
                       ref.watch(featureListProvider(widget.project.id))
                               .valueOrNull ??
                           const []),
-                  onPickFeature: (f) {
-                    _input.text = 'Let\'s work on: ${f.title}';
-                    setState(() {});
-                  },
-                  onBuildFeature: widget.onBuildFeature,
+                  onPickFeature: (f) => setState(() => _forkFeature = f),
                 ),
               ],
             ),
@@ -485,6 +487,100 @@ class _RefineFeaturesScreenState extends ConsumerState<RefineFeaturesScreen> {
           ],
         ),
       );
+
+  /// The feature-selection fork card — shown above the composer when a feature
+  /// is pre-selected. Lets the user choose between chatting about it or building.
+  Widget _forkCard() {
+    final f = _forkFeature!;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      padding: const EdgeInsets.fromLTRB(14, 12, 10, 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF151D2E),
+        border: Border.all(color: const Color(0xFF2A3A5E)),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.auto_fix_high_outlined,
+                  size: 14, color: Color(0xFFE8A04C)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  f.title,
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFFE8E8EC)),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              InkWell(
+                onTap: () => setState(() => _forkFeature = null),
+                borderRadius: BorderRadius.circular(4),
+                child: const Padding(
+                  padding: EdgeInsets.all(4),
+                  child: Icon(Icons.close, size: 14, color: Color(0xFF6B7280)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text('What would you like to do?',
+              style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF))),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.chat_bubble_outline, size: 13),
+                  label: const Text('Discuss & refine',
+                      style: TextStyle(fontSize: 12)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  onPressed: _thinking
+                      ? null
+                      : () {
+                          final title = f.title;
+                          setState(() => _forkFeature = null);
+                          _send('Let\'s work on: $title');
+                        },
+                ),
+              ),
+              if (widget.onBuildFeature != null) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton.icon(
+                    icon: const Icon(Icons.bolt, size: 13),
+                    label: const Text('Build now',
+                        style: TextStyle(fontSize: 12)),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFE8A04C),
+                      foregroundColor: Colors.black87,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    onPressed: _thinking
+                        ? null
+                        : () {
+                            final feature = f;
+                            setState(() => _forkFeature = null);
+                            widget.onBuildFeature!(feature);
+                          },
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _composer() => SafeArea(
         top: false,
@@ -622,7 +718,6 @@ class _ToolRail extends StatelessWidget {
     required this.onSecurity,
     required this.buildOrder,
     required this.onPickFeature,
-    this.onBuildFeature,
   });
 
   final bool busy;
@@ -632,7 +727,6 @@ class _ToolRail extends StatelessWidget {
   final VoidCallback onSecurity;
   final List<Feature> buildOrder;
   final void Function(Feature) onPickFeature;
-  final Future<void> Function(Feature)? onBuildFeature;
 
   @override
   Widget build(BuildContext context) {
@@ -717,41 +811,10 @@ class _ToolRail extends StatelessWidget {
         first = false;
       }
       final status = FeatureStatus.fromWire(f.status);
-      widgets.add(InkWell(
-        onTap: () => onPickFeature(f),
-        borderRadius: BorderRadius.circular(6),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(4, 4, 0, 4),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 4, right: 6),
-                child: Icon(Icons.circle, size: 8, color: status.color),
-              ),
-              Expanded(
-                child: Text(f.title,
-                    style: const TextStyle(
-                        fontSize: 11.5, color: Color(0xFFD5D8DD)),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis),
-              ),
-              if (onBuildFeature != null)
-                Tooltip(
-                  message: 'Build with AI',
-                  child: InkWell(
-                    onTap: () => onBuildFeature!(f),
-                    borderRadius: BorderRadius.circular(4),
-                    child: const Padding(
-                      padding: EdgeInsets.fromLTRB(4, 2, 4, 2),
-                      child: Icon(Icons.bolt,
-                          size: 15, color: Color(0xFFE8A04C)),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
+      widgets.add(_FeatureRailRow(
+        feature: f,
+        status: status,
+        onPickFeature: () => onPickFeature(f),
       ));
     }
     return widgets;
@@ -787,4 +850,65 @@ class _Typing extends StatelessWidget {
               child: CircularProgressIndicator(strokeWidth: 2)),
         ),
       );
+}
+
+// ── Build-order rail row ──────────────────────────────────────────────────────
+
+/// One feature row in the build-order panel. Hover shows a background
+/// highlight; tap opens the fork card so the user chooses to discuss or build.
+class _FeatureRailRow extends StatefulWidget {
+  const _FeatureRailRow({
+    required this.feature,
+    required this.status,
+    required this.onPickFeature,
+  });
+
+  final Feature feature;
+  final FeatureStatus status;
+  final VoidCallback onPickFeature;
+
+  @override
+  State<_FeatureRailRow> createState() => _FeatureRailRowState();
+}
+
+class _FeatureRailRowState extends State<_FeatureRailRow> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onPickFeature,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          decoration: BoxDecoration(
+            color: _hovered ? const Color(0xFF1E2535) : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 4, right: 6),
+                child: Icon(Icons.circle, size: 8, color: widget.status.color),
+              ),
+              Expanded(
+                child: Text(
+                  widget.feature.title,
+                  style: const TextStyle(
+                      fontSize: 11.5, color: Color(0xFFD5D8DD)),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

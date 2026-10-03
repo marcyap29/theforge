@@ -2,6 +2,16 @@
 
 ---
 
+## v0.5.14 — 2026-10-03 — Fork card: unified "Discuss & refine" / "Build now" entry point
+
+- **One tap, two paths.** Tapping a feature in the chat rail (or double-clicking it on the board) no longer sends a "Let's work on: …" message immediately. Instead, a **fork card** slides in above the composer showing the selected feature's title and two buttons: **Discuss & refine** (opens a chat turn with "Let's work on: …") and **Build now** (fires the full build flow). Closes the UX confusion between the two actions — they are now explicitly named and discoverable from a single entry point.
+- `RefineFeaturesScreen`: `initialPrompt` replaced by `initialFeature: Feature?`; new `_forkFeature: Feature?` state field; `_maybeShowFork()` sets it on load; `_forkCard()` widget shown above the composer when `_forkFeature != null`; `onPickFeature` in `_ToolRail` now sets `_forkFeature` instead of pre-filling input text. `_maybePrefill()` removed. `onBuildFeature` wired to the fork card's "Build now" button.
+- `_FeatureRailRow` simplified: bolt icon and `_RailAction` enum removed; single-tap sets `_forkFeature`. Row is now a clean `MouseRegion` + `GestureDetector` with hover highlight.
+- `project_tracker_screen.dart`: `_workOnFeature` passes `initialFeature: feature` instead of `initialPrompt`.
+- `dart analyze lib` clean; `flutter build macos` 27.3 MB ok.
+
+---
+
 ## v0.5.13 — 2026-10-03 — Build with AI directly from the chat hub (⚡ button in rail)
 
 - **Build any feature without leaving the chat.** Each feature row in the "Work on the app" chat rail now shows a small ⚡ bolt icon. Tapping it launches Build with AI for that feature — the full build flow (entitlement check, active-run re-attach, build-kind gate, pre-build guards) runs exactly as if you had right-clicked the tile on the board. No need to leave the chat, find the feature, and navigate through the ⋮ menu.

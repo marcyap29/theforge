@@ -4,6 +4,23 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-10-03 — Claude Code [Fork card: unified Discuss & Build entry point — v0.5.14]
+
+**Branch:** main · **App:** v0.5.14
+
+### Why
+User: "it's not clear what's the difference between 'Let's work on' and 'Build with AI' — I would personally think they're the same feature. Can we combine them so clicking a feature shows a card in the chat asking if you want to refine or start building?" The two actions had separate but indistinguishable UX paths; unifying them into a fork card makes the distinction explicit and the flow simpler.
+
+### Done
+- `refine_features_screen.dart`: `initialPrompt` removed; `initialFeature: Feature?` added; `_forkFeature: Feature?` state drives a fork card above the composer. `_maybeShowFork()` sets it on load. `_forkCard()`: feature title header + close button + "Discuss & refine" (OutlinedButton → chat turn) + "Build now" (FilledButton amber → `onBuildFeature`). `_FeatureRailRow` simplified to single-tap → set `_forkFeature`; bolt and `_RailAction` enum removed.
+- `project_tracker_screen.dart`: `_workOnFeature` now passes `initialFeature: feature`.
+- Docs: CHANGELOG v0.5.14 entry, this context block.
+
+### Verify
+`dart analyze lib` clean · `flutter build macos` built 27.3 MB.
+
+---
+
 ## Session: 2026-10-03 — Claude Code [Build with AI from chat hub — v0.5.13]
 
 **Branch:** main · **App:** v0.5.13

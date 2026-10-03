@@ -1255,13 +1255,13 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
   }
 
   /// Double-click a feature tile → open the chat hub with that feature
-  /// pre-filled so the builder can immediately ask the AI about it.
+  /// pre-selected; the fork card lets the user choose to discuss or build.
   void _workOnFeature(Feature feature) {
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => RefineFeaturesScreen(
         project: project,
         repoPath: _repoPath,
-        initialPrompt: 'Let\'s work on: ${feature.title}',
+        initialFeature: feature,
         onBuildFeature: _buildFeature,
       ),
     ));
