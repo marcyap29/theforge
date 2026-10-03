@@ -107,17 +107,26 @@ class ImplAgent {
             .toList();
 
     // Read the chosen files (bounded) so Pass 2 edits real code, not guesses.
-    // Files are given whole up to a generous cap — a truncated file makes the
-    // model's find/replace hunks miss (or, worse under full-file mode, drop
-    // code), so we keep as much as the budget allows.
+    // Files are given whole up to a generous per-file cap — a truncated file is
+    // catastrophic: the model can't see the code it must edit, so its
+    // find/replace hunks don't match, it guesses, and the applied edit has
+    // unbalanced brackets (then "Fix it" can't see the break either → loops).
+    // That exact failure hit ar_mechanic (BUG-IMPL-012): main.dart is 56k chars
+    // and the edit target sat PAST the old 24k cut (char 24000 = line 735, the
+    // method was at 685). The per-file cap must be large enough that real files
+    // arrive whole; the total [budget] is the real guardrail against overflowing
+    // the context window.
     final readFiles = <String, String>{};
-    var budget = 90000;
+    const perFileCap = 80000;
+    var budget = 150000;
     for (final rel in wanted) {
       if (readFiles.length >= 12 || budget <= 0) break;
       final content = await ImplWorkspace.readRepoFile(repoPath, rel);
       if (content.isEmpty) continue;
       var c = content;
-      if (c.length > 24000) c = '${c.substring(0, 24000)}\n…(truncated)';
+      if (c.length > perFileCap) {
+        c = '${c.substring(0, perFileCap)}\n…(truncated)';
+      }
       if (c.length > budget) c = c.substring(0, budget);
       readFiles[rel] = c;
       budget -= c.length;

@@ -12,6 +12,7 @@ Records go in `bugtracker/records/` — one file per bug.
 | ID | Area | Summary | Date |
 |---|---|---|---|
 | BUG-IMPL-011 | IMPL | Switching the Ollama model then pressing Build hard-crashes (quit-to-desktop, native — no Dart error / no .ips). Only on in-session switch→Build; quit+relaunch→Build is fine. Instrumented with synchronous breadcrumbs (v0.5.4) to capture the aborting op; workaround = relaunch after switching | 2026-10-02 |
+| BUG-IMPL-012 | IMPL | Build-with-AI truncated each file to 24k chars before editing, so on a large file (AR Mechanic main.dart 56k) the edit target was cut off → the model guessed, emitted unbalanced brackets, broke the file, and Fix-it looped (every model). Raised per-file cap 24k→80k + budget 90k→150k so files arrive whole | 2026-10-02 |
 
 ## Fixed
 

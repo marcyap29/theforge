@@ -88,9 +88,9 @@ Every §N that brings The Forge closer to a working interview-to-spec run unbloc
 
 **Suspected cause (now STALE):** the note suspected in-flight, then-uncommitted **Gemini provider** work touching the LLM routing core (the interview is entirely LLM-driven). That work has since **shipped cleanly as v0.5.2** (committed, `dart analyze lib` clean, 114 tests green, all four providers wired through `LlmService`/`_buildProvider`) — so "uncommitted Gemini churn" is no longer a plausible cause. If the symptom persists, look instead at: the interview notifier flow (`interview_notifier.dart` `parseForgeState` / layer-gate), role→provider resolution for the interview's role, and whether a mis-configured/empty model or a provider 401 is being swallowed (it should now surface via `friendlyLlmError`, §LLMKEY).
 
-**Next step:** reproduce (start a new Build project → does the interview ask questions?); if broken, capture `diag.log` (crash diagnostics v0.5.5 + breadcrumbs help) and bisect the interview LLM call.
+**RESOLVED v0.5.7 (2026-10-02):** confirmed and fixed. It was **not** the Gemini work — it was a **routing drop** in `new_project_screen._create()`: the "Answer guided questions" (build) flow fell through to `navigator.pop()` instead of launching `InterviewScreen`, so creating a project returned to the dashboard and the interview never ran (you landed on an empty tracker). Only the "Paste an idea" (import) flow was routed anywhere. Fixed by routing build + audit flows to `InterviewScreen`.
 
-**Status:** OPEN / unconfirmed — awaiting a repro.
+**Status:** ✅ RESOLVED v0.5.7.
 
 ---
 

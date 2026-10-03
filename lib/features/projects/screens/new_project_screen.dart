@@ -6,6 +6,8 @@ import '../../../data/local_db/forge_database.dart';
 import '../../../features/settings/settings_providers.dart';
 import '../../../services/llm/llm_provider.dart';
 import '../../import/import_screen.dart';
+import '../../interview/providers/interview_providers.dart';
+import '../../interview/ui/interview_screen.dart';
 import '../providers/providers.dart';
 
 /// How a new project is seeded. The three interview flows map 1:1 to
@@ -83,7 +85,22 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
             builder: (_) => ImportScreen(
                 projectPath: projectPath, projectName: name),
           ));
+        } else if (_flow == _Flow.build || _flow == _Flow.audit) {
+          // "Answer guided questions" (build) and audit launch the interview —
+          // this was silently dropped (the flow just popped to the dashboard),
+          // so the guided interview never ran. Restore it.
+          navigator.pushReplacement(MaterialPageRoute<void>(
+            builder: (_) => InterviewScreen(
+              args: InterviewArgs(
+                path: projectPath,
+                name: name,
+                mode: mode,
+              ),
+            ),
+          ));
         } else {
+          // Pull (bring-in-existing-code) has its own onboarding/ingestion flow
+          // reached from the project screen — just return to it.
           navigator.pop();
         }
       }

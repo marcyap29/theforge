@@ -2,6 +2,14 @@
 
 ---
 
+## v0.5.7 — 2026-10-02 — Two real bugs: builds on large files, and the missing interview
+
+- **Fixed: Build-with-AI failed on any file larger than ~24k chars — every model, every time (BUG-IMPL-012).** This was the *real* cause behind "the coding model keeps looping/breaking the file" on AR Mechanic. The Forge truncated each file it sent the model to **24,000 characters** before editing. AR Mechanic's `main.dart` is **56k chars**, and the method the model needed to edit sat at line 685 — but char 24,000 is line 735, so the method body was **cut off mid-way with `…(truncated)`**. The model saw the method *start* but not its body, couldn't build a matching find/replace hunk, guessed, and produced unbalanced brackets — then "Fix it" also couldn't see the break (still past the cut) and **looped forever**. It wasn't the model (kimi, minimax all failed identically because none could see the code); it was the truncation. Raised the per-file cap 24k → **80k** and the total read budget 90k → **150k** (the budget is the real context-window guardrail), so real-world files arrive whole. `impl_agent.dart`.
+- **Fixed: "Answer guided questions" didn't start the interview.** Creating a new project with the guided-interview option just **popped back to the dashboard** — the interview screen was never launched, so the whole guided interview flow was silently gone (you'd land on an empty tracker). `new_project_screen._create()` only routed the "Paste an idea" (import) flow anywhere; the build/audit flows fell through to `navigator.pop()`. Now build + audit launch `InterviewScreen` as they should. (Closes the §INT-BUG investigation — it was a routing drop, not the Gemini work.)
+- `dart analyze lib` clean; `flutter build macos` ok; 114 tests green.
+
+---
+
 ## v0.5.6 — 2026-10-02 — Copy the outputs you need (capability summary + build errors)
 
 - **"What this app can do" is now one-click copyable.** The summary was already selectable text, but there was no obvious way to grab it all — added a **Copy** button (copy-all icon) in that screen's toolbar that copies the whole markdown summary to the clipboard (with a confirmation), so you can save it for reuse.
