@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -572,7 +573,22 @@ List<Feature> buildOrderUnbuilt(List<Feature> all) {
     final s = FeatureStatus.fromWire(f.status);
     return s != FeatureStatus.shipped && s != FeatureStatus.archived;
   }).toList();
-  final byVersion = groupFeaturesByVersion(unbuilt);
+
+  // Subtasks that have no targetVersion inherit it from their parent epic so
+  // the rail grouping matches the board's build-order view.
+  final versionOf = {for (final f in all) f.id: f.targetVersion};
+  final resolved = unbuilt.map((f) {
+    if ((f.targetVersion == null || f.targetVersion!.trim().isEmpty) &&
+        f.parentId != null) {
+      final parentVersion = versionOf[f.parentId];
+      if (parentVersion != null && parentVersion.trim().isNotEmpty) {
+        return f.copyWith(targetVersion: Value(parentVersion));
+      }
+    }
+    return f;
+  }).toList();
+
+  final byVersion = groupFeaturesByVersion(resolved);
   final versions = byVersion.keys.toList()
     ..sort((a, b) {
       final au = a.trim().isEmpty, bu = b.trim().isEmpty; // unversioned last
