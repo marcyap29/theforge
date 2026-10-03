@@ -2,6 +2,15 @@
 
 ---
 
+## v0.5.16 — 2026-10-03 — Build Mode: AppBar button now opens a feature picker, not the chat
+
+- **Bug fix: AppBar "Build" opened the same screen as "Architect".** `_openBuildMode()` previously pushed `RefineFeaturesScreen(buildMode: true)`, which was identical to Architect Mode except for the AppBar title. Clicking Build Mode looked the same as Architect Mode.
+- **Fix:** `_openBuildMode()` now shows a `DraggableScrollableSheet` bottom sheet listing all unbuilt features in build order (via `buildOrderUnbuilt()`). Each row shows the feature title, version, and a **⚡ Build** button that calls `_buildFeature(feature)` → opens `ImplementationScreen` directly.
+- **Cleanup:** `buildMode: bool` removed from `RefineFeaturesScreen` entirely. The screen is always Architect Mode; the AppBar always says "Architect Mode · <project>". The unused static Build-Mode intro message removed from `_startNew()`.
+- `dart analyze lib` clean.
+
+---
+
 ## v0.5.15 — 2026-10-03 — Architect Mode / Build Mode: named entry points + per-tile quick actions
 
 - **Two named mode buttons replace "Work on the app."** The tracker AppBar now shows **Architect** (outlined, `forum_outlined`, blue) and **Build** (amber filled, `construction` icon) buttons, each with a `Tooltip` on hover explaining its purpose. Architect opens the chat hub for planning/refinement; Build opens the same screen in Build Mode (static intro, no LLM greeting, build-order rail front-and-center).

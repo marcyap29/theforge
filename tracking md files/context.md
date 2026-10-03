@@ -4,6 +4,23 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-10-03 — Claude Code [Build Mode AppBar fix: feature picker bottom sheet — v0.5.16]
+
+**Branch:** main · **App:** v0.5.16
+
+### Why
+AppBar "Build" button opened `RefineFeaturesScreen(buildMode: true)` which was visually identical to Architect Mode (same chat screen, just a different title). User reported: "build mode and architect mode are the same in some cases — we need to fix this."
+
+### Done
+- `project_tracker_screen.dart`: `_openBuildMode()` replaced with a `showModalBottomSheet` + `DraggableScrollableSheet` that lists unbuilt features in build order (via `buildOrderUnbuilt()`). Each row has feature title, version tag, and a ⚡ Build button that calls `_buildFeature(f)` → opens `ImplementationScreen` directly. No chat involved.
+- `refine_features_screen.dart`: Removed `buildMode: bool` param from constructor, removed the `if (widget.buildMode)` static-intro branch in `_startNew()`, changed AppBar title to always say "Architect Mode · <project>".
+- Docs: CHANGELOG v0.5.16 entry, this context block.
+
+### Verify
+`dart analyze lib` clean.
+
+---
+
 ## Session: 2026-10-03 — Claude Code [Architect Mode / Build Mode named entry points — v0.5.15]
 
 **Branch:** main · **App:** v0.5.15

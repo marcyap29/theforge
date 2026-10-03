@@ -24,7 +24,6 @@ class RefineFeaturesScreen extends ConsumerStatefulWidget {
     this.initialFeature,
     this.onBuildFeature,
     this.autoDiscuss = false,
-    this.buildMode = false,
   });
 
   final Project project;
@@ -42,10 +41,6 @@ class RefineFeaturesScreen extends ConsumerStatefulWidget {
   /// When true and [initialFeature] is set, skip the fork card and immediately
   /// send the "Let's work on: <title>" message to start a discussion.
   final bool autoDiscuss;
-
-  /// When true, opens in Build Mode: shows the build-order rail and replaces
-  /// the AI greeting with a static prompt (no LLM call on open).
-  final bool buildMode;
 
   @override
   ConsumerState<RefineFeaturesScreen> createState() =>
@@ -121,19 +116,7 @@ class _RefineFeaturesScreenState extends ConsumerState<RefineFeaturesScreen> {
         _loading = false;
       });
     }
-    if (widget.buildMode) {
-      // Build Mode: static intro — no LLM greeting, jump straight to the rail.
-      if (mounted) {
-        setState(() => _history.add(const RefineTurn(
-          isUser: false,
-          text: 'Welcome to **Build Mode**. Select a feature from the Build '
-              'Order panel on the right to start building with AI.',
-        )));
-      }
-    } else {
-      // Architect Mode: greet + ask what to add.
-      _send(null);
-    }
+    _send(null);
     _maybeShowFork();
   }
 
@@ -426,9 +409,7 @@ class _RefineFeaturesScreenState extends ConsumerState<RefineFeaturesScreen> {
       backgroundColor: const Color(0xFF0C1016),
       appBar: AppBar(
         backgroundColor: const Color(0xFF12161C),
-        title: Text(widget.buildMode
-            ? 'Build Mode · ${widget.project.name}'
-            : 'Architect Mode · ${widget.project.name}'),
+        title: Text('Architect Mode · ${widget.project.name}'),
         actions: [
           if (_addedCount > 0)
             Padding(

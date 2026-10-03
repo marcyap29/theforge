@@ -1285,17 +1285,90 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     ));
   }
 
-  /// Opens Architect Mode in Build Mode — the chat rail defaults to showing
-  /// the build-order panel so the user can pick a feature to code.
-  void _openBuildMode() {
-    Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => RefineFeaturesScreen(
-        project: project,
-        repoPath: _repoPath,
-        buildMode: true,
-        onBuildFeature: _buildFeature,
+  /// AppBar "Build" button → bottom sheet listing unbuilt features in build
+  /// order; tapping one goes straight to ImplementationScreen (no chat).
+  Future<void> _openBuildMode() async {
+    final all =
+        ref.read(featureListProvider(project.id)).valueOrNull ?? const [];
+    final ordered = buildOrderUnbuilt(all);
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF15161C),
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.55,
+        minChildSize: 0.35,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (_, scrollCtrl) => Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: Row(
+                children: [
+                  Icon(Icons.construction, size: 18, color: Color(0xFFE8A04C)),
+                  SizedBox(width: 8),
+                  Text('Build Mode — pick a feature',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 15)),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            if (ordered.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(32),
+                child: Text('All features are shipped or archived.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white54)),
+              )
+            else
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollCtrl,
+                  itemCount: ordered.length,
+                  itemBuilder: (_, i) {
+                    final f = ordered[i];
+                    final ver = f.targetVersion?.isNotEmpty == true
+                        ? f.targetVersion!
+                        : 'Unversioned';
+                    return ListTile(
+                      dense: true,
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+                      title: Text(f.title,
+                          style: const TextStyle(fontSize: 13),
+                          overflow: TextOverflow.ellipsis),
+                      subtitle: Text(ver,
+                          style: const TextStyle(
+                              fontSize: 11, color: Colors.white38)),
+                      trailing: FilledButton.icon(
+                        icon: const Icon(Icons.bolt, size: 14),
+                        label: const Text('Build',
+                            style: TextStyle(fontSize: 12)),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFFE8A04C),
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _buildFeature(f);
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
       ),
-    ));
+    );
   }
 
   /// Architect icon on a tile → open Architect Mode and auto-send the
