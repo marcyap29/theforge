@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/local_db/forge_database.dart';
+import '../data/conversation_store.dart';
 import '../providers/tracker_providers.dart';
 import '../scan/feature_scan.dart';
 import '../widgets/scan_review_sheet.dart';
@@ -34,11 +35,149 @@ class _RefineFeaturesScreenState extends ConsumerState<RefineFeaturesScreen> {
   bool _thinking = false;
   int _addedCount = 0;
 
+  // Multi-session persistence: the current conversation (resumable; past chats
+  // are browsable). Saved to `.forge/conversations/`.
+  late Conversation _convo;
+  bool _loading = true;
+
   @override
   void initState() {
     super.initState();
-    // Kick off with an opening turn so the architect greets + asks what to add.
-    Future.microtask(() => _send(null));
+    Future.microtask(_loadInitial);
+  }
+
+  /// Resume the most recent conversation, or start a fresh one (with a greeting).
+  Future<void> _loadInitial() async {
+    final metas = await ConversationStore.list(widget.project.path);
+    if (metas.isNotEmpty) {
+      final c = await ConversationStore.read(widget.project.path, metas.first.id);
+      if (c != null && mounted) {
+        setState(() {
+          _convo = c;
+          _history
+            ..clear()
+            ..addAll(c.turns.map((t) => RefineTurn(isUser: t.isUser, text: t.text)));
+          _loading = false;
+        });
+        _jump();
+        return;
+      }
+    }
+    _startNew();
+  }
+
+  void _startNew() {
+    _convo = Conversation(
+      id: 'c${DateTime.now().millisecondsSinceEpoch}',
+      title: 'New chat',
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+      turns: [],
+    );
+    if (mounted) {
+      setState(() {
+        _history.clear();
+        _pending = const [];
+        _loading = false;
+      });
+    }
+    // Greet + ask what to add.
+    _send(null);
+  }
+
+  Future<void> _save() async {
+    _convo.turns
+      ..clear()
+      ..addAll(_history.map((t) => StoredTurn(isUser: t.isUser, text: t.text)));
+    // Title from the first user message, once there is one.
+    if (_convo.title == 'New chat') {
+      final firstUser = _history.firstWhere((t) => t.isUser,
+          orElse: () => const RefineTurn(isUser: true, text: ''));
+      if (firstUser.text.isNotEmpty) {
+        _convo.title = ConversationStore.titleFrom(firstUser.text);
+      }
+    }
+    await ConversationStore.write(widget.project.path, _convo);
+  }
+
+  Future<void> _openHistory() async {
+    final metas = await ConversationStore.list(widget.project.path);
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF15161C),
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.add_comment_outlined,
+                  color: Color(0xFFE8A04C)),
+              title: const Text('New chat'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _startNew();
+              },
+            ),
+            const Divider(height: 1),
+            if (metas.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(20),
+                child: Text('No past chats yet.',
+                    style: TextStyle(color: Color(0xFF8A8A8E))),
+              ),
+            for (final m in metas)
+              ListTile(
+                leading: Icon(
+                    m.id == _convo.id
+                        ? Icons.chat_bubble
+                        : Icons.chat_bubble_outline,
+                    size: 18,
+                    color: m.id == _convo.id
+                        ? const Color(0xFFE8A04C)
+                        : const Color(0xFF8A8A8E)),
+                title: Text(m.title,
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                subtitle: Text(_ago(m.updatedAt),
+                    style: const TextStyle(fontSize: 11)),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  onPressed: () async {
+                    await ConversationStore.delete(widget.project.path, m.id);
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (m.id == _convo.id) _startNew();
+                  },
+                ),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final c = await ConversationStore.read(
+                      widget.project.path, m.id);
+                  if (c != null && mounted) {
+                    setState(() {
+                      _convo = c;
+                      _pending = const [];
+                      _history
+                        ..clear()
+                        ..addAll(c.turns
+                            .map((t) => RefineTurn(isUser: t.isUser, text: t.text)));
+                    });
+                    _jump();
+                  }
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _ago(DateTime d) {
+    final diff = DateTime.now().difference(d);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
+    if (diff.inDays < 1) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
   }
 
   @override
@@ -77,6 +216,7 @@ class _RefineFeaturesScreenState extends ConsumerState<RefineFeaturesScreen> {
         if (result.proposals.isNotEmpty) _pending = result.proposals;
         _thinking = false;
       });
+      await _save();
       _jump();
     } catch (e) {
       if (!mounted) return;
@@ -138,6 +278,7 @@ class _RefineFeaturesScreenState extends ConsumerState<RefineFeaturesScreen> {
               'add, or close this and run "Plan build order" to order them into '
               'versions.'));
     });
+    await _save();
     _jump();
   }
 
@@ -151,14 +292,26 @@ class _RefineFeaturesScreenState extends ConsumerState<RefineFeaturesScreen> {
         actions: [
           if (_addedCount > 0)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 18),
               child: Text('$_addedCount added',
                   style: const TextStyle(
                       fontSize: 12, color: Color(0xFF6BD69A))),
             ),
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: 'Past chats',
+            onPressed: _loading ? null : _openHistory,
+          ),
+          IconButton(
+            icon: const Icon(Icons.add_comment_outlined),
+            tooltip: 'New chat',
+            onPressed: _loading ? null : _startNew,
+          ),
         ],
       ),
-      body: Column(
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
         children: [
           Expanded(
             child: ListView.builder(

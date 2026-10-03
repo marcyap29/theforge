@@ -2,6 +2,13 @@
 
 ---
 
+## v0.5.9 — 2026-10-03 — Chat history: past conversations persist and resume (chat-hub increment 1)
+
+- **"Refine features" chats are now saved — browse past chats and resume where you left off.** First step of the larger "conversation as the hub" redesign. Conversations persist to `.forge/conversations/<id>.json` (`ConversationStore`); the chat screen resumes your most recent conversation on open, and a **Past chats** button (history icon) lists prior conversations (newest-first, titled from your first message, with delete) plus **New chat**. Each turn + feature-add is saved as it happens, so nothing is lost. Multiple named sessions, ChatGPT-style. `ConversationStore` (+ `Conversation`/`StoredTurn`/`ConversationMeta`), unit-tested (`test/conversation_store_test.dart`); `RefineFeaturesScreen` load/save/history. `dart analyze lib` clean; `flutter build macos` ok; 119 tests green (5 new).
+  - *Coming next (increments 2–3 of the redesign):* tools (What-this-app-can-do, Scan, Recommend, Plan-build-order, Remove-duplicates, Security, Check-in) run **inline in the chat** as a right-side action rail; and an established project's primary button becomes **"Work on the app"** → the chat hub (new projects still do the guided interview first).
+
+---
+
 ## v0.5.8 — 2026-10-03 — Refine features by talking (conversational re-interview)
 
 - **New: "Refine features (chat)" — re-open a conversation on an existing project and add features by talking.** The natural-language counterpart to the one-shot "Recommend features": the first interview sets a project up; later you re-activate a chat to *refine and extend* it. In the tracker's **AI tools ▾ → Refine features (chat)**, the architect greets you, asks what you want to add, asks a clarifying question when your intent is vague, and proposes concrete features — which you **Review & add** straight to the board (reusing the scan-review sheet + dedup against existing). Multi-turn: keep talking to add more. Afterward, the existing **Plan build order** step orders them into sensible versions (foundational features first). New `FeatureScanner.refineFeatures` (+ `RefineTurn`/`RefineResult`, JSON `{reply, proposals}`) and `RefineFeaturesScreen` (chat UI, selectable bubbles, proposals bar). `dart analyze lib` clean; `flutter build macos` ok; 114 tests green.
