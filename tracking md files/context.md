@@ -4,6 +4,23 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-10-03 — Claude Code [Build-order rail panel + double-click to chat — v0.5.12]
+
+**Branch:** main · **App:** v0.5.12
+
+### Why
+Two chat-hub enhancements requested: (1) show the build-order recommendation list in the "Work on the app" chat rail so a builder can jump straight to the next feature; (2) double-clicking any feature tile on the tracker board opens the chat hub pre-filled with that feature's title.
+
+### Done
+- `refine_features_screen.dart`: `buildOrderUnbuilt()` top-level function (filters non-shipped/archived, groups via `groupFeaturesByVersion`, sorts by version then priority, unversioned last). `_ToolRail` gains `buildOrder` + `onPickFeature` params; scrollable build-order section below the tool buttons with "NEXT UP" badge on the first concrete version group, status dot + tappable rows that call `onPickFeature`. `initialPrompt` added to `RefineFeaturesScreen` constructor; `_maybePrefill()` sets input text on load.
+- `project_tracker_screen.dart`: `_FeatureTile` gains `final VoidCallback onWorkOn` field + `GestureDetector.onDoubleTap: onWorkOn`; both tile call sites (status-view `~line 347` + build-order-view `~line 424`) pass `onWorkOn: () => _workOnFeature(n.feature)`. `_workOnFeature` helper opens `RefineFeaturesScreen` with `initialPrompt: 'Let's work on: ${feature.title}'`.
+- Docs: CHANGELOG v0.5.12 entry, FEATURES.md rows, this context block.
+
+### Verify
+`dart analyze lib` clean · `flutter test` 22/22 green · `flutter build macos` built 27.3 MB.
+
+---
+
 ## Session: 2026-10-03 — Claude Code [Never commit un-analyzed AI output — v0.5.11 / BUG-IMPL-013]
 
 **Branch:** main · **App:** v0.5.11
