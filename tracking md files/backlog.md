@@ -83,6 +83,17 @@ Every §N that brings The Forge closer to a working interview-to-spec run unbloc
 
 ## High Priority
 
+### §INT-BUG — Investigate: reported "interview doesn't run" (UNCONFIRMED)
+**What it is:** A handoff note (another session, 2026-10-02) reported that The Forge's Build **interview doesn't interview you**. Not reproduced/confirmed in-session — logged so it isn't lost.
+
+**Suspected cause (now STALE):** the note suspected in-flight, then-uncommitted **Gemini provider** work touching the LLM routing core (the interview is entirely LLM-driven). That work has since **shipped cleanly as v0.5.2** (committed, `dart analyze lib` clean, 114 tests green, all four providers wired through `LlmService`/`_buildProvider`) — so "uncommitted Gemini churn" is no longer a plausible cause. If the symptom persists, look instead at: the interview notifier flow (`interview_notifier.dart` `parseForgeState` / layer-gate), role→provider resolution for the interview's role, and whether a mis-configured/empty model or a provider 401 is being swallowed (it should now surface via `friendlyLlmError`, §LLMKEY).
+
+**Next step:** reproduce (start a new Build project → does the interview ask questions?); if broken, capture `diag.log` (crash diagnostics v0.5.5 + breadcrumbs help) and bisect the interview LLM call.
+
+**Status:** OPEN / unconfirmed — awaiting a repro.
+
+---
+
 ### §BRANCH — Auto-branch epics (branch on build, merge on done)
 **What it is:** When The Forge builds a feature classified as an **epic** (`BuildKind.epic`) — or, optionally, any feature — it should automatically `git checkout -b` a work branch in the linked repo before applying edits, do all the code work there, and only **merge back to `main` when the epic is marked done and its builds verified** (analyze clean + checklist passing). If a build fails or is abandoned, the branch isolates the mess from `main`.
 

@@ -55,7 +55,7 @@ void main() {
   });
 }
 
-const _appVersion = '0.5.5';
+const _appVersion = '0.5.6';
 
 /// Retained so the lifecycle listener isn't garbage-collected (see main()).
 // ignore: unused_element

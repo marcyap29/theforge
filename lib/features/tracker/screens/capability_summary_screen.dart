@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -121,6 +122,19 @@ class _CapabilitySummaryScreenState
       appBar: AppBar(
         title: Text('What this app can do — ${widget.project.name}'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.copy_all_outlined, size: 18),
+            tooltip: 'Copy this summary',
+            onPressed: (_markdown == null || _markdown!.isEmpty)
+                ? null
+                : () {
+                    Clipboard.setData(ClipboardData(text: _markdown!));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('Summary copied to clipboard')),
+                    );
+                  },
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
             child: FilledButton.icon(

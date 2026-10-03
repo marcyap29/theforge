@@ -2,6 +2,13 @@
 
 ---
 
+## v0.5.6 — 2026-10-02 — Copy the outputs you need (capability summary + build errors)
+
+- **"What this app can do" is now one-click copyable.** The summary was already selectable text, but there was no obvious way to grab it all — added a **Copy** button (copy-all icon) in that screen's toolbar that copies the whole markdown summary to the clipboard (with a confirmation), so you can save it for reuse.
+- **A failed build's full terminal output is now reliably copyable.** Two problems fixed: (1) the console is a virtualized list wrapped in a `SelectionArea`, so **drag-selecting only grabbed the on-screen rows** — scrolled-off text couldn't be selected. Added a **Copy output** button right on the red failure bar (next to Try again / Close) that copies the **entire** console, not just what's visible. (2) On a failure, the model's raw output was **truncated to the last 80 lines / 4000 chars** before it even reached the console — so even "copy all" missed the part you most need to debug a loop/error. Raised to keep the output whole (trim only a runaway >20k-char blob, keeping the tail). `dart analyze lib` clean; 114 tests green.
+
+---
+
 ## v0.5.5 — 2026-10-02 — Durable crash diagnostics (so any crash leaves a trail to hand off)
 
 - **Every crash now leaves a trail you can send for a fix — no telemetry, nothing leaves your Mac until you share it.** Motivated by BUG-IMPL-011 (a tester's app crashed on model-switch, but the crash was *invisible* — native, no Dart error, no findable report). New `CrashDiagnostics` service does three best-effort things:

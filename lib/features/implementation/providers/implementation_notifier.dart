@@ -343,12 +343,18 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
   }
 
   /// The tail of a raw model response, split into console lines (bounded).
+  /// The model's raw output shown on a failure — kept WHOLE (minus a generous
+  /// head trim on an enormous blob) so the user can copy all of it to debug or
+  /// feed back a fix. Previously capped to the last 80 lines / 4000 chars, which
+  /// silently dropped the part people most need on an error.
   static List<String> _rawTail(String raw) {
     var s = raw.trim();
-    const cap = 4000;
-    if (s.length > cap) s = '…${s.substring(s.length - cap)}';
-    final lines = s.split('\n');
-    return lines.length > 80 ? lines.sublist(lines.length - 80) : lines;
+    // Only trim if truly huge (a runaway repetition loop), keeping the tail.
+    const cap = 20000;
+    if (s.length > cap) {
+      s = '…[earlier output trimmed]…\n${s.substring(s.length - cap)}';
+    }
+    return s.split('\n');
   }
 
   /// Hand-edit: replace the proposed content of one edit with the user's own.

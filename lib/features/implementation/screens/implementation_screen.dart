@@ -413,6 +413,16 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
                           Future.microtask(() => notifier.start(widget.brief));
                         },
                         onClose: () => Navigator.of(context).pop(false),
+                        onCopyOutput: () {
+                          Clipboard.setData(ClipboardData(
+                              text: state.console
+                                  .map((l) => l.text)
+                                  .join('\n')));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('Full output copied to clipboard')),
+                          );
+                        },
                       ),
                     // Always-available prompt box (shared controller with the
                     // right-side "Build this feature" button).
@@ -1691,11 +1701,17 @@ class _FailedBar extends StatelessWidget {
     required this.stopped,
     required this.onRetry,
     required this.onClose,
+    required this.onCopyOutput,
   });
   final String? error;
   final bool stopped;
   final VoidCallback onRetry;
   final VoidCallback onClose;
+
+  /// Copies the FULL console (not just the on-screen rows) — the reliable way to
+  /// grab an error, since a virtualized list only lets you drag-select what's
+  /// currently visible.
+  final VoidCallback onCopyOutput;
 
   @override
   Widget build(BuildContext context) {
@@ -1720,6 +1736,12 @@ class _FailedBar extends StatelessWidget {
               style: const TextStyle(fontSize: 13, color: Color(0xFFE5E5E7)),
             ),
           ),
+          TextButton.icon(
+            onPressed: onCopyOutput,
+            icon: const Icon(Icons.copy_all_outlined, size: 16),
+            label: const Text('Copy output'),
+          ),
+          const SizedBox(width: 8),
           TextButton(onPressed: onRetry, child: const Text('Try again')),
           const SizedBox(width: 8),
           TextButton(onPressed: onClose, child: const Text('Close')),
