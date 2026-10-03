@@ -600,55 +600,86 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     return result ?? false;
   }
 
-  /// Handles the "uncommitted changes" pre-build case with real options: the
-  /// user can **Commit & push** the leftover work right here (so it's saved and
-  /// the tree is clean before building), **Build anyway** (stack onto it), or
-  /// **Cancel**. Shows the changed files so the choice is informed. Returns true
-  /// to proceed with the build. Best-effort git — push is skipped gracefully
-  /// when there's no remote.
+  /// Handles the "uncommitted changes" pre-build case with real options. First
+  /// it runs the analyzer on the leftover work (the same gate the Build run
+  /// uses): The Forge must never commit un-analyzed AI output — a failed build
+  /// leaves non-compiling edits in the tree, and committing/pushing those is the
+  /// worst outcome (BUG-IMPL-011).
+  ///
+  /// • If the tree **doesn't compile**, "Commit & push" is withheld and replaced
+  ///   with **Discard broken edits** (restore to HEAD) alongside Build anyway /
+  ///   Cancel.
+  /// • If it compiles (or analysis can't run), the user can **Commit & push**
+  ///   the leftover work, **Build anyway**, or **Cancel**.
+  ///
+  /// Shows the changed files so the choice is informed. Returns true to proceed
+  /// with the build. Best-effort git — push is skipped gracefully with no remote.
   Future<bool> _handleUncommittedChanges(String repoPath) async {
     final changed = await ProjectFileRepository.gitChangedFiles(repoPath);
     if (!mounted) return false;
+
+    // Analyze the leftover work before offering to commit it. A failed build's
+    // stranded edits must not be committed/pushed as-is.
+    _showBlockingSpinner('Checking the leftover changes compile…');
+    final analysis = await ProjectFileRepository.analyzeClean(repoPath);
+    if (mounted) Navigator.of(context, rootNavigator: true).pop(); // spinner
+    if (!mounted) return false;
+    final broken = analysis.hasErrors;
+
+    final fileList = changed.isEmpty
+        ? const <Widget>[]
+        : <Widget>[
+            const SizedBox(height: 12),
+            Text('${changed.length} changed file'
+                '${changed.length == 1 ? '' : 's'}:',
+                style:
+                    const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
+            const SizedBox(height: 4),
+            Container(
+              constraints: const BoxConstraints(maxHeight: 140),
+              width: double.maxFinite,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F0F10),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: SingleChildScrollView(
+                child: Text(changed.join('\n'),
+                    style: const TextStyle(
+                        fontFamily: 'Menlo',
+                        fontSize: 11,
+                        color: Color(0xFFCFCFD2))),
+              ),
+            ),
+          ];
+
     final choice = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF141416),
-        title: const Text('Uncommitted changes in the repo'),
+        title: Text(broken
+            ? 'Leftover changes don\'t compile'
+            : 'Uncommitted changes in the repo'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'The linked repo has uncommitted changes from a previous build or '
-              'manual edits. Building now stacks new edits onto them — and if the '
-              'last build failed, it can recreate code that\'s already there. '
-              'Commit & push them first, or build anyway.',
-              style: TextStyle(fontSize: 13, color: Color(0xFFE5E5E7)),
+            Text(
+              broken
+                  ? 'The linked repo has uncommitted changes that fail analysis '
+                      '(${analysis.errorCount} error'
+                      '${analysis.errorCount == 1 ? '' : 's'}) — almost always a '
+                      'build that didn\'t finish. These won\'t be committed as-is. '
+                      'Discard them to restore the last good commit, or build '
+                      'anyway to let the AI edit on top.'
+                  : 'The linked repo has uncommitted changes from a previous '
+                      'build or manual edits. Building now stacks new edits onto '
+                      'them — and if the last build failed, it can recreate code '
+                      'that\'s already there. Commit & push them first, or build '
+                      'anyway.',
+              style: const TextStyle(fontSize: 13, color: Color(0xFFE5E5E7)),
             ),
-            if (changed.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text('${changed.length} changed file'
-                  '${changed.length == 1 ? '' : 's'}:',
-                  style: const TextStyle(
-                      fontSize: 11, color: Color(0xFF9CA3AF))),
-              const SizedBox(height: 4),
-              Container(
-                constraints: const BoxConstraints(maxHeight: 140),
-                width: double.maxFinite,
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F0F10),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: SingleChildScrollView(
-                  child: Text(changed.join('\n'),
-                      style: const TextStyle(
-                          fontFamily: 'Menlo',
-                          fontSize: 11,
-                          color: Color(0xFFCFCFD2))),
-                ),
-              ),
-            ],
+            ...fileList,
           ],
         ),
         actions: [
@@ -661,18 +692,28 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             child: const Text('Build anyway',
                 style: TextStyle(color: Color(0xFF8A8A8E))),
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, 'commit'),
-            child: const Text('Commit & push'),
-          ),
+          if (broken)
+            FilledButton(
+              style:
+                  FilledButton.styleFrom(backgroundColor: const Color(0xFFB4232A)),
+              onPressed: () => Navigator.pop(ctx, 'discard'),
+              child: const Text('Discard broken edits'),
+            )
+          else
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, 'commit'),
+              child: const Text('Commit & push'),
+            ),
         ],
       ),
     );
 
     if (choice == 'build') return true;
+    if (choice == 'discard') return _discardLeftoverEdits(repoPath);
     if (choice != 'commit') return false; // cancel / dismissed
 
-    // Commit & push the leftover work, then proceed with the build.
+    // Commit & push the leftover work, then proceed with the build. Only
+    // reachable when analysis is clean/unavailable — never for broken code.
     final messenger = ScaffoldMessenger.of(context);
     _showBlockingSpinner('Committing & pushing…');
     final committed = await ProjectFileRepository.gitCommitAll(
@@ -689,6 +730,23 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
               : 'Committed locally — not pushed (no remote / auth).'),
     ));
     // Proceed with the build only if the tree is actually clean now.
+    return !await ProjectFileRepository.gitHasChanges(repoPath);
+  }
+
+  /// Discards the leftover (non-compiling) edits by restoring the repo to HEAD,
+  /// then proceeds with the build if the tree is clean. Returns true to proceed.
+  Future<bool> _discardLeftoverEdits(String repoPath) async {
+    final messenger = ScaffoldMessenger.of(context);
+    _showBlockingSpinner('Discarding broken edits…');
+    final ok = await ProjectFileRepository.gitDiscardAll(repoPath);
+    if (mounted) Navigator.of(context, rootNavigator: true).pop(); // spinner
+    if (!mounted) return false;
+    messenger.showSnackBar(SnackBar(
+      content: Text(ok
+          ? 'Discarded the broken edits — restored the last good commit.'
+          : 'Couldn\'t discard the changes (not a git repo?).'),
+    ));
+    // Proceed only if the tree is genuinely clean now.
     return !await ProjectFileRepository.gitHasChanges(repoPath);
   }
 

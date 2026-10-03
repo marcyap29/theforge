@@ -8,6 +8,19 @@ import 'ios_deployment.dart';
 
 enum ProjectMode { build, audit, pull }
 
+/// Whether a repo's static analysis is clean, has compile errors, or couldn't
+/// be run (not a Dart/Flutter repo, or the toolchain is unavailable).
+enum AnalyzeStatus { clean, errors, skipped }
+
+/// The outcome of [ProjectFileRepository.analyzeClean].
+class AnalyzeResult {
+  const AnalyzeResult(this.status, {this.errorCount = 0});
+  final AnalyzeStatus status;
+  final int errorCount;
+  bool get isClean => status == AnalyzeStatus.clean;
+  bool get hasErrors => status == AnalyzeStatus.errors;
+}
+
 /// The outcome of [ProjectFileRepository.relocateRepo] — which top-level
 /// entries were moved, deliberately skipped, or failed to move.
 class RepoRelocation {
@@ -984,6 +997,67 @@ class ProjectFileRepository {
     } catch (_) {
       return false;
     }
+  }
+
+  /// Discards ALL uncommitted changes — restores tracked files to HEAD and
+  /// removes untracked files/dirs. Used to throw away a failed build's stranded
+  /// edits so non-compiling AI output never lingers (or gets committed). Returns
+  /// true on success; false (never throws) if it's not a git repo or git errors.
+  static Future<bool> gitDiscardAll(String repoPath) async {
+    try {
+      final reset = await Process.run('git', ['reset', '--hard', 'HEAD'],
+          workingDirectory: repoPath);
+      if (reset.exitCode != 0) return false;
+      final clean = await Process.run('git', ['clean', '-fd'],
+          workingDirectory: repoPath);
+      return clean.exitCode == 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Runs the project's static analyzer (`flutter analyze` / `dart analyze`) and
+  /// reports whether the code compiles. Mirrors the Build run's analyze gate so
+  /// callers (e.g. the tracker's pre-build commit path) can refuse to commit AI
+  /// output that doesn't compile. Only gates Dart/Flutter repos; a missing
+  /// pubspec or an unavailable toolchain → [AnalyzeStatus.skipped] (never blocks
+  /// on tooling we can't run). Counts only `error •` lines, so warnings/infos
+  /// don't register as failures. Never throws.
+  static Future<AnalyzeResult> analyzeClean(String repoPath) async {
+    try {
+      final pubspec = File(p.join(repoPath, 'pubspec.yaml'));
+      if (!pubspec.existsSync()) {
+        return const AnalyzeResult(AnalyzeStatus.skipped);
+      }
+      final content = await pubspec.readAsString();
+      final isFlutter =
+          content.contains('sdk: flutter') || content.contains('\nflutter:');
+      final res = await Process.run(
+        isFlutter ? 'flutter' : 'dart',
+        ['analyze'],
+        workingDirectory: repoPath,
+      );
+      return classifyAnalyzeOutput(
+          '${res.stdout}\n${res.stderr}', res.exitCode);
+    } catch (_) {
+      return const AnalyzeResult(AnalyzeStatus.skipped);
+    }
+  }
+
+  /// Pure classifier for `flutter analyze` / `dart analyze` output — the testable
+  /// core of [analyzeClean]. Counts only `error •` lines (warnings/infos don't
+  /// fail). Treats "issues found" / "No issues found" or a zero exit as proof
+  /// the analyzer actually ran; absent that signal it's [AnalyzeStatus.skipped]
+  /// so a missing toolchain never masquerades as clean or broken.
+  static AnalyzeResult classifyAnalyzeOutput(String out, int exitCode) {
+    final errors = out.split('\n').where((l) => l.contains('error •')).length;
+    // "No issues found!", "1 issue found.", "2 issues found." all confirm a run.
+    final ran = exitCode == 0 || RegExp(r'issues? found').hasMatch(out);
+    if (!ran) return const AnalyzeResult(AnalyzeStatus.skipped);
+    if (errors > 0) {
+      return AnalyzeResult(AnalyzeStatus.errors, errorCount: errors);
+    }
+    return const AnalyzeResult(AnalyzeStatus.clean);
   }
 
   /// Pushes the linked repo's current branch to its remote. Returns true on

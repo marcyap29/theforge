@@ -2,6 +2,17 @@
 
 ---
 
+## v0.5.11 — 2026-10-03 — Never commit un-analyzed AI output: pre-build commit gate + Discard broken edits (BUG-IMPL-013)
+
+- **The Forge no longer offers to commit code that doesn't compile.** The pre-build "Uncommitted changes" dialog now runs the analyzer (the same `error •` gate the Build run uses) on the leftover work *before* presenting options:
+  - If the tree **fails analysis** (almost always a build that didn't finish), the **Commit & push** button is withheld and replaced with a destructive **Discard broken edits** action that restores the repo to the last good commit (`git reset --hard HEAD` + `git clean -fd`). The dialog states the error count and reframes the situation ("Leftover changes don't compile").
+  - If it **compiles** (or the analyzer can't run — not a Dart/Flutter repo, toolchain missing), the existing **Commit & push / Build anyway / Cancel** flow is unchanged.
+- **Why:** The Forge's own Standing Rule #4 — *never commit un-analyzed code* — was enforced for the dev workflow but not for the product. A failed Build-with-AI run leaves non-compiling edits stranded in the working tree; the v0.4.60 "Commit & push" button would then cheerfully commit+push that broken code to the remote. Caught in the wild in the AR Mechanic repo (a stranded, never-compiled `main.dart` rewrite). Detection (the analyze gate) existed; **protection** (not committing / being able to discard) did not.
+- New: `ProjectFileRepository.analyzeClean()` + pure `classifyAnalyzeOutput()` (testable: counts `error •`, treats "No issues found!"/"N issue(s) found." or exit 0 as "ran", else skipped) and `gitDiscardAll()`. Tracker: `_handleUncommittedChanges` branches on analysis; new `_discardLeftoverEdits`.
+- `dart analyze lib` clean; `flutter test` green (123 tests, 4 new in `test/analyze_gate_test.dart`).
+
+---
+
 ## v0.5.10 — 2026-10-03 — "Work on the app" chat hub: inline tools + primary entry point (chat-hub increments 2–3)
 
 - **The chat is now the hub, with tools that run inline.** Building on v0.5.9's persistence, the conversation screen gains a **right-side action rail** (like Build-with-AI's) where tools run **in the chat** — their result arrives as a message or proposals, no separate screen:

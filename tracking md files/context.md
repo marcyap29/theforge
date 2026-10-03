@@ -4,6 +4,41 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-10-03 — Claude Code [Never commit un-analyzed AI output — v0.5.11 / BUG-IMPL-013]
+
+**Branch:** main · **App:** v0.5.11
+
+### Why
+Reviewing the AR Mechanic repo, found a stranded never-compiled `main.dart`
+(a failed Build-with-AI `_buildInstructionOverlay` rewrite: Python-ism `:.0f`
+interpolation, `width = …` instead of `width:`, a duplicated/merged method body).
+Reverted it (stashed, not dropped). The deeper lesson: The Forge *detected* this
+class (the analyze gate) but never *protected* against it — a failed build leaves
+broken edits in the tree, and the v0.4.60 "Commit & push" button in the
+pre-build dialog would commit+push that non-compiling code (its exact
+"chore: commit work in progress before AI build" message was already in AR
+Mechanic's history). Standing Rule #4 (never commit un-analyzed code) was enforced
+for the dev workflow but not for the product.
+
+### Done
+- `project_file_repository.dart`: `analyzeClean()` (runs `flutter/dart analyze`,
+  Dart/Flutter only, unavailable→skipped) + pure, unit-tested
+  `classifyAnalyzeOutput(out, exitCode)` (counts `error •`; "issue(s) found"/exit0
+  ⇒ ran); `gitDiscardAll()` (`git reset --hard HEAD` + `git clean -fd`); new
+  `AnalyzeStatus`/`AnalyzeResult`.
+- `project_tracker_screen.dart`: `_handleUncommittedChanges` now analyzes first;
+  on compile errors it withholds **Commit & push** and offers destructive
+  **Discard broken edits** (new `_discardLeftoverEdits`) + Build anyway / Cancel.
+  Clean/unavailable → original flow unchanged.
+- Docs: CHANGELOG v0.5.11, BUG-IMPL-013 record + BUG_PREVENTION rule + master
+  index row. Test: `test/analyze_gate_test.dart` (4 cases).
+
+### Verify
+`dart analyze lib` clean · `flutter test` 123/123 green (4 new). Deploy pending
+user confirmation.
+
+---
+
 ## Session: 2026-09-15 — Claude Code [Plan build order (phased roadmap) — v0.4.29]
 
 **Branch:** main · **App:** v0.4.29
