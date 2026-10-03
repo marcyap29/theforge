@@ -28,6 +28,21 @@ class RoadmapPhase {
 }
 
 /// A feature proposed by the repo scanner, pending user review/import.
+/// One message in a refine-features conversation.
+class RefineTurn {
+  const RefineTurn({required this.isUser, required this.text});
+  final bool isUser;
+  final String text;
+}
+
+/// The architect's response to one refine turn: a conversational reply plus any
+/// features it's confident enough to propose for the board this turn.
+class RefineResult {
+  RefineResult({required this.reply, required this.proposals});
+  final String reply;
+  final List<ProposedFeature> proposals;
+}
+
 class ProposedFeature {
   ProposedFeature({
     required this.title,
@@ -715,6 +730,105 @@ Respond with ONLY this JSON, no prose, no code fences:
         _recommendUserPrompt(projectPath, docs, readme, fileList, repoPath, existing);
     return _parseWithRetry(_recommendSystemPrompt, user, 0.4, 2500, _parse);
   }
+
+  /// One conversational turn of feature refinement: the architect's reply to the
+  /// user, plus any concrete features it's now confident enough to propose for
+  /// the board. `proposals` stays empty while it's still asking clarifying
+  /// questions.
+  Future<RefineResult> refineFeatures({
+    required String projectPath,
+    String? repoPath,
+    required List<Feature> existing,
+    required List<RefineTurn> history,
+  }) async {
+    final docs = await _readProjectDocs(projectPath);
+    String? readme;
+    if (repoPath != null && Directory(repoPath).existsSync()) {
+      readme = await _readReadme(repoPath);
+    }
+    final user = _refineUserPrompt(projectPath, docs, readme, existing, history);
+    return _parseWithRetry(
+        _refineSystemPrompt, user, 0.5, 2000, _parseRefine);
+  }
+
+  RefineResult _parseRefine(String raw) {
+    dynamic decoded;
+    try {
+      decoded = jsonDecode(_extractJsonObject(raw));
+    } catch (_) {
+      throw FeatureScanException('Could not parse the reply as JSON.');
+    }
+    if (decoded is! Map) {
+      throw FeatureScanException('The reply was not a JSON object.');
+    }
+    final reply = (decoded['reply'] ?? '').toString().trim();
+    final proposals = <ProposedFeature>[];
+    for (final p in (decoded['proposals'] as List? ?? const [])) {
+      if (p is! Map) continue;
+      final title = (p['title'] ?? '').toString().trim();
+      if (title.isEmpty) continue;
+      final desc = (p['description'] ?? '').toString().trim();
+      proposals.add(ProposedFeature(
+        title: title,
+        description: desc.isEmpty ? null : desc,
+        status: FeatureStatus.planned,
+      ));
+    }
+    if (reply.isEmpty && proposals.isEmpty) {
+      throw FeatureScanException('Empty reply.');
+    }
+    return RefineResult(reply: reply, proposals: proposals);
+  }
+
+  String _refineUserPrompt(String projectPath, String? docs, String? readme,
+      List<Feature> existing, List<RefineTurn> history) {
+    final b = StringBuffer()
+      ..writeln('# Project: ${p.basename(projectPath)}')
+      ..writeln();
+    if (existing.isNotEmpty) {
+      b.writeln('## Features already on the board (do NOT re-propose these)');
+      for (final f in existing.take(60)) {
+        final v = (f.targetVersion ?? '').isNotEmpty ? ' [${f.targetVersion}]' : '';
+        b.writeln('- ${f.title} (${f.status})$v');
+      }
+      b.writeln();
+    }
+    if (docs != null) {
+      b..writeln('## Project documents')..writeln(docs)..writeln();
+    }
+    if (readme != null) {
+      b..writeln('## README')..writeln(readme)..writeln();
+    }
+    b.writeln('## Conversation so far');
+    if (history.isEmpty) {
+      b.writeln('(none yet — greet the builder and ask what they want to add)');
+    } else {
+      for (final t in history) {
+        b.writeln('${t.isUser ? 'BUILDER' : 'YOU'}: ${t.text}');
+      }
+    }
+    return b.toString();
+  }
+
+  static const _refineSystemPrompt = '''
+You help a solo builder ADD features to an existing project by talking with
+them, like a product manager. The project and its current board are given.
+
+Your job each turn:
+- Reply conversationally to the builder (warm, concise, non-technical).
+- If their intent is still vague, ASK ONE clarifying question — don't guess.
+- Once you understand what they want, PROPOSE concrete features for the board.
+  Each proposal is one buildable feature with a short title + one-line
+  description. Never re-propose a feature already on the board.
+- You may propose features across turns as the picture firms up; it's fine to
+  return an empty proposals list on a turn where you're just asking a question.
+- Don't order or version them here (a separate "Plan build order" step does
+  that) — just surface the features.
+
+Respond with ONLY this JSON (no prose, no code fences):
+{"reply":"your conversational message to the builder",
+ "proposals":[{"title":"short feature title","description":"one line"}]}
+Return an empty proposals array when you're only asking a question.''';
 
   /// Concatenates the project's README + `.forge` deliverables (spec/handoff/
   /// goal/seeds/worksheet…), spec-first, within a size budget.
