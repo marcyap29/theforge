@@ -1246,8 +1246,11 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
   /// Plan-build-order step.
   void _refineFeatures() {
     Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) =>
-          RefineFeaturesScreen(project: project, repoPath: _repoPath),
+      builder: (_) => RefineFeaturesScreen(
+        project: project,
+        repoPath: _repoPath,
+        onBuildFeature: _buildFeature,
+      ),
     ));
   }
 
@@ -1259,6 +1262,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
         project: project,
         repoPath: _repoPath,
         initialPrompt: 'Let\'s work on: ${feature.title}',
+        onBuildFeature: _buildFeature,
       ),
     ));
   }

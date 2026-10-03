@@ -22,6 +22,7 @@ class RefineFeaturesScreen extends ConsumerStatefulWidget {
     required this.project,
     this.repoPath,
     this.initialPrompt,
+    this.onBuildFeature,
   });
 
   final Project project;
@@ -30,6 +31,10 @@ class RefineFeaturesScreen extends ConsumerStatefulWidget {
   /// Pre-fills the chat input (e.g. "Let's work on: <feature>" when a feature is
   /// double-clicked on the board). Not auto-sent — the builder edits/sends it.
   final String? initialPrompt;
+
+  /// Called when the user taps the ⚡ Build button on a feature row in the rail.
+  /// Provided by [ProjectTrackerScreen] so the full build-guard flow runs there.
+  final Future<void> Function(Feature)? onBuildFeature;
 
   @override
   ConsumerState<RefineFeaturesScreen> createState() =>
@@ -450,6 +455,7 @@ class _RefineFeaturesScreenState extends ConsumerState<RefineFeaturesScreen> {
                     _input.text = 'Let\'s work on: ${f.title}';
                     setState(() {});
                   },
+                  onBuildFeature: widget.onBuildFeature,
                 ),
               ],
             ),
@@ -616,6 +622,7 @@ class _ToolRail extends StatelessWidget {
     required this.onSecurity,
     required this.buildOrder,
     required this.onPickFeature,
+    this.onBuildFeature,
   });
 
   final bool busy;
@@ -625,6 +632,7 @@ class _ToolRail extends StatelessWidget {
   final VoidCallback onSecurity;
   final List<Feature> buildOrder;
   final void Function(Feature) onPickFeature;
+  final Future<void> Function(Feature)? onBuildFeature;
 
   @override
   Widget build(BuildContext context) {
@@ -713,12 +721,12 @@ class _ToolRail extends StatelessWidget {
         onTap: () => onPickFeature(f),
         borderRadius: BorderRadius.circular(6),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+          padding: const EdgeInsets.fromLTRB(4, 4, 0, 4),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.only(top: 3, right: 6),
+                padding: const EdgeInsets.only(top: 4, right: 6),
                 child: Icon(Icons.circle, size: 8, color: status.color),
               ),
               Expanded(
@@ -728,6 +736,19 @@ class _ToolRail extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis),
               ),
+              if (onBuildFeature != null)
+                Tooltip(
+                  message: 'Build with AI',
+                  child: InkWell(
+                    onTap: () => onBuildFeature!(f),
+                    borderRadius: BorderRadius.circular(4),
+                    child: const Padding(
+                      padding: EdgeInsets.fromLTRB(4, 2, 4, 2),
+                      child: Icon(Icons.bolt,
+                          size: 15, color: Color(0xFFE8A04C)),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),

@@ -2,6 +2,14 @@
 
 ---
 
+## v0.5.13 — 2026-10-03 — Build with AI directly from the chat hub (⚡ button in rail)
+
+- **Build any feature without leaving the chat.** Each feature row in the "Work on the app" chat rail now shows a small ⚡ bolt icon. Tapping it launches Build with AI for that feature — the full build flow (entitlement check, active-run re-attach, build-kind gate, pre-build guards) runs exactly as if you had right-clicked the tile on the board. No need to leave the chat, find the feature, and navigate through the ⋮ menu.
+- `RefineFeaturesScreen` gains `onBuildFeature: Future<void> Function(Feature)?`; `_ToolRail` gets the same field; each row renders the bolt as a `Tooltip`-wrapped `InkWell` when the callback is present. Both `_refineFeatures()` and `_workOnFeature()` in `ProjectTrackerScreen` now pass `onBuildFeature: _buildFeature`.
+- `dart analyze lib` clean; `flutter build macos` ok.
+
+---
+
 ## v0.5.12 — 2026-10-03 — Double-click a feature to open chat hub + Build-order panel in chat rail
 
 - **Double-click any feature tile** on the tracker board to open the "Work on the app" chat hub pre-filled with "Let's work on: \<title>". The same action is available from the build-order list in the rail. Completes the WIP wiring from v0.5.10: `_FeatureTile.onWorkOn` (outer `GestureDetector.onDoubleTap`), `_workOnFeature` helper (opens `RefineFeaturesScreen` with `initialPrompt`), wired in both status-view and build-order-view tile call sites.

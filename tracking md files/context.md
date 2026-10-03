@@ -4,6 +4,22 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-10-03 — Claude Code [Build with AI from chat hub — v0.5.13]
+
+**Branch:** main · **App:** v0.5.13
+
+### Why
+User: "the chat doesn't allow the user to directly build anything — we have to leave the chat, click on the ⋮ of a feature, then click Build with AI." Needed a direct path from the chat rail to the build screen.
+
+### Done
+- `refine_features_screen.dart`: `RefineFeaturesScreen` gains `onBuildFeature: Future<void> Function(Feature)?`; `_ToolRail` gains same field; each build-order row renders an amber ⚡ `InkWell` (with `Tooltip: 'Build with AI'`) when the callback is present. Tapping it calls the callback directly — no navigation logic duplicated here.
+- `project_tracker_screen.dart`: both `_refineFeatures()` and `_workOnFeature()` now pass `onBuildFeature: _buildFeature` — the full build flow (entitlement, active-run re-attach, build-kind gate, pre-build guards) is reused from the tracker.
+
+### Verify
+`dart analyze lib` clean · `flutter build macos` built 27.3 MB.
+
+---
+
 ## Session: 2026-10-03 — Claude Code [Build-order rail panel + double-click to chat — v0.5.12]
 
 **Branch:** main · **App:** v0.5.12
