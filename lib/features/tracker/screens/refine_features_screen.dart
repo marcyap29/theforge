@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/local_db/forge_database.dart';
@@ -282,13 +283,99 @@ class _RefineFeaturesScreenState extends ConsumerState<RefineFeaturesScreen> {
     _jump();
   }
 
+  // --- Inline tools (run as a chat turn; result is a message or proposals) ---
+
+  List<Feature> get _existing =>
+      ref.read(featureListProvider(widget.project.id)).valueOrNull ??
+      const <Feature>[];
+
+  Future<void> _runTool(String label, Future<void> Function() run) async {
+    if (_thinking) return;
+    setState(() {
+      _history.add(RefineTurn(isUser: true, text: '▶ $label'));
+      _thinking = true;
+    });
+    _jump();
+    try {
+      await run();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _history.add(RefineTurn(
+            isUser: false,
+            text: 'Couldn\'t run $label: '
+                '${e.toString().replaceFirst('Exception: ', '')}')));
+      }
+    }
+    if (!mounted) return;
+    setState(() => _thinking = false);
+    await _save();
+    _jump();
+  }
+
+  void _reply(String text) =>
+      _history.add(RefineTurn(isUser: false, text: text));
+
+  Future<void> _toolCapability() => _runTool('What this app can do', () async {
+        final md = await ref.read(featureScannerProvider).describeCapabilities(
+              projectPath: widget.project.path,
+              repoPath: widget.repoPath,
+              features: _existing,
+            );
+        if (mounted) setState(() => _reply(md));
+      });
+
+  Future<void> _toolSecurity() => _runTool('Security check', () async {
+        final md = await ref.read(featureScannerProvider).securityCheck(
+              projectPath: widget.project.path,
+              repoPath: widget.repoPath,
+            );
+        if (mounted) setState(() => _reply(md));
+      });
+
+  Future<void> _toolRecommend() => _runTool('Recommend features', () async {
+        final props = await ref.read(featureScannerProvider).recommend(
+              projectPath: widget.project.path,
+              repoPath: widget.repoPath,
+              existing: _existing,
+            );
+        if (mounted) {
+          setState(() {
+            if (props.isEmpty) {
+              _reply('No new recommendations right now — you\'re on top of it.');
+            } else {
+              _pending = props;
+              _reply('I found ${props.length} feature'
+                  '${props.length == 1 ? '' : 's'} to consider — review below.');
+            }
+          });
+        }
+      });
+
+  Future<void> _toolScan() => _runTool('Scan repo & documents', () async {
+        final props = await ref.read(featureScannerProvider).scan(
+              projectPath: widget.project.path,
+              repoPath: widget.repoPath,
+            );
+        if (mounted) {
+          setState(() {
+            if (props.isEmpty) {
+              _reply('Nothing new surfaced from the repo/docs.');
+            } else {
+              _pending = props;
+              _reply('Scanned the repo & docs — ${props.length} feature'
+                  '${props.length == 1 ? '' : 's'} found. Review below.');
+            }
+          });
+        }
+      });
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0C1016),
       appBar: AppBar(
         backgroundColor: const Color(0xFF12161C),
-        title: Text('Refine features — ${widget.project.name}'),
+        title: Text('Work on ${widget.project.name}'),
         actions: [
           if (_addedCount > 0)
             Padding(
@@ -311,23 +398,36 @@ class _RefineFeaturesScreenState extends ConsumerState<RefineFeaturesScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              controller: _scroll,
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              itemCount: _history.length + (_thinking ? 1 : 0),
-              itemBuilder: (_, i) {
-                if (i >= _history.length) return const _Typing();
-                return _Bubble(turn: _history[i]);
-              },
+          : Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: ListView.builder(
+                          controller: _scroll,
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                          itemCount: _history.length + (_thinking ? 1 : 0),
+                          itemBuilder: (_, i) {
+                            if (i >= _history.length) return const _Typing();
+                            return _Bubble(turn: _history[i]);
+                          },
+                        ),
+                      ),
+                      if (_pending.isNotEmpty && !_thinking) _proposalsBar(),
+                      _composer(),
+                    ],
+                  ),
+                ),
+                _ToolRail(
+                  busy: _thinking,
+                  onCapability: _toolCapability,
+                  onScan: _toolScan,
+                  onRecommend: _toolRecommend,
+                  onSecurity: _toolSecurity,
+                ),
+              ],
             ),
-          ),
-          if (_pending.isNotEmpty && !_thinking) _proposalsBar(),
-          _composer(),
-        ],
-      ),
     );
   }
 
@@ -406,14 +506,102 @@ class _Bubble extends StatelessWidget {
           border: Border.all(
               color: user ? const Color(0x55E8A04C) : const Color(0xFF26262B)),
         ),
-        child: SelectableText(
-          turn.text,
-          style: const TextStyle(
-              fontSize: 14, height: 1.4, color: Color(0xFFE5E5E7)),
-        ),
+        child: user
+            ? SelectableText(
+                turn.text,
+                style: const TextStyle(
+                    fontSize: 14, height: 1.4, color: Color(0xFFE5E5E7)),
+              )
+            // Architect / tool replies may be markdown (capability + security
+            // reports), so render them formatted + selectable.
+            : MarkdownBody(
+                data: turn.text,
+                selectable: true,
+                styleSheet: MarkdownStyleSheet(
+                  p: const TextStyle(
+                      fontSize: 14, height: 1.4, color: Color(0xFFE5E5E7)),
+                  h1: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFE5E5E7)),
+                  h2: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFFE8A04C)),
+                  listBullet: const TextStyle(
+                      fontSize: 14, color: Color(0xFFE5E5E7)),
+                  code: const TextStyle(
+                      fontSize: 12.5, backgroundColor: Color(0xFF0C0D12)),
+                ),
+              ),
       ),
     );
   }
+}
+
+/// The right-side action rail — tools that run INLINE in the chat (their result
+/// arrives as a message or proposals). Mirrors Build-with-AI's action panel.
+class _ToolRail extends StatelessWidget {
+  const _ToolRail({
+    required this.busy,
+    required this.onCapability,
+    required this.onScan,
+    required this.onRecommend,
+    required this.onSecurity,
+  });
+
+  final bool busy;
+  final VoidCallback onCapability;
+  final VoidCallback onScan;
+  final VoidCallback onRecommend;
+  final VoidCallback onSecurity;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 168,
+      decoration: const BoxDecoration(
+        color: Color(0xFF101319),
+        border: Border(left: BorderSide(color: Color(0xFF1C1C1E))),
+      ),
+      child: ListView(
+        padding: const EdgeInsets.all(10),
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(4, 4, 4, 8),
+            child: Text('TOOLS',
+                style: TextStyle(
+                    fontSize: 11,
+                    letterSpacing: 1.2,
+                    color: Color(0xFF6B7280))),
+          ),
+          _btn(Icons.auto_awesome_outlined, 'What this app can do',
+              busy ? null : onCapability),
+          _btn(Icons.radar, 'Scan repo & docs', busy ? null : onScan),
+          _btn(Icons.lightbulb_outline, 'Recommend features',
+              busy ? null : onRecommend),
+          _btn(Icons.shield_outlined, 'Security check',
+              busy ? null : onSecurity),
+        ],
+      ),
+    );
+  }
+
+  Widget _btn(IconData icon, String label, VoidCallback? onTap) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: OutlinedButton.icon(
+          onPressed: onTap,
+          icon: Icon(icon, size: 16),
+          label: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(label, style: const TextStyle(fontSize: 12)),
+          ),
+          style: OutlinedButton.styleFrom(
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          ),
+        ),
+      );
 }
 
 class _Typing extends StatelessWidget {

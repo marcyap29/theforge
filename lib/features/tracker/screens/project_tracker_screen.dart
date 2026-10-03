@@ -168,14 +168,21 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
                   .setStatus(s),
             ),
           ),
-          // AI-driven analysis actions, grouped so the board isn't a wall of
-          // mystery icons. Everything the AI does to read/organize the project.
+          // The primary way to develop an established project: a conversation
+          // (add features by talking) with the tools available inline.
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            child: FilledButton.tonalIcon(
+              onPressed: _refineFeatures,
+              icon: const Icon(Icons.forum_outlined, size: 16),
+              label: const Text('Work on the app'),
+            ),
+          ),
+          // Remaining AI-driven actions not yet folded into the chat rail.
           _barMenu(Icons.auto_awesome_outlined, 'AI tools', [
             _menuEntry(Icons.auto_awesome_outlined, 'What this app can do',
                 _openCapabilitySummary),
             _menuEntry(Icons.radar, 'Scan repo & documents', _scanRepo),
-            _menuEntry(Icons.forum_outlined, 'Refine features (chat)',
-                _refineFeatures),
             _menuEntry(
                 Icons.lightbulb_outline, 'Recommend features', _recommendFeatures),
             _menuEntry(Icons.route_outlined, 'Plan build order', _planBuildOrder),

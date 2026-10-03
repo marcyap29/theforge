@@ -2,6 +2,18 @@
 
 ---
 
+## v0.5.10 — 2026-10-03 — "Work on the app" chat hub: inline tools + primary entry point (chat-hub increments 2–3)
+
+- **The chat is now the hub, with tools that run inline.** Building on v0.5.9's persistence, the conversation screen gains a **right-side action rail** (like Build-with-AI's) where tools run **in the chat** — their result arrives as a message or proposals, no separate screen:
+  - **What this app can do** → the capability summary appears as a formatted chat message.
+  - **Security check** → the security report appears inline.
+  - **Recommend features** / **Scan repo & docs** → proposed features surface in the chat's Review-&-add bar → straight to the board.
+  Architect/tool messages now render as markdown (formatted + selectable). `_ToolRail` + inline `_toolCapability/_toolSecurity/_toolRecommend/_toolScan` in `RefineFeaturesScreen`.
+- **Promoted to the primary way to develop an established project:** a prominent **"Work on the app"** button in the tracker toolbar opens the chat hub (title "Work on <project>"); the redundant "Refine features (chat)" menu entry is removed. New projects still do the guided interview first (v0.5.7). The remaining menu tools (Plan build order, Remove duplicates, Run check-in) stay accessible during the transition — they'll fold into the rail next.
+- `dart analyze lib` clean; `flutter build macos` ok; 119 tests green.
+
+---
+
 ## v0.5.9 — 2026-10-03 — Chat history: past conversations persist and resume (chat-hub increment 1)
 
 - **"Refine features" chats are now saved — browse past chats and resume where you left off.** First step of the larger "conversation as the hub" redesign. Conversations persist to `.forge/conversations/<id>.json` (`ConversationStore`); the chat screen resumes your most recent conversation on open, and a **Past chats** button (history icon) lists prior conversations (newest-first, titled from your first message, with delete) plus **New chat**. Each turn + feature-add is saved as it happens, so nothing is lost. Multiple named sessions, ChatGPT-style. `ConversationStore` (+ `Conversation`/`StoredTurn`/`ConversationMeta`), unit-tested (`test/conversation_store_test.dart`); `RefineFeaturesScreen` load/save/history. `dart analyze lib` clean; `flutter build macos` ok; 119 tests green (5 new).
