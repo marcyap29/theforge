@@ -4,6 +4,23 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-10-03 — Claude Code [Architect Mode / Build Mode named entry points — v0.5.15]
+
+**Branch:** main · **App:** v0.5.15
+
+### Why
+User: "Let's have these be two separate mode buttons — Architect Mode and Build Mode. On each feature tile, place them next to each other so the user can go directly to the appropriate mode. Remove the 'Work on the App' button and replace with two buttons for 'Architect Mode' and 'Build Mode', and when you hover over them a popout explains what each mode does."
+
+### Done
+- `refine_features_screen.dart`: Added `autoDiscuss: bool` (skips fork card, auto-sends "Let's work on: <title>") and `buildMode: bool` (replaces LLM greeting with static welcome; AppBar shows "Build Mode · <project>"). `_maybeShowFork()` branches on `autoDiscuss`; `_startNew()` branches on `buildMode`. Fork card buttons renamed: "Discuss & refine" → "Architect Mode" (icon: `forum_outlined`), "Build now" → "Build Mode".
+- `project_tracker_screen.dart`: Replaced "Work on the app" `FilledButton.tonalIcon` with two buttons: **Architect** (outlined, `forum_outlined`, `Tooltip`) + **Build** (amber filled, `construction`, `Tooltip`). Added `_openBuildMode()` and `_architectChat(Feature)`. `_FeatureTile` gains `onArchitectChat` required param; `_tile()` trailing changed to a `Row` with blue forum icon + amber construction icon + ⋮ menu. Both tile call sites wired with `onArchitectChat: () => _architectChat(n.feature)`.
+- Docs: CHANGELOG v0.5.15 entry, this context block.
+
+### Verify
+`dart analyze lib` clean.
+
+---
+
 ## Session: 2026-10-03 — Claude Code [Fork card: unified Discuss & Build entry point — v0.5.14]
 
 **Branch:** main · **App:** v0.5.14

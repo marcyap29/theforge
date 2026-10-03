@@ -2,6 +2,16 @@
 
 ---
 
+## v0.5.15 — 2026-10-03 — Architect Mode / Build Mode: named entry points + per-tile quick actions
+
+- **Two named mode buttons replace "Work on the app."** The tracker AppBar now shows **Architect** (outlined, `forum_outlined`, blue) and **Build** (amber filled, `construction` icon) buttons, each with a `Tooltip` on hover explaining its purpose. Architect opens the chat hub for planning/refinement; Build opens the same screen in Build Mode (static intro, no LLM greeting, build-order rail front-and-center).
+- **Per-tile quick actions.** Every feature tile gains two small icon buttons before the ⋮ menu: a blue `forum_outlined` (Architect Mode — opens chat and auto-sends the discussion message, skipping the fork card) and an amber `construction` (Build Mode — fires the full build flow directly). The fork card's two buttons are renamed from "Discuss & refine" / "Build now" to **Architect Mode** / **Build Mode** (icon changed to `forum_outlined` on Architect Mode).
+- `RefineFeaturesScreen` gains `autoDiscuss: bool` (skips fork card, sends "Let's work on: <title>" immediately) and `buildMode: bool` (static welcome message instead of LLM greeting; AppBar shows "Build Mode · <project>"). `_maybeShowFork()` branches on `autoDiscuss`; `_startNew()` branches on `buildMode`.
+- `project_tracker_screen.dart`: `_FeatureTile` gains `onArchitectChat` required param; `_tile()` trailing changed to a `Row` containing the two icon buttons + ⋮ menu. `_openBuildMode()` and `_architectChat(Feature)` added; both `_FeatureTile` call sites wired with `onArchitectChat`.
+- `dart analyze lib` clean.
+
+---
+
 ## v0.5.14 — 2026-10-03 — Fork card: unified "Discuss & refine" / "Build now" entry point
 
 - **One tap, two paths.** Tapping a feature in the chat rail (or double-clicking it on the board) no longer sends a "Let's work on: …" message immediately. Instead, a **fork card** slides in above the composer showing the selected feature's title and two buttons: **Discuss & refine** (opens a chat turn with "Let's work on: …") and **Build now** (fires the full build flow). Closes the UX confusion between the two actions — they are now explicitly named and discoverable from a single entry point.

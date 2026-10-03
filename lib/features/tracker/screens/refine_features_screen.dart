@@ -23,19 +23,29 @@ class RefineFeaturesScreen extends ConsumerStatefulWidget {
     this.repoPath,
     this.initialFeature,
     this.onBuildFeature,
+    this.autoDiscuss = false,
+    this.buildMode = false,
   });
 
   final Project project;
   final String? repoPath;
 
   /// When set, the fork card is shown immediately: two buttons let the user
-  /// choose between "Discuss & refine" (starts a chat turn) and "Build now"
+  /// choose between "Architect Mode" (starts a chat turn) and "Build Mode"
   /// (fires [onBuildFeature]).
   final Feature? initialFeature;
 
-  /// Called when the user taps "Build now" on the fork card.
+  /// Called when the user taps "Build Mode" on the fork card.
   /// Provided by [ProjectTrackerScreen] so the full build-guard flow runs there.
   final Future<void> Function(Feature)? onBuildFeature;
+
+  /// When true and [initialFeature] is set, skip the fork card and immediately
+  /// send the "Let's work on: <title>" message to start a discussion.
+  final bool autoDiscuss;
+
+  /// When true, opens in Build Mode: shows the build-order rail and replaces
+  /// the AI greeting with a static prompt (no LLM call on open).
+  final bool buildMode;
 
   @override
   ConsumerState<RefineFeaturesScreen> createState() =>
@@ -88,7 +98,10 @@ class _RefineFeaturesScreenState extends ConsumerState<RefineFeaturesScreen> {
   }
 
   void _maybeShowFork() {
-    if (widget.initialFeature != null && mounted) {
+    if (widget.initialFeature == null || !mounted) return;
+    if (widget.autoDiscuss) {
+      _send('Let\'s work on: ${widget.initialFeature!.title}');
+    } else {
       setState(() => _forkFeature = widget.initialFeature);
     }
   }
@@ -108,8 +121,19 @@ class _RefineFeaturesScreenState extends ConsumerState<RefineFeaturesScreen> {
         _loading = false;
       });
     }
-    // Greet + ask what to add.
-    _send(null);
+    if (widget.buildMode) {
+      // Build Mode: static intro — no LLM greeting, jump straight to the rail.
+      if (mounted) {
+        setState(() => _history.add(const RefineTurn(
+          isUser: false,
+          text: 'Welcome to **Build Mode**. Select a feature from the Build '
+              'Order panel on the right to start building with AI.',
+        )));
+      }
+    } else {
+      // Architect Mode: greet + ask what to add.
+      _send(null);
+    }
     _maybeShowFork();
   }
 
@@ -402,7 +426,9 @@ class _RefineFeaturesScreenState extends ConsumerState<RefineFeaturesScreen> {
       backgroundColor: const Color(0xFF0C1016),
       appBar: AppBar(
         backgroundColor: const Color(0xFF12161C),
-        title: Text('Work on ${widget.project.name}'),
+        title: Text(widget.buildMode
+            ? 'Build Mode · ${widget.project.name}'
+            : 'Architect Mode · ${widget.project.name}'),
         actions: [
           if (_addedCount > 0)
             Padding(
@@ -538,8 +564,8 @@ class _RefineFeaturesScreenState extends ConsumerState<RefineFeaturesScreen> {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  icon: const Icon(Icons.chat_bubble_outline, size: 13),
-                  label: const Text('Discuss & refine',
+                  icon: const Icon(Icons.forum_outlined, size: 13),
+                  label: const Text('Architect Mode',
                       style: TextStyle(fontSize: 12)),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 10),
@@ -558,7 +584,7 @@ class _RefineFeaturesScreenState extends ConsumerState<RefineFeaturesScreen> {
                 Expanded(
                   child: FilledButton.icon(
                     icon: const Icon(Icons.bolt, size: 13),
-                    label: const Text('Build now',
+                    label: const Text('Build Mode',
                         style: TextStyle(fontSize: 12)),
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFFE8A04C),

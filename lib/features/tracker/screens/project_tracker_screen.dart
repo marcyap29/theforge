@@ -168,14 +168,30 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
                   .setStatus(s),
             ),
           ),
-          // The primary way to develop an established project: a conversation
-          // (add features by talking) with the tools available inline.
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-            child: FilledButton.tonalIcon(
-              onPressed: _refineFeatures,
-              icon: const Icon(Icons.forum_outlined, size: 16),
-              label: const Text('Work on the app'),
+            child: Tooltip(
+              message: 'Chat with the AI to plan, refine, and add features',
+              child: OutlinedButton.icon(
+                onPressed: _refineFeatures,
+                icon: const Icon(Icons.forum_outlined, size: 16),
+                label: const Text('Architect'),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            child: Tooltip(
+              message: 'Build features with the AI code agent',
+              child: FilledButton.icon(
+                onPressed: _openBuildMode,
+                icon: const Icon(Icons.construction, size: 16),
+                label: const Text('Build'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFE8A04C),
+                  foregroundColor: Colors.black87,
+                ),
+              ),
             ),
           ),
           // Remaining AI-driven actions not yet folded into the chat rail.
@@ -344,6 +360,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             onBuild: () => _buildFeature(n.feature),
             onAdvice: () => _openBuildAdvice(n.feature),
             onArchitect: () => _architectFeature(n.feature),
+            onArchitectChat: () => _architectChat(n.feature),
             onWorkOn: () => _workOnFeature(n.feature),
             selected: n.feature.id == _focusedFeatureId,
             onFocus: () => setState(() => _focusedFeatureId = n.feature.id),
@@ -421,6 +438,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             onBuild: () => _buildFeature(n.feature),
             onAdvice: () => _openBuildAdvice(n.feature),
             onArchitect: () => _architectFeature(n.feature),
+            onArchitectChat: () => _architectChat(n.feature),
             onWorkOn: () => _workOnFeature(n.feature),
             selected: n.feature.id == _focusedFeatureId,
             onFocus: () => setState(() => _focusedFeatureId = n.feature.id),
@@ -1267,6 +1285,33 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     ));
   }
 
+  /// Opens Architect Mode in Build Mode — the chat rail defaults to showing
+  /// the build-order panel so the user can pick a feature to code.
+  void _openBuildMode() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => RefineFeaturesScreen(
+        project: project,
+        repoPath: _repoPath,
+        buildMode: true,
+        onBuildFeature: _buildFeature,
+      ),
+    ));
+  }
+
+  /// Architect icon on a tile → open Architect Mode and auto-send the
+  /// discussion prompt for [feature] (skips the fork card).
+  void _architectChat(Feature feature) {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => RefineFeaturesScreen(
+        project: project,
+        repoPath: _repoPath,
+        initialFeature: feature,
+        autoDiscuss: true,
+        onBuildFeature: _buildFeature,
+      ),
+    ));
+  }
+
   Future<void> _recommendFeatures() async {
     final messenger = ScaffoldMessenger.of(context);
     final config = await ProjectFileRepository.readProjectConfig(project.path);
@@ -1667,6 +1712,7 @@ class _FeatureTile extends StatelessWidget {
     required this.onBuild,
     required this.onAdvice,
     required this.onArchitect,
+    required this.onArchitectChat,
     required this.selected,
     required this.onFocus,
     required this.onWorkOn,
@@ -1687,6 +1733,9 @@ class _FeatureTile extends StatelessWidget {
   final VoidCallback onWorkOn;
   final VoidCallback onAdvice;
   final VoidCallback onArchitect;
+  /// Architect Mode chat button on the tile — opens the chat hub and auto-sends
+  /// a discussion message for this feature (skips the fork card).
+  final VoidCallback onArchitectChat;
 
   /// Whether this is the focused feature (highlighted).
   final bool selected;
@@ -1765,11 +1814,30 @@ class _FeatureTile extends StatelessWidget {
         ],
       ),
       subtitle: _subtitle(),
-      trailing: PopupMenuButton<_TileAction>(
-        icon: const Icon(Icons.more_vert, size: 18, color: Color(0xFF8A8A8E)),
-        onOpened: onFocus,
-        onSelected: _handleAction,
-        itemBuilder: (_) => _menuItems(status),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.forum_outlined, size: 16),
+            tooltip: 'Architect Mode — discuss & refine',
+            color: const Color(0xFF64B5F6),
+            visualDensity: VisualDensity.compact,
+            onPressed: onArchitectChat,
+          ),
+          IconButton(
+            icon: const Icon(Icons.construction, size: 16),
+            tooltip: 'Build Mode — build with AI',
+            color: const Color(0xFFE8A04C),
+            visualDensity: VisualDensity.compact,
+            onPressed: onBuild,
+          ),
+          PopupMenuButton<_TileAction>(
+            icon: const Icon(Icons.more_vert, size: 18, color: Color(0xFF8A8A8E)),
+            onOpened: onFocus,
+            onSelected: _handleAction,
+            itemBuilder: (_) => _menuItems(status),
+          ),
+        ],
       ),
     );
   }
