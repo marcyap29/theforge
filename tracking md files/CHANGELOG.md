@@ -2,6 +2,16 @@
 
 ---
 
+## v0.5.19 — 2026-10-04 — Gemini (and all BYOK) settings: model picker in API key card
+
+- **Model picker added to the Gemini, Claude, and OpenAI API key cards.** Each BYOK card now shows a "Model" dropdown below the API key field, listing the available models for that provider. Selecting a model: (a) uses it for the "Test" button immediately, and (b) propagates to any role assignment (Architect / Executor) already configured to use that provider — so the Role cards stay in sync.
+- **Custom model support.** The dropdown includes a "Custom…" option that opens the free-text model id dialog (same flow as the Role cards).
+- **`testProvider` now accepts `modelOverride`.** The notifier method accepts an optional `modelOverride` parameter so the BYOK card can pass the user-selected model for testing. Without override, the test uses the role-assigned model; ultimate fallback is the same safe default (`gemini-2.0-flash`, `gpt-4o-mini`, `claude-haiku-4-5-20251001`).
+- Root cause of the stuck Gemini 404: `testProvider` always used `gemini-2.0-flash` regardless of what was configured in the Role cards; if that model wasn't on the user's tier, there was no way to pick a different one.
+- `dart analyze lib` clean.
+
+---
+
 ## v0.5.18 — 2026-10-03 — Build Mode bottom sheet: version section headers always visible
 
 - **Version group headers** now appear in the Build Mode bottom sheet exactly as they do on the tracker board — amber uppercase labels (e.g. "V1 ─────") separate each version's features. These always show regardless of whether any feature is an epic.

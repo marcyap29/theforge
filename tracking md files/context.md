@@ -4,6 +4,23 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-10-04 — Claude Code [Gemini model picker in BYOK card — v0.5.19]
+
+**Branch:** main · **App:** v0.5.19
+
+### Why
+User: "Update the ability to add an API key to Gemini — the ability to choose a particular model. The way it's set up, you don't get to choose the model, so we get stuck." The Test button used a hardcoded `gemini-2.0-flash` regardless of role configuration; no picker was shown in the Gemini BYOK card.
+
+### Done
+- `settings_notifier.dart`: `testProvider()` gains `{String? modelOverride}` param. For Gemini/Claude/OpenAI, uses modelOverride → role-assigned model → fallback default (in that order).
+- `settings_screen.dart`: `_ByokCardState` gains `_selectedModel` + `_onModelChanged()` (updates state + propagates to matching role assignments). `build()` adds `DropdownButtonFormField<String>` for non-Ollama providers (reads `modelsFor(type)`, shows "Custom…" option, derives current value from `_selectedModel ?? assignedModel ?? first`). `_runTest` passes `modelOverride: _selectedModel`.
+- Docs: CHANGELOG v0.5.19, this context block.
+
+### Verify
+`dart analyze lib` clean.
+
+---
+
 ## Session: 2026-10-03 — Claude Code [Build Mode bottom sheet version headers — v0.5.18]
 
 **Branch:** main · **App:** v0.5.18

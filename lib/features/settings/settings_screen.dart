@@ -464,6 +464,8 @@ class _ByokCardState extends ConsumerState<_ByokCard> {
   bool _testing = false;
   bool? _testPassed;
   String _testError = '';
+  // Locally selected model — null means "use whatever the role assigns".
+  String? _selectedModel;
 
   @override
   void initState() {
@@ -482,13 +484,30 @@ class _ByokCardState extends ConsumerState<_ByokCard> {
     setState(() { _testing = true; _testPassed = null; });
     final error = await ref
         .read(settingsProvider.notifier)
-        .testProvider(widget.providerType);
+        .testProvider(widget.providerType, modelOverride: _selectedModel);
     if (!mounted) return;
     setState(() {
       _testing = false;
       _testPassed = error == null;
       _testError = error ?? '';
     });
+  }
+
+  /// Updates [_selectedModel] and also propagates to any role assignments
+  /// already using this provider, so the role cards stay in sync.
+  Future<void> _onModelChanged(String id) async {
+    setState(() => _selectedModel = id);
+    final settings =
+        ref.read(settingsProvider).valueOrNull?.settings;
+    if (settings == null) return;
+    for (final entry in settings.roleAssignments.entries) {
+      if (entry.value.providerType == widget.providerType) {
+        await ref.read(settingsProvider.notifier).setRoleAssignment(
+              entry.key,
+              entry.value.copyWith(modelId: id),
+            );
+      }
+    }
   }
 
   String _maskKey(String key) {
@@ -498,13 +517,25 @@ class _ByokCardState extends ConsumerState<_ByokCard> {
 
   @override
   Widget build(BuildContext context) {
-    final apiKey = ref
-        .watch(settingsProvider)
-        .valueOrNull
-        ?.settings
-        .apiKeys[widget.providerType];
+    final settingsState = ref.watch(settingsProvider).valueOrNull;
+    final apiKey = settingsState?.settings.apiKeys[widget.providerType];
     final hasKey = apiKey != null;
     final masked = hasKey ? _maskKey(apiKey) : '';
+
+    // Model picker — shown for non-Ollama BYOK providers (Gemini, Claude, OpenAI).
+    final availableModels = modelsFor(widget.providerType);
+    final showModelPicker =
+        widget.providerType != LlmProviderType.ollama && availableModels.isNotEmpty;
+
+    // Derive displayed model: local selection → role assignment → catalog first.
+    final assignedModel = settingsState?.settings.roleAssignments.values
+        .where((a) => a.providerType == widget.providerType)
+        .map((a) => a.modelId)
+        .firstOrNull;
+    final currentModel =
+        _selectedModel ?? assignedModel ?? availableModels.firstOrNull?.id ?? '';
+    final modelInList =
+        availableModels.any((m) => m.id == currentModel);
 
     return _ProviderCardShell(
       title: widget.displayName,
@@ -534,6 +565,37 @@ class _ByokCardState extends ConsumerState<_ByokCard> {
             ),
           ),
         ),
+        if (showModelPicker) ...[
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            initialValue: modelInList ? currentModel : _customModelSentinel,
+            decoration: const InputDecoration(
+              labelText: 'Model',
+              isDense: true,
+            ),
+            items: [
+              ...availableModels.map((m) =>
+                  DropdownMenuItem(value: m.id, child: Text(m.displayName))),
+              if (!modelInList && currentModel.isNotEmpty)
+                DropdownMenuItem(
+                    value: _customModelSentinel,
+                    child: Text('$currentModel (custom)',
+                        style: const TextStyle(color: Color(0xFF9CA3AF)))),
+              const DropdownMenuItem(
+                  value: _customModelSentinel, child: Text('Custom…')),
+            ],
+            onChanged: (id) async {
+              if (id == _customModelSentinel) {
+                final custom =
+                    await _promptCustomModel(context, currentModel);
+                if (custom == null || custom.isEmpty || !mounted) return;
+                await _onModelChanged(custom);
+              } else if (id != null) {
+                await _onModelChanged(id);
+              }
+            },
+          ),
+        ],
         const SizedBox(height: 8),
         Row(
           mainAxisAlignment: MainAxisAlignment.end,

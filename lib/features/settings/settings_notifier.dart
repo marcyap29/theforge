@@ -347,12 +347,22 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
   }
 
   /// Returns null on success, error string on failure.
-  Future<String?> testProvider(LlmProviderType type) async {
+  /// [modelOverride] lets the BYOK card pass whichever model the user picked
+  /// in the model dropdown; when omitted the role-assigned model is used.
+  Future<String?> testProvider(LlmProviderType type,
+      {String? modelOverride}) async {
     final current = state.valueOrNull;
     if (current == null) return 'Settings not loaded.';
 
     final key = current.settings.apiKeys[type];
     final baseUrl = current.settings.ollamaBaseUrl;
+
+    // Helper: pick the model assigned to any role using this provider.
+    String? _assignedModel(LlmProviderType t) => current
+        .settings.roleAssignments.values
+        .where((a) => a.providerType == t)
+        .map((a) => a.modelId)
+        .firstOrNull;
 
     LlmProvider provider;
     String modelId;
@@ -361,15 +371,21 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
       case LlmProviderType.claude:
         if (key == null || key.isEmpty) return 'No API key configured.';
         provider = ClaudeProvider(apiKey: key);
-        modelId = 'claude-haiku-4-5-20251001';
+        modelId = modelOverride ??
+            _assignedModel(LlmProviderType.claude) ??
+            'claude-haiku-4-5-20251001';
       case LlmProviderType.openai:
         if (key == null || key.isEmpty) return 'No API key configured.';
         provider = OpenAiProvider(apiKey: key);
-        modelId = 'gpt-4o-mini';
+        modelId = modelOverride ??
+            _assignedModel(LlmProviderType.openai) ??
+            'gpt-4o-mini';
       case LlmProviderType.gemini:
         if (key == null || key.isEmpty) return 'No API key configured.';
         provider = GeminiProvider(apiKey: key);
-        modelId = 'gemini-2.0-flash';
+        modelId = modelOverride ??
+            _assignedModel(LlmProviderType.gemini) ??
+            'gemini-2.0-flash';
       case LlmProviderType.ollama:
         // Cloud (https://ollama.com) needs a key; a local server does not.
         final isCloud = baseUrl.contains('ollama.com');
