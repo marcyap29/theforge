@@ -2,6 +2,15 @@
 
 ---
 
+## v0.5.18 — 2026-10-03 — Build Mode bottom sheet: version section headers always visible
+
+- **Version group headers** now appear in the Build Mode bottom sheet exactly as they do on the tracker board — amber uppercase labels (e.g. "V1 ─────") separate each version's features. These always show regardless of whether any feature is an epic.
+- **Epic sub-headers** (purple `folder_outlined` — no button) are a second level of grouping *within* a version, only shown when a feature is an epic with subtasks already created.
+- Root cause of missing headers: AR Mechanic's features are all leaf-level (no parent-child relationships yet), so the prior epic-only header logic produced nothing. Version headers fix this unconditionally.
+- `dart analyze lib` clean.
+
+---
+
 ## v0.5.17 — 2026-10-03 — Epic "Build" routing: redirect to subtask or offer breakdown
 
 - **Building an epic now does the right thing automatically.** Tapping "Build" on an epic (from the Build Mode bottom sheet, the per-tile button, or anywhere else) no longer ambiguously opens the implementation screen for the epic itself.

@@ -4,6 +4,22 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-10-03 — Claude Code [Build Mode bottom sheet version headers — v0.5.18]
+
+**Branch:** main · **App:** v0.5.18
+
+### Why
+User reported not seeing the purple group headers in the Build Mode bottom sheet. Root cause: AR Mechanic has no epics with subtasks yet — all features are leaf-level, so `epicIdsWithChildren` was empty and no headers rendered.
+
+### Done
+- `project_tracker_screen.dart`: `_openBuildMode()` now pre-processes `ordered` into a mixed `rows` list (`String` = version label, `Feature` = feature row). `ListView.builder` renders `String` items as amber uppercase version section headers (matching the tracker board grouping). These always appear. Purple epic sub-headers still render when a feature is an epic with children (second level of grouping within a version).
+- Docs: CHANGELOG v0.5.18, this context block.
+
+### Verify
+`dart analyze lib` clean.
+
+---
+
 ## Session: 2026-10-03 — Claude Code [Epic Build routing + bottom sheet visual clarity — v0.5.17]
 
 **Branch:** main · **App:** v0.5.17

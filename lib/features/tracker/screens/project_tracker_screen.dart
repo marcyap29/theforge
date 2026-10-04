@@ -1334,17 +1334,32 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
   }
 
   /// AppBar "Build" button → bottom sheet listing unbuilt features in build
-  /// order. Epics with subtasks appear as non-clickable group headers; epics
-  /// without subtasks offer "Break down"; leaf tasks have a "Build" button.
+  /// order, grouped by version. Version labels act as section headers. Within
+  /// a version: epics with subtasks show as a purple non-clickable sub-header;
+  /// epics without subtasks get a "Break down" button; leaf tasks get "⚡ Build".
   Future<void> _openBuildMode() async {
     final all =
         ref.read(featureListProvider(project.id)).valueOrNull ?? const [];
     final ordered = buildOrderUnbuilt(all);
-    // Ids of features that have at least one child (i.e. are acted as epics).
     final epicIdsWithChildren = <String>{
       for (final f in all)
         if (f.parentId != null) f.parentId!,
     };
+
+    // Build a flat display list: String = version header, Feature = row.
+    final rows = <Object>[];
+    String? lastVer;
+    for (final f in ordered) {
+      final ver = f.targetVersion?.isNotEmpty == true
+          ? f.targetVersion!
+          : 'Unversioned';
+      if (ver != lastVer) {
+        rows.add(ver); // version section header
+        lastVer = ver;
+      }
+      rows.add(f);
+    }
+
     if (!mounted) return;
     await showModalBottomSheet<void>(
       context: context,
@@ -1371,7 +1386,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
               ),
             ),
             const Divider(height: 1),
-            if (ordered.isEmpty)
+            if (rows.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(32),
                 child: Text('All features are shipped or archived.',
@@ -1382,21 +1397,46 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
               Expanded(
                 child: ListView.builder(
                   controller: scrollCtrl,
-                  itemCount: ordered.length,
+                  itemCount: rows.length,
                   itemBuilder: (_, i) {
-                    final f = ordered[i];
+                    final row = rows[i];
+
+                    // ── Version section header ──────────────────────────
+                    if (row is String) {
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+                        child: Row(
+                          children: [
+                            Text(
+                              row.toUpperCase(),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFE8A04C),
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                                child: Divider(
+                                    height: 1,
+                                    color: Color(0xFF2A2D35))),
+                          ],
+                        ),
+                      );
+                    }
+
+                    // ── Feature row ─────────────────────────────────────
+                    final f = row as Feature;
                     final isEpic =
                         BuildKind.fromWire(f.buildKind) == BuildKind.epic;
                     final hasChildren = epicIdsWithChildren.contains(f.id);
                     final isSubtask = f.parentId != null;
-                    final ver = f.targetVersion?.isNotEmpty == true
-                        ? f.targetVersion!
-                        : 'Unversioned';
 
-                    // Epic with subtasks → non-actionable group header.
+                    // Epic with subtasks → non-actionable purple sub-header.
                     if (isEpic && hasChildren) {
                       return Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 2),
+                        padding: const EdgeInsets.fromLTRB(20, 10, 20, 2),
                         child: Row(
                           children: [
                             const Icon(Icons.folder_outlined,
@@ -1408,40 +1448,34 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
                                 style: const TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
-                                    color: Color(0xFFBA68C8),
-                                    letterSpacing: 0.3),
+                                    color: Color(0xFFBA68C8)),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            Text(ver,
-                                style: const TextStyle(
-                                    fontSize: 10, color: Colors.white24)),
                           ],
                         ),
                       );
                     }
 
-                    // Epic with no subtasks → offer breakdown.
-                    // Leaf task or subtask → Build button.
+                    // Epic without subtasks → "Break down" button.
+                    // Leaf task / subtask → "⚡ Build" button.
                     final leftPad = isSubtask ? 36.0 : 20.0;
                     return ListTile(
                       dense: true,
-                      contentPadding: EdgeInsets.fromLTRB(
-                          leftPad, 2, 20, 2),
+                      contentPadding:
+                          EdgeInsets.fromLTRB(leftPad, 2, 20, 2),
                       title: Text(f.title,
                           style: const TextStyle(fontSize: 13),
                           overflow: TextOverflow.ellipsis),
-                      subtitle: Text(
-                        isEpic ? '$ver  ·  needs subtasks' : ver,
-                        style: TextStyle(
-                            fontSize: 11,
-                            color: isEpic
-                                ? const Color(0xFFE8A04C).withAlpha(180)
-                                : Colors.white38),
-                      ),
+                      subtitle: isEpic
+                          ? const Text('needs subtasks',
+                              style: TextStyle(
+                                  fontSize: 11, color: Color(0xFFE8A04C)))
+                          : null,
                       trailing: isEpic
                           ? OutlinedButton.icon(
-                              icon: const Icon(Icons.account_tree_outlined,
+                              icon: const Icon(
+                                  Icons.account_tree_outlined,
                                   size: 13),
                               label: const Text('Break down',
                                   style: TextStyle(fontSize: 12)),
