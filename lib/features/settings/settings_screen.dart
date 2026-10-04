@@ -471,6 +471,18 @@ class _ByokCardState extends ConsumerState<_ByokCard> {
   void initState() {
     super.initState();
     _controller.addListener(() => setState(() {}));
+    // Auto-refresh Gemini model list on first open when a key is already
+    // configured and we have no live models cached yet (new session).
+    if (widget.providerType == LlmProviderType.gemini) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final s = ref.read(settingsProvider).valueOrNull;
+        final hasGeminiKey =
+            (s?.settings.apiKeys[LlmProviderType.gemini] ?? '').isNotEmpty;
+        if (hasGeminiKey && (s?.geminiLiveModels.isEmpty ?? true)) {
+          ref.read(settingsProvider.notifier).refreshGemini();
+        }
+      });
+    }
   }
 
   @override
@@ -523,7 +535,13 @@ class _ByokCardState extends ConsumerState<_ByokCard> {
     final masked = hasKey ? _maskKey(apiKey) : '';
 
     // Model picker — shown for non-Ollama BYOK providers (Gemini, Claude, OpenAI).
-    final availableModels = modelsFor(widget.providerType);
+    // For Gemini, prefer the live model list fetched from the API over the
+    // static seed so the picker always reflects current available models.
+    final liveGemini = settingsState?.geminiLiveModels ?? const [];
+    final availableModels = (widget.providerType == LlmProviderType.gemini &&
+            liveGemini.isNotEmpty)
+        ? liveGemini
+        : modelsFor(widget.providerType);
     final showModelPicker =
         widget.providerType != LlmProviderType.ollama && availableModels.isNotEmpty;
 
@@ -641,6 +659,20 @@ class _ByokCardState extends ConsumerState<_ByokCard> {
                     : const Icon(Icons.bolt, size: 14),
                 label: Text(_testing ? 'Testing…' : 'Test'),
               ),
+              // Gemini: manual refresh so the user can pull the latest model
+              // list without re-saving the key.
+              if (widget.providerType == LlmProviderType.gemini) ...[
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed: _testing
+                      ? null
+                      : () => ref
+                          .read(settingsProvider.notifier)
+                          .refreshGemini(),
+                  icon: const Icon(Icons.refresh, size: 14),
+                  label: const Text('Refresh models'),
+                ),
+              ],
               const SizedBox(width: 12),
               if (_testPassed == true)
                 const Row(
@@ -713,6 +745,9 @@ class _RoleCard extends ConsumerWidget {
         ...ollamaCloudModels,
         ...state.ollamaModels,
       ].where((m) => seen.add(m.id)).toList(growable: false);
+    } else if (assignment.providerType == LlmProviderType.gemini &&
+        state.geminiLiveModels.isNotEmpty) {
+      models = state.geminiLiveModels;
     } else {
       models = modelsFor(assignment.providerType);
     }
@@ -747,7 +782,11 @@ class _RoleCard extends ConsumerWidget {
                   if (p == null) return;
                   // Default to the provider's first model so a role never ends
                   // up with a provider but no model (which breaks every call).
-                  final defaultModel = modelsFor(p).firstOrNull?.id ?? '';
+                  final liveG = state.geminiLiveModels;
+                  final defaultModel = (p == LlmProviderType.gemini &&
+                          liveG.isNotEmpty)
+                      ? liveG.first.id
+                      : modelsFor(p).firstOrNull?.id ?? '';
                   await ref.read(settingsProvider.notifier).setRoleAssignment(
                         role,
                         ModelAssignment(

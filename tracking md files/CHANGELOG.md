@@ -2,6 +2,18 @@
 
 ---
 
+## v0.5.20 — 2026-10-04 — Gemini live model list: fetch from Google's API instead of a hardcoded seed
+
+- **The Gemini model picker now shows the real available models from Google's API**, not a hardcoded list frozen at 2.5. `GeminiProvider.fetchModels(apiKey)` hits `GET /v1beta/models?key=…`, pages through results, filters to `generateContent`-capable models, excludes image/video/embedding variants (`imagen`, `-image`, `veo`, `tts`, `aqa`, `embedding`), and sorts newest-first by version number extracted from the model id (so gemini-3.8-* sorts above 2.5-*).
+- **Auto-refresh on key save.** `SettingsNotifier.setApiKey` now calls `refreshGemini()` for the Gemini provider so the picker updates immediately after saving a key (no restart required).
+- **Auto-refresh on settings open.** If a Gemini key is already configured but no live models are cached (fresh session), the settings screen triggers a background refresh on first open.
+- **Manual "Refresh models" button** added to the Gemini BYOK card alongside the Test button.
+- **Role card and model-picker fallback.** Both the Role card model dropdown and the BYOK card picker use `geminiLiveModels` when populated; fall back to the static `geminiModels` seed when the API hasn't been fetched yet (no key, offline, etc.).
+- `LlmSettingsState` gains `geminiLiveModels: List<ModelInfo>` (mirrors `ollamaModels`). Static `geminiModels` seed list in `llm_model_config.dart` is intentionally left as fallback — not deleted.
+- `dart analyze lib` clean; `flutter test` 123/123 green.
+
+---
+
 ## v0.5.19 — 2026-10-04 — Gemini (and all BYOK) settings: model picker in API key card
 
 - **Model picker added to the Gemini, Claude, and OpenAI API key cards.** Each BYOK card now shows a "Model" dropdown below the API key field, listing the available models for that provider. Selecting a model: (a) uses it for the "Test" button immediately, and (b) propagates to any role assignment (Architect / Executor) already configured to use that provider — so the Role cards stay in sync.

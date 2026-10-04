@@ -23,22 +23,29 @@ class LlmSettingsState {
   final LlmSettings settings;
   final List<ModelInfo> ollamaModels;
   final OllamaStatus ollamaStatus;
+  /// Live Gemini models fetched from the API on key save — empty until a
+  /// key is saved. When non-empty, these replace the static [geminiModels]
+  /// seed list in the model picker so the user always sees current models.
+  final List<ModelInfo> geminiLiveModels;
 
   const LlmSettingsState({
     required this.settings,
     this.ollamaModels = const [],
     this.ollamaStatus = OllamaStatus.unknown,
+    this.geminiLiveModels = const [],
   });
 
   LlmSettingsState copyWith({
     LlmSettings? settings,
     List<ModelInfo>? ollamaModels,
     OllamaStatus? ollamaStatus,
+    List<ModelInfo>? geminiLiveModels,
   }) {
     return LlmSettingsState(
       settings: settings ?? this.settings,
       ollamaModels: ollamaModels ?? this.ollamaModels,
       ollamaStatus: ollamaStatus ?? this.ollamaStatus,
+      geminiLiveModels: geminiLiveModels ?? this.geminiLiveModels,
     );
   }
 }
@@ -296,6 +303,9 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
         settings: current.settings.copyWith(apiKeys: newKeys),
       ),
     );
+    // Refresh the live model list whenever a Gemini key is saved so the
+    // picker immediately shows current models from the API.
+    if (type == LlmProviderType.gemini) await refreshGemini();
   }
 
   Future<void> clearApiKey(LlmProviderType type) async {
@@ -436,5 +446,20 @@ class SettingsNotifier extends AsyncNotifier<LlmSettingsState> {
         ),
       );
     }
+  }
+
+  /// Fetches the live Gemini model list from Google's API using the stored key
+  /// and updates [LlmSettingsState.geminiLiveModels]. A network/auth failure is
+  /// silent — the picker falls back to the static [geminiModels] seed list.
+  Future<void> refreshGemini() async {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    final key = current.settings.apiKeys[LlmProviderType.gemini] ?? '';
+    final live = await GeminiProvider.fetchModels(key);
+    if (state.valueOrNull == null) return;
+    final models = live
+        .map((m) => ModelInfo(id: m.id, displayName: m.displayName))
+        .toList();
+    state = AsyncData(current.copyWith(geminiLiveModels: models));
   }
 }
