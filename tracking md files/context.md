@@ -4,6 +4,22 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-10-04 — Claude Code [Fix BYOK model picker Test button (duplicate sentinel) — v0.5.21]
+
+**Branch:** main · **App:** v0.5.21
+
+### Why
+After v0.5.19/v0.5.20, the Test button stopped working in all BYOK cards. Root cause: `DropdownButtonFormField` items had two entries with `value: _customModelSentinel` — once for "(current model custom)" and once for "Custom…". Flutter assertion failure broke the card silently.
+
+### Done
+- `settings_screen.dart`: Replaced `DropdownButtonFormField` with `DropdownButton` wrapped in `InputDecorator`. `value: modelInList ? currentModel : null` with a hint text — null is valid and shows a fallback label. Removed the duplicate sentinel entry.
+- Docs: CHANGELOG v0.5.21, this context block.
+
+### Verify
+`dart analyze lib` clean.
+
+---
+
 ## Session: 2026-10-04 — Claude Code [Gemini model picker in BYOK card — v0.5.19]
 
 **Branch:** main · **App:** v0.5.19

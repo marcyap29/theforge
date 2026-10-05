@@ -2,6 +2,14 @@
 
 ---
 
+## v0.5.21 — 2026-10-04 — Fix: BYOK model picker broke Test button (duplicate dropdown sentinel)
+
+- **Root cause:** When the current model ID wasn't in `availableModels` (e.g. after the Gemini live list loaded), both the "(custom)" entry and the "Custom…" entry used the same `_customModelSentinel` value in the `DropdownButtonFormField`. Flutter's assertion requires unique item values — the duplicate caused a `FlutterError` that silently broke the card, making the Test button unresponsive.
+- **Fix:** Replaced `DropdownButtonFormField` with a `DropdownButton` wrapped in `InputDecorator`. `DropdownButton` accepts `value: null` (shows a hint) when the current model isn't in the live list, avoiding the uniqueness constraint entirely. The duplicate sentinel entry is removed — only "Custom…" uses `_customModelSentinel`.
+- `dart analyze lib` clean.
+
+---
+
 ## v0.5.20 — 2026-10-04 — Gemini live model list: fetch from Google's API instead of a hardcoded seed
 
 - **The Gemini model picker now shows the real available models from Google's API**, not a hardcoded list frozen at 2.5. `GeminiProvider.fetchModels(apiKey)` hits `GET /v1beta/models?key=…`, pages through results, filters to `generateContent`-capable models, excludes image/video/embedding variants (`imagen`, `-image`, `veo`, `tts`, `aqa`, `embedding`), and sorts newest-first by version number extracted from the model id (so gemini-3.8-* sorts above 2.5-*).

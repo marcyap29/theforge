@@ -585,33 +585,45 @@ class _ByokCardState extends ConsumerState<_ByokCard> {
         ),
         if (showModelPicker) ...[
           const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            initialValue: modelInList ? currentModel : _customModelSentinel,
+          // Use DropdownButton (not FormField) so `value` is fully reactive:
+          // when availableModels changes (e.g. after Gemini live-list fetch),
+          // a null value shows the hint rather than throwing an assertion.
+          InputDecorator(
             decoration: const InputDecoration(
               labelText: 'Model',
               isDense: true,
+              contentPadding:
+                  EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             ),
-            items: [
-              ...availableModels.map((m) =>
-                  DropdownMenuItem(value: m.id, child: Text(m.displayName))),
-              if (!modelInList && currentModel.isNotEmpty)
-                DropdownMenuItem(
-                    value: _customModelSentinel,
-                    child: Text('$currentModel (custom)',
-                        style: const TextStyle(color: Color(0xFF9CA3AF)))),
-              const DropdownMenuItem(
-                  value: _customModelSentinel, child: Text('Custom…')),
-            ],
-            onChanged: (id) async {
-              if (id == _customModelSentinel) {
-                final custom =
-                    await _promptCustomModel(context, currentModel);
-                if (custom == null || custom.isEmpty || !mounted) return;
-                await _onModelChanged(custom);
-              } else if (id != null) {
-                await _onModelChanged(id);
-              }
-            },
+            child: DropdownButton<String>(
+              value: modelInList ? currentModel : null,
+              hint: currentModel.isNotEmpty
+                  ? Text('$currentModel (not in list)',
+                      style: const TextStyle(
+                          fontSize: 13, color: Color(0xFF9CA3AF)))
+                  : const Text('Pick a model',
+                      style: TextStyle(color: Color(0xFF9CA3AF))),
+              isExpanded: true,
+              underline: const SizedBox.shrink(),
+              isDense: true,
+              items: [
+                ...availableModels.map((m) => DropdownMenuItem(
+                    value: m.id, child: Text(m.displayName))),
+                // "Custom…" uses a sentinel so its onChanged branch opens dialog.
+                const DropdownMenuItem(
+                    value: _customModelSentinel, child: Text('Custom…')),
+              ],
+              onChanged: (id) async {
+                if (id == _customModelSentinel) {
+                  final custom =
+                      await _promptCustomModel(context, currentModel);
+                  if (custom == null || custom.isEmpty || !mounted) return;
+                  await _onModelChanged(custom);
+                } else if (id != null) {
+                  await _onModelChanged(id);
+                }
+              },
+            ),
           ),
         ],
         const SizedBox(height: 8),
