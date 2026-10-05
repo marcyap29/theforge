@@ -4,6 +4,23 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-10-04 — Claude Code [Build: reuse existing plan on retry — v0.5.23]
+
+**Branch:** main · **App:** v0.5.23
+
+### Why
+User: "The app keeps on writing a new plan even if the earlier attempt at building was not successful but it wrote a plan. My worry: multiple plans will keep being written, and they may not all be similar, resulting in conflict."
+
+### Done
+- `implementation_screen.dart`: `onRetry` callback captures `state.plan` before calling `notifier.reset()`, then passes it to `notifier.start(widget.brief, existingPlan: plan)`.
+- `implementation_notifier.dart`: `start()` gains `{AgentPlan? existingPlan}` param. If `existingPlan != null` and no new instruction was given, restores the plan into state and transitions to `RunPhase.awaitingApproval` (logs "Resuming with existing plan (N file edits)"). If a new instruction is provided alongside an existing plan, passes it as `previousPlan` to `_plan()` so the LLM refines rather than replaces.
+- Docs: CHANGELOG v0.5.23, this context block.
+
+### Verify
+`dart analyze lib` clean.
+
+---
+
 ## Session: 2026-10-04 — Claude Code [Gemini auto-retry on 503/429 — v0.5.22]
 
 **Branch:** main · **App:** v0.5.22

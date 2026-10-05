@@ -409,8 +409,11 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
                         error: state.error,
                         stopped: state.phase == RunPhase.stopped,
                         onRetry: () {
+                          final plan = state.plan;
                           notifier.reset();
-                          Future.microtask(() => notifier.start(widget.brief));
+                          Future.microtask(
+                              () => notifier.start(widget.brief,
+                                  existingPlan: plan));
                         },
                         onClose: () => Navigator.of(context).pop(false),
                         onCopyOutput: () {

@@ -2,6 +2,15 @@
 
 ---
 
+## v0.5.23 — 2026-10-04 — Build: reuse existing plan on "Try again" instead of re-planning
+
+- **When a run fails or is stopped and the user taps "Try again", the app now reuses the plan from the prior attempt** instead of calling the LLM to write a new one. Previously every "Try again" triggered a full planning round, risking conflicting or divergent plans across attempts.
+- **How it works:** `onRetry` captures `state.plan` before calling `reset()`, then passes it to `start()` as `existingPlan`. `start()` restores the plan into state and skips straight to `RunPhase.awaitingApproval`, logging "Resuming with existing plan (N file edits)". If no plan exists (first attempt) or the user provides a new instruction, the normal planning flow runs as before.
+- If the user types a new instruction via the prompt box while retrying, the existing plan is passed as `previousPlan` to the planning call so the LLM refines it rather than starting from scratch.
+- `dart analyze lib` clean.
+
+---
+
 ## v0.5.22 — 2026-10-04 — Gemini: auto-retry on 503/429 (overload / rate limit)
 
 - **`GeminiProvider.complete()` now retries automatically on 503 (server overload) and 429 (rate limit)**, both of which are transient Google-side errors. Back-off schedule: 2 s → 6 s → 15 s (3 retries before giving up). The 503 "high demand" error the user hit during a Build planning call will now silently recover instead of failing the run.

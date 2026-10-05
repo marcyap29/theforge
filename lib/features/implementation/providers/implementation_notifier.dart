@@ -151,7 +151,8 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
   /// window no longer auto-starts — the user triggers this from the compose
   /// screen (a Build action or the prompt box), optionally with an [instruction]
   /// describing what to build.
-  Future<void> start(ImplBrief brief, {String? instruction}) async {
+  Future<void> start(ImplBrief brief,
+      {String? instruction, AgentPlan? existingPlan}) async {
     if (state.phase != RunPhase.idle) return;
     _brief = brief;
     state = state.copyWith(startedAt: DateTime.now(), error: null);
@@ -165,7 +166,20 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
       _log(ConsoleLineKind.info,
           'Model: ${resolved.provider.name} · ${resolved.modelId}');
     }
-    await _plan(feedback: instruction);
+    // Reuse a plan from a prior attempt when no new instruction overrides it.
+    final hasNewInstruction =
+        instruction != null && instruction.trim().isNotEmpty;
+    if (existingPlan != null && !hasNewInstruction) {
+      _log(ConsoleLineKind.info,
+          'Resuming with existing plan (${existingPlan.edits.length} file '
+          'edit${existingPlan.edits.length == 1 ? '' : 's'}).');
+      state = state.copyWith(plan: existingPlan);
+      _phase(RunPhase.awaitingApproval);
+      return;
+    }
+    await _plan(
+        feedback: instruction,
+        previousPlan: hasNewInstruction ? existingPlan : null);
   }
 
   /// A quick preset action (Run checks, Fix errors, Suggest improvements, …) or
