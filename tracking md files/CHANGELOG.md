@@ -2,6 +2,13 @@
 
 ---
 
+## v0.5.22 — 2026-10-04 — Gemini: auto-retry on 503/429 (overload / rate limit)
+
+- **`GeminiProvider.complete()` now retries automatically on 503 (server overload) and 429 (rate limit)**, both of which are transient Google-side errors. Back-off schedule: 2 s → 6 s → 15 s (3 retries before giving up). The 503 "high demand" error the user hit during a Build planning call will now silently recover instead of failing the run.
+- `dart analyze lib` clean.
+
+---
+
 ## v0.5.21 — 2026-10-04 — Fix: BYOK model picker broke Test button (duplicate dropdown sentinel)
 
 - **Root cause:** When the current model ID wasn't in `availableModels` (e.g. after the Gemini live list loaded), both the "(custom)" entry and the "Custom…" entry used the same `_customModelSentinel` value in the `DropdownButtonFormField`. Flutter's assertion requires unique item values — the duplicate caused a `FlutterError` that silently broke the card, making the Test button unresponsive.

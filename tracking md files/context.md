@@ -4,6 +4,22 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-10-04 — Claude Code [Gemini auto-retry on 503/429 — v0.5.22]
+
+**Branch:** main · **App:** v0.5.22
+
+### Why
+User hit "Gemini error 503: This model is currently experiencing high demand" during Build planning. The build failed immediately instead of retrying the transient server error.
+
+### Done
+- `gemini_provider.dart`: Added retry loop in `complete()` for status codes `{429, 503}`. Back-off: 2 s, 6 s, 15 s (3 retries). After the 4th attempt, throws as before. Added `dart:async` import for `Future.delayed`.
+- Docs: CHANGELOG v0.5.22, this context block.
+
+### Verify
+`dart analyze lib` clean.
+
+---
+
 ## Session: 2026-10-04 — Claude Code [Fix BYOK model picker Test button (duplicate sentinel) — v0.5.21]
 
 **Branch:** main · **App:** v0.5.21

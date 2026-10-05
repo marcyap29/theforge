@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -46,11 +47,24 @@ class GeminiProvider extends LlmProvider {
       'generationConfig': gen,
     };
 
-    final res = await http.post(
-      Uri.parse('$_base/models/$modelId:generateContent?key=$apiKey'),
-      headers: {'content-type': 'application/json'},
-      body: jsonEncode(body),
-    );
+    // Retry on 503 (overload) and 429 (rate limit) — both are transient.
+    // Back-off: 2 s, 6 s, 15 s before giving up on the 4th attempt.
+    const retryStatuses = {429, 503};
+    const delays = [2, 6, 15];
+    http.Response res;
+    var attempt = 0;
+    while (true) {
+      res = await http.post(
+        Uri.parse('$_base/models/$modelId:generateContent?key=$apiKey'),
+        headers: {'content-type': 'application/json'},
+        body: jsonEncode(body),
+      );
+      if (res.statusCode == 200 ||
+          !retryStatuses.contains(res.statusCode) ||
+          attempt >= delays.length) break;
+      await Future.delayed(Duration(seconds: delays[attempt]));
+      attempt++;
+    }
     if (res.statusCode != 200) {
       throw Exception('Gemini error ${res.statusCode}: ${_errorMessage(res.body)}');
     }
