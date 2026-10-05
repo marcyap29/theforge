@@ -4,6 +4,24 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-10-05 — Claude Code [LICENSE + README + version bump — v0.5.24]
+
+**Branch:** main · **App:** v0.5.24
+
+### Why
+User added LICENSE (PolyForm Noncommercial 1.0.0, Copyright 2026 Orbital AI, LLC) and README.md to repo root, making the project source-available. `_appVersion` was also stuck at 0.5.20 despite the codebase being at 0.5.23 — corrected.
+
+### Done
+- Added LICENSE and README.md (authored by user, committed here).
+- Bumped `_appVersion` in `lib/main.dart` from `0.5.20` to `0.5.23`.
+- Removed stale `.git/index.lock` (0-byte leftover).
+- Docs: CHANGELOG v0.5.24, this context block, CONFIGURATION_MANAGEMENT.md updated.
+
+### Verify
+`dart analyze lib` clean. DMG rebuild needed (see user instructions below).
+
+---
+
 ## Session: 2026-10-04 — Claude Code [Build: reuse existing plan on retry — v0.5.23]
 
 **Branch:** main · **App:** v0.5.23

@@ -1,6 +1,6 @@
 # Configuration Management — The Forge
 
-**Last Updated:** 2026-09-10
+**Last Updated:** 2026-10-05
 **Status:** ✅ Synced
 
 ---
@@ -9,6 +9,8 @@
 
 | Document | Location | Last Reviewed | Status |
 |----------|----------|---------------|--------|
+| LICENSE | root | 2026-10-05 | ✅ Synced |
+| README.md | root | 2026-10-05 | ✅ Synced |
 | claude.md | root | 2026-05-31 | ✅ Synced |
 | agents.md | agents md files/ | 2026-05-31 | ✅ Synced |
 | ARCHITECTURE.md | tracking md files/ | 2026-05-31 | ✅ Synced |

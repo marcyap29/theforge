@@ -2,6 +2,13 @@
 
 ---
 
+## v0.5.24 — 2026-10-05 — Source-available release: LICENSE + README, version bump
+
+- **LICENSE** (PolyForm Noncommercial 1.0.0, Copyright 2026 Orbital AI, LLC) and **README.md** added to the repo root. The README pitches the app to vibe coders, covers BYOK, the DMG download link, building from source, and the license. Commercial use → open an issue.
+- **Version bump**: `_appVersion` in `main.dart` corrected from `0.5.20` to `0.5.23` (was missed across the v0.5.21–v0.5.23 patch series).
+
+---
+
 ## v0.5.23 — 2026-10-04 — Build: reuse existing plan on "Try again" instead of re-planning
 
 - **When a run fails or is stopped and the user taps "Try again", the app now reuses the plan from the prior attempt** instead of calling the LLM to write a new one. Previously every "Try again" triggered a full planning round, risking conflicting or divergent plans across attempts.
