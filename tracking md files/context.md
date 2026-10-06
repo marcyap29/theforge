@@ -4,6 +4,23 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-10-05 — Claude Code [Teams Tier backlog + website licensing — v0.5.25]
+
+**Branch:** main · **App:** v0.5.25
+
+### Why
+User: review the repo and backlog, identify existing features movable to a Teams paid tier, and identify new Teams features. Also update the website licensing copy to match PolyForm Noncommercial 1.0.0.
+
+### Done
+- Teams Tier section added to `backlog.md` — 8 items (§TEAMS-W through §TEAMS-PORTFOLIO) covering Watch Mode gating, `.forge/` repo sync, Slack/email alerts, AI authorship report, team key management, shared workspace, handoff review/approval workflow, Linear/Jira/GitHub Issues export, and cross-project portfolio view.
+- `orbitalai.net` (`OrbitalAI/index.html`) updated: removed "free plan / advanced plan" language, added BYOK + Keychain copy, updated fact items to reflect PolyForm Noncommercial license + commercial contact via GitHub. Buttons changed to "Download for macOS" (DMG link) and "View on GitHub".
+- Docs: CHANGELOG v0.5.25, this context block.
+
+### Verify
+No code changes. `dart analyze lib` not required.
+
+---
+
 ## Session: 2026-10-05 — Claude Code [LICENSE + README + version bump — v0.5.24]
 
 **Branch:** main · **App:** v0.5.24

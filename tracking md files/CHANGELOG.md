@@ -2,6 +2,13 @@
 
 ---
 
+## v0.5.25 — 2026-10-05 — Teams Tier backlog + website licensing update
+
+- **Teams Tier section added to `backlog.md`** with 8 new items (§TEAMS-W through §TEAMS-PORTFOLIO), prioritized build order, effort ratings, and architecture sketches. Covers: Watch Mode gating, `.forge/` repo sync, Slack/email alerts, AI authorship report, team API key management, shared workspace, handoff review/approval, Linear/Jira/GitHub Issues export, and cross-project portfolio view.
+- **`orbitalai.net` website updated** — The Forge panel licensing copy brought in line with PolyForm Noncommercial 1.0.0: removed "free plan / advanced plan" framing, added BYOK + Keychain copy, replaced plan fact items with "Free for personal use" + "Commercial & teams: open a GitHub issue". Buttons updated: "Join the waitlist" → **Download for macOS** (links to DMG), "Learn more" → **View on GitHub**.
+
+---
+
 ## v0.5.24 — 2026-10-05 — Source-available release: LICENSE + README, version bump
 
 - **LICENSE** (PolyForm Noncommercial 1.0.0, Copyright 2026 Orbital AI, LLC) and **README.md** added to the repo root. The README pitches the app to vibe coders, covers BYOK, the DMG download link, building from source, and the license. Commercial use → open an issue.

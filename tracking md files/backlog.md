@@ -1,6 +1,6 @@
 # The Forge — Feature Backlog
 
-**Last Updated:** 2026-09-10
+**Last Updated:** 2026-10-05
 
 Long-term feature pool. Active sprint work lives in `planner.md`.
 
@@ -592,6 +592,131 @@ LlmProvider.complete({
 **Dependencies:** §4 (LLM provider layer — SwarmSpace provider must exist), §9 (handoff package records credit cost)
 
 **Status:** Not started
+
+---
+
+---
+
+## Teams Tier
+
+> **Licensing context:** The Forge ships under PolyForm Noncommercial 1.0.0 — free for personal use, commercial/team use requires a license. The Teams tier is the paid product for businesses: a superset of personal features plus the collaboration and management tooling below.
+>
+> **Build order:** (1) Gate Watch Mode as Teams-only — already built, zero dev work. (2) `.forge/` repo sync + Slack alerts — small effort, high signal. (3) Team API key management — unblocks teams from trusting The Forge with shared keys. (4) Everything else after shared workspace exists.
+
+---
+
+### §TEAMS-W — Watch Mode: Gate as Teams-Only
+**What it is:** Move the entire Watch Mode cluster (§W1–§W6) behind the Teams entitlement. Per-engineer token spend, CI correlator, failure signals, alert engine, spec drift — all of it is management tooling with zero value for a solo developer.
+
+**Why it matters:** Watch Mode is the single clearest Teams differentiator already in the codebase. Gating it is a business decision, not a code change.
+
+**Architecture:** Wire the Watch Mode dashboard entry point through the same `entitlementProvider` stub used by §BWAI. When Teams entitlement is not active, show a Teams upgrade prompt instead of the dashboard.
+
+**Status:** Not started — zero code required until the entitlement backend (§MB) exists. Decision logged.
+
+---
+
+### §TEAMS-SYNC — `.forge/` Repo Sync (Push Artifacts to Git)
+**What it is:** A "Push to repo" action after any artifact is generated (spec, handoff, build memory, tracker state). Commits the `.forge/` folder into the linked project repo so every teammate who pulls the repo gets the full artifact history — specs, decisions, handoffs, build records — without needing a separate sync layer.
+
+**Why it matters:** The biggest blocker to team use is that Forge artifacts live on one machine. Git is the shared source of truth every developer already has. This makes `.forge/` a first-class part of the project repo.
+
+**Architecture:** A `ForgeGitSync` service wrapping the existing `command_runner` (git add + commit `[forge] update .forge artifacts`). Button added to each artifact action bar and to the tracker header. A `forge.gitignore` template excludes large ingested files. Conflicts handled by rebasing on the main branch before pushing.
+
+**Effort:** Small — reuses existing git subprocess infrastructure.
+
+**Status:** Not started.
+
+---
+
+### §TEAMS-ALERT — Slack / Email Alerts for Watch Mode
+**What it is:** Route Watch Mode CRITICAL signals (stalled project, runaway spend, high token-to-fail ratio) to a Slack webhook URL or email address configured per workspace. Managers should not need to open The Forge to see that something is on fire.
+
+**Why it matters:** An alert that requires opening a separate desktop app is an alert that goes unseen. Routing to Slack or email makes Watch Mode actionable for a manager who never touches the app.
+
+**Architecture:** An `AlertDeliveryService` that reads the active `AlertLog`, filters to un-notified CRITICAL entries, and POSTs to a configured Slack incoming webhook (JSON payload) or sends via a user-configured SMTP relay. Delivered flags persisted to `forge_config.json`. Settings card added to Watch Mode config.
+
+**Effort:** Small — Slack webhook POST is ~10 lines; SMTP is heavier but optional.
+
+**Status:** Not started. Pairs with §TEAMS-W (Watch Mode gate).
+
+---
+
+### §TEAMS-AIATTR — AI vs. Human Authorship Report
+**What it is:** A report (inside Watch Mode) showing what percentage of shipped code was AI-generated, per engineer and per project, trended over the last 30 days. Answers the CFO question: "We're spending on these AI subscriptions — is it showing up in the code?"
+
+**Why it matters:** §W2's `isAgentCommit` heuristic already flags AI-generated commits. The data is collected. This is a display layer over existing signals.
+
+**Architecture:** A new screen under Watch Mode reading `EngineerGitActivity.commits` filtered by `isAgentCommit`, grouped by engineer and week. `fl_chart` line chart (same pattern as spend chart in `EngineerDetailScreen`).
+
+**Effort:** Small — data already exists in §W2.
+
+**Status:** Not started.
+
+---
+
+### §TEAMS-KEYS — Team API Key + Spend Management
+**What it is:** A Teams admin can configure shared BYOK keys with per-member daily spend limits. Spend is enforced in-app using Watch Mode data — a member who hits their limit gets a soft block with an "over daily budget" message until the next day.
+
+**Why it matters:** You cannot give every developer on your team your Anthropic org key without usage controls. This is the unlock for team-wide BYOK without handing out an uncapped credential.
+
+**Architecture:** A `TeamKeyPolicy` model (shared key per provider, `dailyLimitUSD` per member, `adminHandle`). Admin configures in Settings; per-member enforcement in `implementation_notifier` (check today's spend from §W1 before starting a build). Pairs with §W1 spend tracking.
+
+**Effort:** Medium.
+
+**Status:** Not started. Depends on §TEAMS-W (Watch Mode) being active.
+
+---
+
+### §TEAMS-WS — Shared Project Workspace
+**What it is:** A configurable project root that can point at a shared folder — iCloud Drive, a network share, or a designated cloud folder — so multiple team members see the same project board, specs, and artifacts in The Forge.
+
+**Why it matters:** A PM running The Forge on their Mac cannot see the board if it lives on the developer's Mac. Shared root = shared ground truth, no server required.
+
+**Architecture:** Extend the existing `rootDir` setting (already user-configurable in §10) to accept any path. Document the iCloud Drive path (`~/Library/Mobile Documents/com~apple~CloudDocs/The Forge Projects/`) as the zero-infrastructure Teams option. Add a conflict resolution notice: last-write-wins per file (drift/SQLite DB is the main conflict risk — document as "one active writer at a time").
+
+**Effort:** Medium (the path is already configurable; conflict guidance and onboarding copy is the real work).
+
+**Status:** Not started.
+
+---
+
+### §TEAMS-HANDOFF — Handoff Review + Approval Workflow
+**What it is:** After a handoff package is generated, a non-technical PM or founder can review it, leave inline comments, and approve or request changes before the developer proceeds to Build with AI. Execution is gated on approval.
+
+**Why it matters:** Non-technical co-founders and PMs need sign-off power without needing to understand the code. An approval gate makes The Forge usable in a two-person team where one person specs and the other builds.
+
+**Architecture:** A `HandoffReviewState` (pending / approved / changesRequested) stored alongside the handoff JSON. A `HandoffReviewScreen` with inline comment fields per section and an Approve / Request Changes action. `implementation_notifier.start()` checks for `approved` state before proceeding.
+
+**Effort:** Medium.
+
+**Status:** Not started. Depends on §TEAMS-WS (shared workspace) for the reviewer to see the handoff.
+
+---
+
+### §TEAMS-EXPORT — Export to Jira / Linear / GitHub Issues
+**What it is:** A "Push to Linear" (or Jira / GitHub Issues) action on a feature card that creates an issue in the team's project management tool with the feature title, spec summary, acceptance criteria, and a Forge deep-link. One-way push first; two-way sync in a later version.
+
+**Why it matters:** Teams live in Linear or Jira. Double-entry between The Forge and the PM tool kills adoption. A one-click push removes the friction entirely.
+
+**Architecture:** A `PmIntegrationService` with provider-specific HTTP clients (Linear GraphQL `createIssue`, Jira REST `POST /rest/api/3/issue`, GitHub REST `POST /repos/{owner}/{repo}/issues`). API token stored in Keychain per integration. Action added to feature card context menu.
+
+**Effort:** Medium per integration. Linear first (most used by startups).
+
+**Status:** Not started.
+
+---
+
+### §TEAMS-PORTFOLIO — Cross-Project Team Portfolio View
+**What it is:** An executive rollup across all team members' projects — features in progress by member, builds shipped this week, projects stalled, total spec drift score. The thing a CTO opens Monday morning.
+
+**Why it matters:** The existing Portfolio Tracker (§PT) is per-person. A team view aggregates across all members in a shared workspace.
+
+**Architecture:** Extends §PT's `ProjectListNotifier` to aggregate across all projects in the shared root, grouped by last-commit author. Reads Watch Mode data for spend + CI pass rate per project. A new `TeamPortfolioScreen` above the existing portfolio dashboard.
+
+**Effort:** Medium. Depends on §TEAMS-WS (shared workspace) and §TEAMS-W (Watch Mode gate).
+
+**Status:** Not started.
 
 ---
 
