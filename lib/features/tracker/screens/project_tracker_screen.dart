@@ -736,7 +736,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     // reachable when analysis is clean/unavailable — never for broken code.
     final messenger = ScaffoldMessenger.of(context);
     _showBlockingSpinner('Committing & pushing…');
-    final committed = await ProjectFileRepository.gitCommitAll(
+    final (committed, gitOut) = await ProjectFileRepository.gitCommitAll(
         repoPath, 'chore: commit work in progress before AI build');
     final pushed =
         committed ? await ProjectFileRepository.gitPush(repoPath) : false;
@@ -744,7 +744,9 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     if (!mounted) return false;
     messenger.showSnackBar(SnackBar(
       content: Text(!committed
-          ? 'Nothing was committed (or not a git repo).'
+          ? (gitOut.isNotEmpty
+              ? 'Commit failed: $gitOut'
+              : 'Nothing was committed (or not a git repo).')
           : pushed
               ? 'Committed & pushed the leftover changes.'
               : 'Committed locally — not pushed (no remote / auth).'),

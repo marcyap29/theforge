@@ -203,9 +203,15 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     final path = repoPath.isNotEmpty ? repoPath : (_brief?.repoPath ?? '');
     if (path.isEmpty || state.phase.isBusy) return;
     _log(ConsoleLineKind.command, '\$ git add -A && git commit -m "$message" && git push');
-    final committed = await ProjectFileRepository.gitCommitAll(path, message);
+    final (committed, gitOut) =
+        await ProjectFileRepository.gitCommitAll(path, message);
     if (!committed) {
-      _log(ConsoleLineKind.info, 'Nothing to commit (or not a git repo).');
+      final hint = gitOut.contains('nothing to commit')
+          ? 'No changes in the linked repo — the build may not have applied edits yet.'
+          : gitOut.isNotEmpty
+              ? 'Commit failed: $gitOut'
+              : 'Nothing to commit (or not a git repo).';
+      _log(ConsoleLineKind.info, hint);
       return;
     }
     _log(ConsoleLineKind.success, '✓ committed: $message');
@@ -799,9 +805,11 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
         '${(brief.targetVersion?.isNotEmpty ?? false) ? ' (${brief.targetVersion})' : ''}'
         ' + docs';
     _log(ConsoleLineKind.command, '\$ git add -A && git commit && git push');
-    final committed = await ProjectFileRepository.gitCommitAll(repoPath, msg);
+    final (committed, gitOut2) =
+        await ProjectFileRepository.gitCommitAll(repoPath, msg);
     if (!committed) {
-      _log(ConsoleLineKind.info, 'Nothing to commit (or not a git repo).');
+      _log(ConsoleLineKind.info,
+          gitOut2.isNotEmpty ? 'Commit failed: $gitOut2' : 'Nothing to commit (or not a git repo).');
       return;
     }
     _log(ConsoleLineKind.success, '✓ committed: $msg');

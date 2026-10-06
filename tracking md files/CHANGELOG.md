@@ -2,6 +2,15 @@
 
 ---
 
+## v0.5.26 — 2026-10-05 — Fix: commit button shows actual git error
+
+- **`gitCommitAll` now returns `(bool, String)`** — the git stdout+stderr is captured on failure and surfaced to the user instead of the generic "Nothing to commit (or not a git repo)." message.
+- **Commit button now shows the real git error.** If the linked repo is clean (Build crashed before applying edits), the message reads "No changes in the linked repo — the build may not have applied edits yet." If git has a config issue, hook failure, or any other error, the actual git output is shown.
+- Affected files: `project_file_repository.dart`, `implementation_notifier.dart`, `project_tracker_screen.dart`.
+- `dart analyze` clean.
+
+---
+
 ## v0.5.25 — 2026-10-05 — Teams Tier backlog + website licensing update
 
 - **Teams Tier section added to `backlog.md`** with 8 new items (§TEAMS-W through §TEAMS-PORTFOLIO), prioritized build order, effort ratings, and architecture sketches. Covers: Watch Mode gating, `.forge/` repo sync, Slack/email alerts, AI authorship report, team API key management, shared workspace, handoff review/approval, Linear/Jira/GitHub Issues export, and cross-project portfolio view.

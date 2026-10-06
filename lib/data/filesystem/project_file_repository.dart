@@ -983,19 +983,29 @@ class ProjectFileRepository {
     }
   }
 
-  static Future<bool> gitCommitAll(String repoPath, String message) async {
+  /// Returns `(success, gitOutput)`. On failure `gitOutput` contains the
+  /// combined stdout+stderr from git so callers can show a useful message.
+  static Future<(bool, String)> gitCommitAll(
+      String repoPath, String message) async {
     try {
       final add =
           await Process.run('git', ['add', '-A'], workingDirectory: repoPath);
-      if (add.exitCode != 0) return false;
+      if (add.exitCode != 0) {
+        return (false, (add.stderr as String).trim());
+      }
       final commit = await Process.run(
         'git',
         ['commit', '-m', message],
         workingDirectory: repoPath,
       );
-      return commit.exitCode == 0;
-    } catch (_) {
-      return false;
+      if (commit.exitCode == 0) return (true, '');
+      final out = [
+        (commit.stdout as String).trim(),
+        (commit.stderr as String).trim(),
+      ].where((s) => s.isNotEmpty).join('\n');
+      return (false, out);
+    } catch (e) {
+      return (false, e.toString());
     }
   }
 

@@ -4,6 +4,24 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-10-05 — Claude Code [Fix commit button error message — v0.5.26]
+
+**Branch:** main · **App:** v0.5.26
+
+### Why
+Commit & push button was showing a generic "Nothing to commit (or not a git repo)." for every failure — could be "nothing to commit", git config missing, pre-commit hook blocking, wrong path, etc. User couldn't tell what was wrong.
+
+### Done
+- `gitCommitAll` return type changed from `Future<bool>` to `Future<(bool, String)>` — captures combined stdout+stderr on failure.
+- `commitAndPush` in `implementation_notifier.dart` now shows: "No changes in the linked repo — the build may not have applied edits yet." when git says nothing to commit; otherwise shows the raw git output.
+- Same improvement in the auto-commit path (post-Build success) and the tracker pre-build commit path.
+- Docs: CHANGELOG v0.5.26, this context block.
+
+### Verify
+`dart analyze lib` clean (no issues in three changed files).
+
+---
+
 ## Session: 2026-10-05 — Claude Code [Teams Tier backlog + website licensing — v0.5.25]
 
 **Branch:** main · **App:** v0.5.25
