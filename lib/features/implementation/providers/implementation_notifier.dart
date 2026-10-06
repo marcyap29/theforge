@@ -312,6 +312,7 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
         feedback: feedback,
         onDelta: (t, thinking) => _onDelta(t, thinking, gen),
         onStatus: (s) {
+          DiagLog.breadcrumb('plan: onStatus: $s');
           if (gen == _gen) _log(ConsoleLineKind.narration, s);
         },
       );

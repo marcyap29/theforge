@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../../../data/filesystem/project_file_repository.dart';
+import '../../../services/diag_log.dart';
 import '../../../services/llm/llm_provider.dart';
 import '../../../services/llm/llm_service.dart';
 import '../models/run_session.dart';
@@ -45,8 +46,11 @@ class ImplAgent {
     void Function(String text, bool thinking)? onDelta,
     void Function(String status)? onStatus,
   }) async {
+    DiagLog.breadcrumb('proposePlan: gatherRepoFiles');
     final files = await ImplWorkspace.gatherRepoFiles(repoPath);
+    DiagLog.breadcrumb('proposePlan: gatherRepoFiles done (${files.length} files)');
     final keyDocs = await ImplWorkspace.gatherKeyDocs(repoPath);
+    DiagLog.breadcrumb('proposePlan: buildUserContext');
     var context = buildUserContext(
       featureTitle: featureTitle,
       featureDescription: featureDescription,
@@ -87,6 +91,7 @@ class ImplAgent {
 
     // --- Pass 1 — Scout: which existing files does it need to read? ---
     onStatus?.call('Choosing which files to read…');
+    DiagLog.breadcrumb('proposePlan: pass1 scout (maxTokens=4000)');
     final scoutRaw = await _stream(
       system: _scoutSystemPrompt,
       user: '$context$manifestBlock\n\nReturn ONLY: '
@@ -99,6 +104,7 @@ class ImplAgent {
       onDelta: onDelta,
       jsonMode: true,
     );
+    DiagLog.breadcrumb('proposePlan: pass1 done, reading files');
     final wanted = _parseKeyList(scoutRaw, 'files');
     final wantedDocs = offered.isEmpty
         ? const <String>[]
@@ -164,6 +170,7 @@ class ImplAgent {
         : readSummary.toString());
 
     // --- Pass 2 — Plan: propose edits/commands grounded in the file bodies. ---
+    DiagLog.breadcrumb('proposePlan: pass2 plan start (maxTokens=$_planTokens)');
     onStatus?.call('Writing the plan…');
     final planUser = StringBuffer(context);
     if (readFiles.isEmpty) {
@@ -203,6 +210,7 @@ class ImplAgent {
       onDelta: onDelta,
       jsonMode: true,
     );
+    DiagLog.breadcrumb('proposePlan: pass2 done, parsing JSON');
     try {
       return _parse(planRaw, repoPath);
     } on ImplAgentException {
@@ -267,6 +275,8 @@ class ImplAgent {
     final all = StringBuffer(); // thinking + content, for loop detection
     var lastCheck = 0;
     var looping = false;
+    DiagLog.breadcrumb('_stream: opening LLM stream (maxTokens=$maxTokens)');
+    var _firstToken = true;
     await for (final delta in _llm.completeStream(
       role: LlmRole.executor,
       temperature: temperature,
@@ -275,6 +285,10 @@ class ImplAgent {
       userPrompt: user,
       jsonMode: jsonMode,
     )) {
+      if (_firstToken) {
+        DiagLog.breadcrumb('_stream: first token received');
+        _firstToken = false;
+      }
       if (!delta.thinking) buffer.write(delta.text);
       onDelta?.call(delta.text, delta.thinking);
       all.write(delta.text);
@@ -287,6 +301,7 @@ class ImplAgent {
         }
       }
     }
+    DiagLog.breadcrumb('_stream: stream closed (looping=$looping, len=${buffer.length})');
     if (looping) {
       throw ImplAgentException(
         'The model got stuck repeating itself and was stopped. Try a different '
