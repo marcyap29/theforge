@@ -2,6 +2,12 @@
 
 ---
 
+## v0.5.27 — 2026-10-05 — Fix: push works on branches with no upstream
+
+- **`gitPush` now uses `git push -u origin HEAD`** instead of bare `git push`. Bare push fails on any branch that has never been pushed before ("no upstream branch"). The `-u origin HEAD` form sets the upstream automatically on first push, matching the standard `gh` / VS Code behavior.
+
+---
+
 ## v0.5.26 — 2026-10-05 — Fix: commit button shows actual git error
 
 - **`gitCommitAll` now returns `(bool, String)`** — the git stdout+stderr is captured on failure and surfaced to the user instead of the generic "Nothing to commit (or not a git repo)." message.

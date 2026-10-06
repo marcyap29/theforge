@@ -4,6 +4,22 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-10-05 — Claude Code [Fix push on branches with no upstream — v0.5.27]
+
+**Branch:** main · **App:** v0.5.27
+
+### Why
+After fixing the commit (v0.5.26), push was failing silently: `ar_mechanic` was on branch `feat/provider-layer` with no upstream set. Bare `git push` exits non-zero in that case.
+
+### Done
+- `gitPush` changed from `git push` → `git push -u origin HEAD`. Sets upstream automatically on first push of any branch.
+- Docs: CHANGELOG v0.5.27, this context block.
+
+### Verify
+`dart analyze lib` clean.
+
+---
+
 ## Session: 2026-10-05 — Claude Code [Fix commit button error message — v0.5.26]
 
 **Branch:** main · **App:** v0.5.26

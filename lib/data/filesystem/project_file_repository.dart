@@ -1074,8 +1074,10 @@ class ProjectFileRepository {
   /// success; false (never throws) if there's no remote / auth fails.
   static Future<bool> gitPush(String repoPath) async {
     try {
-      final res =
-          await Process.run('git', ['push'], workingDirectory: repoPath);
+      // -u origin HEAD sets the upstream on first push of a new branch.
+      final res = await Process.run(
+          'git', ['push', '-u', 'origin', 'HEAD'],
+          workingDirectory: repoPath);
       return res.exitCode == 0;
     } catch (_) {
       return false;
