@@ -4,6 +4,22 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-10-05 — Claude Code [Fix loop detection false positive — v0.5.28]
+
+**Branch:** main · **App:** v0.5.28
+
+### Why
+Build was failing with "model got stuck repeating itself" on valid plans. Root cause: `_looksLooping` used a 500-char probe which false-positive fired when a `replace` hunk opened with the same function signature/docstring as the `find` hunk (typical when extending a function — the first 500–1000 chars are identical).
+
+### Done
+- `probeLen` in `_looksLooping` raised 500 → 1200. Genuine model loops repeat thousands of chars; function-body overlaps are 500–1000 chars.
+- Docs: CHANGELOG v0.5.28, this context block.
+
+### Verify
+`dart analyze lib` clean.
+
+---
+
 ## Session: 2026-10-05 — Claude Code [Fix push on branches with no upstream — v0.5.27]
 
 **Branch:** main · **App:** v0.5.27

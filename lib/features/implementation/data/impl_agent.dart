@@ -313,14 +313,18 @@ class ImplAgent {
     return buffer.toString();
   }
 
-  /// True if the last ~500 chars of [s] already appear earlier in it — an exact
-  /// long repeat that only happens when the model is looping (normal generation
-  /// never repeats 500 chars verbatim). Bounded to the last 8000 chars so the
-  /// scan stays cheap.
+  /// True if the last ~1200 chars of [s] already appear earlier in it — a
+  /// verbatim repeat long enough to be a genuine model loop. 1200 chars avoids
+  /// false positives from find/replace hunks whose function bodies share the
+  /// same opening or parameter list (those overlaps are typically 500–1000 chars
+  /// and are not loops). Real loops (model reprinting its reasoning block)
+  /// repeat thousands of chars. Bounded to the last 12 000 chars so the scan
+  /// stays cheap.
   static bool _looksLooping(String s) {
     if (s.length < 3000) return false;
     final window = s.length > 12000 ? s.substring(s.length - 12000) : s;
-    const probeLen = 500;
+    const probeLen = 1200;
+    if (window.length < probeLen + 1) return false;
     final probe = window.substring(window.length - probeLen);
     // Search only the part before the probe so it can't match itself.
     final hay = window.substring(0, window.length - probeLen);

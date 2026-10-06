@@ -2,6 +2,13 @@
 
 ---
 
+## v0.5.28 — 2026-10-05 — Fix: loop detection false positive on find/replace hunks
+
+- **`_looksLooping` probe length raised from 500 → 1200 chars.** The 500-char probe fired a false positive when a plan's `replace` hunk opened with the same function signature/body as the `find` hunk (those overlaps are typically 500–1000 chars and are not loops). Genuine model loops repeat thousands of chars verbatim; 1200-char probe still catches those while eliminating the false positive that killed valid builds.
+- Bug was visible when building features with large edit hunks (e.g. extending a function with a long body).
+
+---
+
 ## v0.5.27 — 2026-10-05 — Fix: push works on branches with no upstream
 
 - **`gitPush` now uses `git push -u origin HEAD`** instead of bare `git push`. Bare push fails on any branch that has never been pushed before ("no upstream branch"). The `-u origin HEAD` form sets the upstream automatically on first push, matching the standard `gh` / VS Code behavior.
