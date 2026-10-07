@@ -4,6 +4,23 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-10-07 — Claude Code [Architect breadcrumbs + website v1 updates]
+
+**Branch:** main · **App:** v0.5.29
+
+### Why
+App crashed in architect paths (feature scan, recommend, plan build order, etc.) with no trail in diag.log — only Build (executor) had breadcrumbs. User also switched architect to `mistral-large-4` (valid Ollama Cloud model). Website version history needed problem-focused copy for v1 launch.
+
+### Done
+- `feature_scan.dart`: DiagLog breadcrumbs added to all architect LLM call sites — `_parseWithRetry` (scan/recommend/roadmap/metaphor/refine/architect), `describeCapabilities`, `securityCheck`, `adviseBuild`.
+- `OrbitalAI/index.html`: Added "What's new" section with 3 problem-focused v1 milestone entries; updated Forge panel tagline and description copy.
+- Docs: CHANGELOG v0.5.29, this context block.
+
+### Verify
+`dart analyze lib` clean.
+
+---
+
 ## Session: 2026-10-05 — Claude Code [Fix loop detection false positive — v0.5.28]
 
 **Branch:** main · **App:** v0.5.28

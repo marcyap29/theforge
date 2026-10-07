@@ -2,6 +2,13 @@
 
 ---
 
+## v0.5.29 — 2026-10-07 — Diagnostics: breadcrumbs for all architect LLM calls
+
+- **`feature_scan.dart` now writes `DiagLog.breadcrumb()` before and after every architect-model call**: `_parseWithRetry` (covers scan, recommend, plan build order, refine features, metaphor, architect decompose), `describeCapabilities`, `securityCheck`, and `adviseBuild`. Previously a native crash during any of these left zero trail in `diag.log`. Now the last crumb identifies exactly which feature and which LLM call died.
+- Motivated by crash cascade on 2026-10-07 where `mistral-large-4` was the architect model and the log showed no architect activity — only Build (executor) breadcrumbs existed.
+
+---
+
 ## v0.5.28 — 2026-10-05 — Fix: loop detection false positive on find/replace hunks
 
 - **`_looksLooping` probe length raised from 500 → 1200 chars.** The 500-char probe fired a false positive when a plan's `replace` hunk opened with the same function signature/body as the `find` hunk (those overlaps are typically 500–1000 chars and are not loops). Genuine model loops repeat thousands of chars verbatim; 1200-char probe still catches those while eliminating the false positive that killed valid builds.

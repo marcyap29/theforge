@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 
 import '../../../data/filesystem/project_file_repository.dart';
 import '../../../data/local_db/forge_database.dart';
+import '../../../services/diag_log.dart';
 import '../../../services/llm/llm_provider.dart';
 import '../../../services/llm/llm_service.dart';
 import '../../../services/llm/llm_service_provider.dart';
@@ -243,6 +244,7 @@ Respond with ONLY this JSON, no prose, no code fences:
     }
     final user = _capabilityUserPrompt(
         projectPath, docs, readme, code, fileList, repoPath, features);
+    DiagLog.breadcrumb('architect: describeCapabilities LLM call');
     final md = await _llm.complete(
       role: LlmRole.architect,
       temperature: 0.3,
@@ -252,6 +254,7 @@ Respond with ONLY this JSON, no prose, no code fences:
       jsonMode: false,
       think: false,
     );
+    DiagLog.breadcrumb('architect: describeCapabilities done (len=${md.length})');
     final out = md.trim();
     if (out.isEmpty) {
       throw FeatureScanException(
@@ -288,6 +291,7 @@ Respond with ONLY this JSON, no prose, no code fences:
     }
     final user = _securityUserPrompt(
         projectPath, docs, readme, code, fileList, secretHits, repoPath);
+    DiagLog.breadcrumb('architect: securityCheck LLM call');
     final md = await _llm.complete(
       role: LlmRole.architect,
       temperature: 0.2,
@@ -297,6 +301,7 @@ Respond with ONLY this JSON, no prose, no code fences:
       jsonMode: false,
       think: false,
     );
+    DiagLog.breadcrumb('architect: securityCheck done (len=${md.length})');
     final out = md.trim();
     if (out.isEmpty) {
       throw FeatureScanException(
@@ -421,6 +426,7 @@ Respond with ONLY this JSON, no prose, no code fences:
     }
     final user = _adviseUserPrompt(
         projectPath, feature, allFeatures, docs, readme, code, fileList, repoPath);
+    DiagLog.breadcrumb('architect: adviseBuild LLM call');
     final md = await _llm.complete(
       role: LlmRole.architect,
       temperature: 0.3,
@@ -430,6 +436,7 @@ Respond with ONLY this JSON, no prose, no code fences:
       jsonMode: false,
       think: false,
     );
+    DiagLog.breadcrumb('architect: adviseBuild done (len=${md.length})');
     final out = md.trim();
     if (out.isEmpty) {
       throw FeatureScanException(
@@ -665,6 +672,7 @@ Respond with ONLY this JSON, no prose, no code fences:
   /// JSON mode on the first pass and return prose).
   Future<T> _parseWithRetry<T>(String system, String user, double temperature,
       int maxTokens, T Function(String) parse) async {
+    DiagLog.breadcrumb('architect: LLM call start (maxTokens=$maxTokens)');
     final raw = await _llm.complete(
       role: LlmRole.architect,
       temperature: temperature,
@@ -676,9 +684,11 @@ Respond with ONLY this JSON, no prose, no code fences:
       // budget reasoning and return empty content (diag.log: empty Raw).
       think: false,
     );
+    DiagLog.breadcrumb('architect: LLM call done (len=${raw.length})');
     try {
       return parse(raw);
     } on FeatureScanException {
+      DiagLog.breadcrumb('architect: parse failed, retrying');
       final retry = await _llm.complete(
         role: LlmRole.architect,
         temperature: 0.1,
@@ -689,6 +699,7 @@ Respond with ONLY this JSON, no prose, no code fences:
         jsonMode: true,
         think: false,
       );
+      DiagLog.breadcrumb('architect: retry done (len=${retry.length})');
       try {
         return parse(retry);
       } on FeatureScanException {
