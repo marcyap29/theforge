@@ -2,6 +2,36 @@
 
 ---
 
+## v0.5.32 — 2026-10-08 — Three-layer Architect guard (depth + heuristic + LLM)
+
+- **Guard 1 — depth limit:** Architect is blocked on features already 2+ levels deep. At that depth you're describing implementation steps, not decomposable features.
+- **Guard 2 — complexity heuristic:** If title + description are short (< 50 words) and contain no compound signals, a dialog offers to Build directly instead. Zero tokens spent — runs entirely in the app.
+- **Guard 3 — LLM self-assessment:** Asks the architect model YES/NO before running full decomposition (~250 tokens vs ~2500+). If the answer is NO, the model's reasoning surfaces in a snackbar with a direct Build shortcut and decomposition stops.
+- Only features that pass all three guards proceed to full Architect decomposition.
+- Affected files: `feature_scan.dart` (assessment prompt + `assessDecomposition`), `project_tracker_screen.dart` (`_featureDepth`, `_looksAtomic`, guard wiring in `_architectFeature`).
+- `dart analyze lib` clean.
+
+---
+
+## v0.5.31 — 2026-10-08 — Refactor: remove Architect + Build toolbar buttons
+
+- **Standalone Architect and Build buttons removed from the AppBar.** They occupied prime space and weren't the natural entry point — users already reach both actions via right-click or per-feature row icons.
+- **Context menu labels simplified:** "Build with AI" → "Build", "Architect (break into sub-features)" → "Architect".
+- Dead methods `_refineFeatures` and `_openBuildMode` removed.
+- Affected file: `project_tracker_screen.dart` (−229 lines).
+- `dart analyze lib` clean.
+
+---
+
+## v0.5.30 — 2026-10-08 — Compile badge in timeline + ship confirmation bar
+
+- **COMPILE section in the Timeline.** After a build runs the static analyzer, a COMPILE row appears in the right-side Timeline showing "Build clean" (green) or "Compile errors" (red) — always visible without scrolling the console.
+- **Ship confirmation bar.** After Mark Shipped completes, instead of silently closing the window the screen now shows a confirmation bar with the exact commit message and a required "Done" tap, so the user knows the feature was committed and pushed before leaving.
+- Affected files: `run_session.dart` (new `compileStatus` field), `implementation_notifier.dart` (populates status), `implementation_screen.dart` (Timeline COMPILE row + `_ShipConfirmationBar` widget).
+- `dart analyze lib` clean.
+
+---
+
 ## v0.5.29 — 2026-10-07 — Diagnostics: breadcrumbs for all architect LLM calls
 
 - **`feature_scan.dart` now writes `DiagLog.breadcrumb()` before and after every architect-model call**: `_parseWithRetry` (covers scan, recommend, plan build order, refine features, metaphor, architect decompose), `describeCapabilities`, `securityCheck`, and `adviseBuild`. Previously a native crash during any of these left zero trail in `diag.log`. Now the last crumb identifies exactly which feature and which LLM call died.
