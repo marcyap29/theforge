@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../data/filesystem/project_file_repository.dart';
 import '../../../data/local_db/forge_database.dart';
+import '../../../services/offline/offline_sync_provider.dart';
 import '../../projects/providers/providers.dart';
 import '../data/tracker_repository.dart';
 import '../models/tracker_enums.dart';
@@ -11,7 +12,10 @@ import '../models/tracker_enums.dart';
 const _uuid = Uuid();
 
 final trackerRepositoryProvider = Provider<TrackerRepository>(
-  (ref) => TrackerRepository(ref.watch(forgeDatabaseProvider)),
+  (ref) => TrackerRepository(
+    ref.watch(forgeDatabaseProvider),
+    sync: ref.watch(offlineSyncServiceProvider),
+  ),
 );
 
 /// Per-project feature list, mutable via the notifier's methods. Keyed by

@@ -7,15 +7,20 @@ import 'package:uuid/uuid.dart';
 
 import '../../../data/filesystem/project_file_repository.dart';
 import '../../../data/local_db/forge_database.dart';
+import '../../../services/offline/offline_sync_service.dart';
 
 /// Persists tracker data (features + per-project tracking state) to the drift
 /// DB and mirrors it to `{projectPath}/tracker/*.json` so it is portable,
 /// git-trackable, and survives a DB rebuild — matching the repo invariant that
 /// the filesystem is the source of truth and SQLite is a rebuildable index.
 class TrackerRepository {
-  TrackerRepository(this._db);
+  TrackerRepository(this._db, {OfflineSyncService? sync}) : _sync = sync;
 
   final ForgeDatabase _db;
+
+  /// Optional offline sync service. When present, every save is also queued for
+  /// cloud sync so tracker data survives offline and flushes when back online.
+  final OfflineSyncService? _sync;
 
   // --- Features ---
 
@@ -25,6 +30,19 @@ class TrackerRepository {
   Future<void> saveFeature(Feature feature, {String? projectPath}) async {
     await _db.upsertFeature(feature.toCompanion(false));
     await _mirrorFeatures(feature.projectId, projectPath);
+    await _sync?.enqueue('feature.save', {
+      'id': feature.id,
+      'projectId': feature.projectId,
+      'title': feature.title,
+      'description': feature.description,
+      'status': feature.status,
+      'priority': feature.priority,
+      'targetVersion': feature.targetVersion,
+      'source': feature.source,
+      'buildKind': feature.buildKind,
+      'parentId': feature.parentId,
+      'updatedAt': feature.updatedAt,
+    });
   }
 
   Future<void> deleteFeature(
@@ -34,6 +52,7 @@ class TrackerRepository {
   }) async {
     await _db.deleteFeature(id);
     await _mirrorFeatures(projectId, projectPath);
+    await _sync?.enqueue('feature.delete', {'id': id, 'projectId': projectId});
   }
 
   /// Replaces the full feature set for a project in one shot (used by the
@@ -60,6 +79,14 @@ class TrackerRepository {
     String? projectPath,
   }) async {
     await _db.upsertTracking(data.toCompanion(false));
+    await _sync?.enqueue('tracking.save', {
+      'projectId': data.projectId,
+      'status': data.status,
+      'summary': data.summary,
+      'reviewCadenceDays': data.reviewCadenceDays,
+      'lastReviewedAt': data.lastReviewedAt,
+      'lastReviewHead': data.lastReviewHead,
+    });
     if (projectPath != null) {
       await _writeJson(projectPath, 'tracker.json', {
         'projectId': data.projectId,
@@ -113,16 +140,18 @@ class TrackerRepository {
     await _writeJson(projectPath, 'releases.json', {
       'projectId': projectId,
       'releases': releases
-          .map((r) => {
-                'id': r.id,
-                'version': r.version,
-                'status': r.status,
-                'releasedAt': r.releasedAt,
-                'notes': r.notes,
-                'gitTag': r.gitTag,
-                'createdAt': r.createdAt,
-                'updatedAt': r.updatedAt,
-              })
+          .map(
+            (r) => {
+              'id': r.id,
+              'version': r.version,
+              'status': r.status,
+              'releasedAt': r.releasedAt,
+              'notes': r.notes,
+              'gitTag': r.gitTag,
+              'createdAt': r.createdAt,
+              'updatedAt': r.updatedAt,
+            },
+          )
           .toList(),
     });
   }
@@ -135,19 +164,21 @@ class TrackerRepository {
     await _writeJson(projectPath, 'features.json', {
       'projectId': projectId,
       'features': features
-          .map((f) => {
-                'id': f.id,
-                'title': f.title,
-                'description': f.description,
-                'status': f.status,
-                'priority': f.priority,
-                'targetVersion': f.targetVersion,
-                'source': f.source,
-                'buildKind': f.buildKind,
-                'parentId': f.parentId,
-                'createdAt': f.createdAt,
-                'updatedAt': f.updatedAt,
-              })
+          .map(
+            (f) => {
+              'id': f.id,
+              'title': f.title,
+              'description': f.description,
+              'status': f.status,
+              'priority': f.priority,
+              'targetVersion': f.targetVersion,
+              'source': f.source,
+              'buildKind': f.buildKind,
+              'parentId': f.parentId,
+              'createdAt': f.createdAt,
+              'updatedAt': f.updatedAt,
+            },
+          )
           .toList(),
     });
   }
@@ -157,8 +188,9 @@ class TrackerRepository {
     String fileName,
     Map<String, dynamic> data,
   ) async {
-    final dir =
-        Directory(p.join(projectPath, ProjectFileRepository.forgeDirName, 'tracker'));
+    final dir = Directory(
+      p.join(projectPath, ProjectFileRepository.forgeDirName, 'tracker'),
+    );
     if (!dir.existsSync()) {
       await dir.create(recursive: true);
     }

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
 import '../../../data/local_db/forge_database.dart';
+import '../../../services/offline/offline_sync_provider.dart';
 import 'providers.dart';
 
 class ProjectListNotifier extends AsyncNotifier<List<Project>> {
@@ -9,6 +10,7 @@ class ProjectListNotifier extends AsyncNotifier<List<Project>> {
   Future<List<Project>> build() async {
     final fileRepo = ref.watch(projectFileRepositoryProvider);
     final db = ref.watch(forgeDatabaseProvider);
+    final sync = ref.watch(offlineSyncServiceProvider);
 
     final paths = await fileRepo.scanProjectPaths();
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -28,6 +30,16 @@ class ProjectListNotifier extends AsyncNotifier<List<Project>> {
             createdAt: now,
           ),
         );
+        // Cache locally (already done above) and queue a cloud sync so the
+        // project reaches the server when connectivity returns.
+        await sync.enqueue('project.upsert', {
+          'id': id,
+          'name': id,
+          'path': path,
+          'mode': 'build',
+          'phase': 'v1_interview',
+          'createdAt': now,
+        });
       }
     }
 
