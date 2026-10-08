@@ -1995,12 +1995,12 @@ class _FeatureTile extends StatelessWidget {
         // Available on any non-archived feature — including shipped ones, so
         // a finished feature can be re-opened and edited/extended.
         if (status != FeatureStatus.archived) ...[
-          PopupMenuItem(
+          const PopupMenuItem(
             value: _TileAction.build_,
             child: Row(children: [
-              const Icon(Icons.auto_awesome, size: 16, color: Color(0xFFE8A04C)),
-              const SizedBox(width: 8),
-              const Text('Build'),
+              Icon(Icons.auto_awesome, size: 16, color: Color(0xFFE8A04C)),
+              SizedBox(width: 8),
+              Text('Build'),
             ]),
           ),
           const PopupMenuItem(
