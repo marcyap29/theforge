@@ -631,8 +631,10 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
         captured.where((l) => l.contains('error •')).toList();
     if (errs.isEmpty) {
       _log(ConsoleLineKind.success, '✓ analyze clean (no compile errors)');
+      state = state.copyWith(analyzeClean: true, error: state.error);
     } else {
       _log(ConsoleLineKind.error, '✗ analyze found ${errs.length} error(s)');
+      state = state.copyWith(analyzeClean: false, error: state.error);
       failures
         ..writeln('Static analysis errors ($cmd):')
         ..writeln(errs.take(60).map((l) => '  $l').join('\n'))
@@ -816,6 +818,7 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     final pushed = await ProjectFileRepository.gitPush(repoPath);
     _log(pushed ? ConsoleLineKind.success : ConsoleLineKind.info,
         pushed ? '✓ pushed to origin' : '• not pushed (no remote / auth) — committed locally');
+    state = state.copyWith(lastCommit: msg, lastPushOk: pushed, error: state.error);
   }
 
   /// Asks the architect model to fold this feature into the repo's ARCHITECTURE

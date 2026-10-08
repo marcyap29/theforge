@@ -171,6 +171,9 @@ class ImplRunState {
     this.endedAt,
     this.canFix = false,
     this.completionWarning,
+    this.analyzeClean,
+    this.lastCommit,
+    this.lastPushOk,
   });
 
   factory ImplRunState.initial(String runId) => ImplRunState(
@@ -217,6 +220,16 @@ class ImplRunState {
   /// look. Multiple warnings are joined with a blank line. See [CompletionGuard].
   final String? completionWarning;
 
+  /// Null = analyze hasn't run yet; true = clean; false = errors found.
+  final bool? analyzeClean;
+
+  /// The commit message from the last successful ship (docs + commit + push).
+  /// Null if not yet shipped or if commit failed.
+  final String? lastCommit;
+
+  /// Whether the push after the last ship succeeded. Null if not yet shipped.
+  final bool? lastPushOk;
+
   int get approvedEditCount =>
       (plan?.edits.length ?? 0) - skippedEdits.length;
   int get approvedCommandCount =>
@@ -237,6 +250,9 @@ class ImplRunState {
     bool? canFix,
     String? completionWarning,
     bool clearCompletionWarning = false,
+    bool? analyzeClean,
+    String? lastCommit,
+    bool? lastPushOk,
   }) {
     return ImplRunState(
       runId: runId,
@@ -255,6 +271,9 @@ class ImplRunState {
       completionWarning: clearCompletionWarning
           ? null
           : (completionWarning ?? this.completionWarning),
+      analyzeClean: analyzeClean ?? this.analyzeClean,
+      lastCommit: lastCommit ?? this.lastCommit,
+      lastPushOk: lastPushOk ?? this.lastPushOk,
     );
   }
 }

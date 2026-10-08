@@ -384,25 +384,27 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
                     if (state.phase == RunPhase.done)
                       _shipping
                           ? const _ShippingBar()
-                          : _DoneBar(
-                              alreadyShipped: state.featureShipped,
-                              canFix: state.canFix,
-                              completionWarning: state.completionWarning,
-                              onShip: () async {
-                                // Shipping does real work (docs + commit + push),
-                                // which takes a few seconds — show a clear
-                                // "working" bar so it doesn't look hung.
-                                setState(() => _shipping = true);
-                                await notifier.shipFeature();
-                                if (context.mounted) {
-                                  Navigator.of(context).pop(true);
-                                }
-                              },
-                              onFix: notifier.fix,
-                              onFollowUp: _followUp,
-                              onClose: () =>
-                                  Navigator.of(context).pop(state.featureShipped),
-                            ),
+                          : state.featureShipped
+                              ? _ShipConfirmationBar(
+                                  commitMessage: state.lastCommit,
+                                  pushOk: state.lastPushOk,
+                                  onDone: () =>
+                                      Navigator.of(context).pop(true),
+                                )
+                              : _DoneBar(
+                                  alreadyShipped: false,
+                                  canFix: state.canFix,
+                                  completionWarning: state.completionWarning,
+                                  onShip: () async {
+                                    setState(() => _shipping = true);
+                                    await notifier.shipFeature();
+                                    if (mounted) setState(() => _shipping = false);
+                                  },
+                                  onFix: notifier.fix,
+                                  onFollowUp: _followUp,
+                                  onClose: () =>
+                                      Navigator.of(context).pop(false),
+                                ),
                     if (state.phase == RunPhase.failed ||
                         state.phase == RunPhase.stopped)
                       _FailedBar(
@@ -1380,6 +1382,41 @@ class _Timeline extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         for (var i = 0; i < _steps.length; i++) _stepRow(_steps[i].$1, i),
+        if (state.analyzeClean != null) ...[
+          const SizedBox(height: 20),
+          const Text(
+            'COMPILE',
+            style: TextStyle(
+              fontSize: 11,
+              letterSpacing: 1,
+              color: Color(0xFF6B7280),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Icon(
+                state.analyzeClean!
+                    ? Icons.check_circle
+                    : Icons.error_outline,
+                size: 14,
+                color: state.analyzeClean!
+                    ? const Color(0xFF81C784)
+                    : const Color(0xFFFF453A),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                state.analyzeClean! ? 'Build clean' : 'Compile errors',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: state.analyzeClean!
+                      ? const Color(0xFF81C784)
+                      : const Color(0xFFFF453A),
+                ),
+              ),
+            ],
+          ),
+        ],
         if (state.appliedEditPaths.isNotEmpty) ...[
           const SizedBox(height: 20),
           const Text(
@@ -1692,6 +1729,82 @@ class _DoneBar extends StatelessWidget {
               icon: const Icon(Icons.local_shipping_outlined, size: 16),
               label: const Text('Mark shipped'),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shown after a successful ship (docs + commit + push). Displays the exact
+/// commit message so the user has conscious awareness the feature was committed,
+/// then requires a tap to close — no silent redirect back to the board.
+class _ShipConfirmationBar extends StatelessWidget {
+  const _ShipConfirmationBar({
+    required this.commitMessage,
+    required this.pushOk,
+    required this.onDone,
+  });
+
+  final String? commitMessage;
+  final bool? pushOk;
+  final VoidCallback onDone;
+
+  @override
+  Widget build(BuildContext context) {
+    final pushed = pushOk ?? false;
+    final subtitle = commitMessage != null
+        ? '"$commitMessage"'
+        : 'Committed locally.';
+    final detail = pushed ? 'Committed and pushed to origin.' : 'Committed locally — not pushed (no remote / auth).';
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+      decoration: const BoxDecoration(
+        color: Color(0x2281C784),
+        border: Border(top: BorderSide(color: Color(0xFF1C1C1E))),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle,
+              size: 18, color: Color(0xFF81C784)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Feature shipped',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFFE5E5E7)),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                      fontFamily: 'Menlo',
+                      fontSize: 11.5,
+                      color: Color(0xFF81C784)),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  detail,
+                  style: const TextStyle(
+                      fontSize: 11.5, color: Color(0xFF9CA3AF)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          FilledButton(
+            onPressed: onDone,
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF81C784),
+              foregroundColor: Colors.black,
+            ),
+            child: const Text('Done'),
+          ),
         ],
       ),
     );
