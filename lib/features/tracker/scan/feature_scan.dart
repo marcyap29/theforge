@@ -450,6 +450,37 @@ Respond with ONLY this JSON, no prose, no code fences:
   /// Decomposes a feature into properly-sized, typed sub-features. Returns
   /// whether it's really an epic, a rationale, and the ordered sub-features
   /// (each tagged standard/manual). Grounded in the repo + docs; JSON output.
+  /// Lightweight pre-flight: asks the architect model whether [feature] genuinely
+  /// needs decomposition. Returns `(shouldDecompose, reason)`. On any parse
+  /// failure, defaults to `(true, '')` so the user is never silently blocked.
+  Future<(bool, String)> assessDecomposition({
+    required Feature feature,
+  }) async {
+    DiagLog.breadcrumb('architect: assessDecomposition start');
+    final desc = (feature.description ?? '').trim();
+    final userPrompt = 'Feature title: ${feature.title}'
+        '${desc.isEmpty ? '' : '\nDescription: $desc'}';
+    final raw = await _llm.complete(
+      role: LlmRole.architect,
+      temperature: 0.2,
+      maxTokens: 250,
+      systemPrompt: _assessSystemPrompt,
+      userPrompt: userPrompt,
+      jsonMode: true,
+      think: false,
+    );
+    DiagLog.breadcrumb('architect: assessDecomposition done (len=${raw.length})');
+    try {
+      final decoded = jsonDecode(_extractJsonObject(raw));
+      if (decoded is! Map) return (true, '');
+      final decompose = decoded['decompose'] == true;
+      final reason = (decoded['reason'] ?? '').toString().trim();
+      return (decompose, reason);
+    } catch (_) {
+      return (true, ''); // parse failure → allow decomposition
+    }
+  }
+
   Future<ArchitectPlan> architectFeature({
     required String projectPath,
     String? repoPath,
@@ -943,6 +974,23 @@ Return an empty proposals array when you're only asking a question.''';
 
   List<String> _cap(List<String> list) =>
       list.length > 400 ? list.sublist(0, 400) : list;
+
+  static const _assessSystemPrompt = '''
+Decide whether a tracked feature genuinely needs breaking into sub-features
+before it can be built, or whether it is already a single focused task a
+developer can implement in one build session.
+
+Answer YES (decompose: true) when the feature clearly spans multiple
+distinct components, concerns, or sessions — a developer could not reasonably
+finish it in one sitting.
+
+Answer NO (decompose: false) when the feature is already focused and
+self-contained enough to hand straight to an AI code generator.
+
+Respond with ONLY this JSON (no prose, no code fences):
+{"decompose": true, "reason": "one sentence — why it needs decomposition"}
+or
+{"decompose": false, "reason": "one sentence — why it can be built directly"}''';
 
   static const _architectSystemPrompt = '''
 You are a senior software architect breaking a tracked "feature" into properly

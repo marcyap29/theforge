@@ -816,15 +816,126 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     );
   }
 
-  /// Architects a feature: asks the LLM to decompose it into typed sub-features,
-  /// lets the user review, then creates the kept sub-features nested under this
-  /// feature (which becomes an epic).
+  /// Walks up [feature]'s parent chain and returns its nesting depth.
+  /// 0 = top-level, 1 = sub-feature, 2 = sub-sub-feature, etc.
+  int _featureDepth(Feature feature, List<Feature> all) {
+    int depth = 0;
+    String? parentId = feature.parentId;
+    while (parentId != null && depth < 10) {
+      depth++;
+      final parent = all.where((f) => f.id == parentId).firstOrNull;
+      parentId = parent?.parentId;
+    }
+    return depth;
+  }
+
+  /// Fast local heuristic: returns true when title + description are short and
+  /// contain no compound-task signals — catches obvious atomic features before
+  /// spending any tokens on the LLM self-assessment.
+  bool _looksAtomic(Feature feature) {
+    final combined = '${feature.title} ${feature.description ?? ''}'.trim();
+    final wordCount =
+        combined.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
+    if (wordCount > 60) return false;
+    final lower = combined.toLowerCase();
+    const compoundPhrases = ['and also', 'as well as', 'in addition', 'including'];
+    if (compoundPhrases.any((p) => lower.contains(p))) return false;
+    if (RegExp(r'\band\b').allMatches(lower).length > 2) return false;
+    return wordCount < 50;
+  }
+
+  /// Architects a feature: runs three guards (depth, heuristic, LLM assessment)
+  /// before spending tokens on full decomposition. If all guards pass, asks the
+  /// LLM to decompose it into typed sub-features, lets the user review, then
+  /// creates the kept sub-features nested under this feature (which becomes epic).
   Future<void> _architectFeature(Feature feature) async {
-    _showBlockingSpinner('Architecting “${feature.title}”…');
+    final all =
+        ref.read(featureListProvider(project.id)).valueOrNull ?? const [];
+
+    // --- Guard 1: depth limit (≥ 2 levels deep = implementation steps, not features) ---
+    if (_featureDepth(feature, all) >= 2) {
+      if (!mounted) return;
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Too deeply nested to decompose'),
+          content: const Text(
+            'This feature is already two levels deep. Decomposing further '
+            'produces implementation steps, not trackable features.\n\n'
+            'If you need finer breakdown, add sub-tasks manually.',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Got it'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // --- Guard 2: complexity heuristic (fast, no tokens) ---
+    if (_looksAtomic(feature)) {
+      if (!mounted) return;
+      final choice = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('This looks buildable as-is'),
+          content: Text(
+            '”${feature.title}” looks like a single focused task. '
+            'Architecting it may just add unnecessary sub-tasks.\n\n'
+            'Build it directly, or continue to Architect if you think '
+            'it is more complex than it appears.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'build'),
+              child: const Text('Build directly'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, 'architect'),
+              child: const Text('Architect anyway'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      if (choice == 'build') { _buildFeature(feature); return; }
+      if (choice != 'architect') return; // dismissed
+    }
+
+    // --- Guard 3: LLM self-assessment (~250 tokens vs ~2500 for full decompose) ---
+    _showBlockingSpinner('Checking if “${feature.title}” needs decomposition…');
+    late final (bool shouldDecompose, String reason) assessment;
+    try {
+      assessment = await ref
+          .read(featureScannerProvider)
+          .assessDecomposition(feature: feature);
+    } catch (e) {
+      if (mounted) Navigator.of(context).pop();
+      _showError('Architect feature', e);
+      return;
+    }
+    if (!mounted) return;
+
+    if (!assessment.$1) {
+      Navigator.of(context).pop(); // dismiss spinner
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('”${feature.title}” can be built directly. '
+            '${assessment.$2}'),
+        action: SnackBarAction(
+          label: 'Build',
+          onPressed: () => _buildFeature(feature),
+        ),
+        duration: const Duration(seconds: 7),
+      ));
+      return;
+    }
+
+    // All guards passed — run full decomposition (reuse the spinner already open).
     ArchitectPlan plan;
     try {
-      final all =
-          ref.read(featureListProvider(project.id)).valueOrNull ?? const [];
       plan = await ref.read(featureScannerProvider).architectFeature(
             projectPath: project.path,
             repoPath: _repoPath,
@@ -832,7 +943,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             allFeatures: all,
           );
     } catch (e) {
-      if (mounted) Navigator.of(context).pop(); // dismiss spinner
+      if (mounted) Navigator.of(context).pop();
       _showError('Architect feature', e);
       return;
     }
