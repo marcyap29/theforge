@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 
 import '../../../data/filesystem/project_file_repository.dart';
 import '../../../data/local_db/forge_database.dart';
@@ -183,6 +184,16 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
                 Icons.shield_outlined, 'Security check', _openSecurityCheck),
             _menuEntry(Icons.fact_check_outlined, 'Run check-in', _runCheckin),
           ]),
+          IconButton(
+            icon: const Icon(Icons.folder_open_outlined),
+            tooltip: 'Forge docs',
+            onPressed: _openForgeFolder,
+          ),
+          IconButton(
+            icon: const Icon(Icons.chat_bubble_outline),
+            tooltip: 'Ask anything',
+            onPressed: _askAnything,
+          ),
           IconButton(
             icon: const Icon(Icons.castle_outlined),
             tooltip: 'Base view (game)',
@@ -1405,6 +1416,26 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
         project: project,
         repoPath: _repoPath,
         initialFeature: feature,
+        onBuildFeature: _buildFeature,
+      ),
+    ));
+  }
+
+  /// Opens the project's `.forge/` artifacts folder in macOS Finder.
+  /// Creates the folder if it doesn't exist yet (first run on a new project).
+  Future<void> _openForgeFolder() async {
+    final forgePath = p.join(project.path, ProjectFileRepository.forgeDirName);
+    await Directory(forgePath).create(recursive: true);
+    await Process.run('open', [forgePath]);
+  }
+
+  /// Opens the AI chat screen with no pre-selected feature, giving the user
+  /// a free-form prompt for any question not covered by Build or Architect.
+  void _askAnything() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => RefineFeaturesScreen(
+        project: project,
+        repoPath: _repoPath,
         onBuildFeature: _buildFeature,
       ),
     ));

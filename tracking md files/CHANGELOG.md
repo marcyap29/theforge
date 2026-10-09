@@ -2,6 +2,16 @@
 
 ---
 
+## v0.5.33 — 2026-10-09 — Forge Docs button + Ask Anything button
+
+- **Forge Docs button** (folder icon, AppBar): opens the project's `.forge/` artifacts folder in macOS Finder. Creates the folder if it doesn't exist yet (first run on a fresh project). Instant access to specs, worksheets, handoffs, audit logs, exports, and any other artifact the Forge has produced.
+- **Ask Anything button** (chat bubble icon, AppBar): opens `RefineFeaturesScreen` without a pre-selected feature, giving users a free-form AI chat for any question not covered by Build or Architect.
+- Both buttons appear in the AppBar between the AI tools menu and the castle icon.
+- Affected file: `project_tracker_screen.dart` (`_openForgeFolder`, `_askAnything`, two `IconButton`s in AppBar).
+- `dart analyze lib` clean.
+
+---
+
 ## v0.5.32 — 2026-10-08 — Three-layer Architect guard (depth + heuristic + LLM)
 
 - **Guard 1 — depth limit:** Architect is blocked on features already 2+ levels deep. At that depth you're describing implementation steps, not decomposable features.

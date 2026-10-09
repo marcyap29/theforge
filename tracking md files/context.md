@@ -4,6 +4,23 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-10-09 — Claude Code [Forge Docs + Ask Anything buttons — v0.5.33]
+
+**Branch:** main · **App:** v0.5.33
+
+### Why
+Two new AppBar buttons requested: (1) quick access to the `.forge/` artifacts folder (specs, worksheets, handoffs, audit, exports — currently hard to find), and (2) a free-form AI chat prompt for questions that don't fit Build or Architect.
+
+### Done
+- `project_tracker_screen.dart`: `_openForgeFolder()` (opens `.forge/` in Finder, creates dir if absent) + `_askAnything()` (opens `RefineFeaturesScreen` without a feature) + two `IconButton`s in AppBar (folder_open + chat_bubble_outline icons).
+- `main.dart`: bumped to v0.5.33.
+- Docs: CHANGELOG v0.5.33, FEATURES.md two new rows, this context block.
+
+### Verify
+`dart analyze lib` clean. App deployed.
+
+---
+
 ## Session: 2026-10-07 — Claude Code [Architect breadcrumbs + website v1 updates]
 
 **Branch:** main · **App:** v0.5.29
