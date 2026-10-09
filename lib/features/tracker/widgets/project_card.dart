@@ -12,7 +12,6 @@ class ProjectCard extends StatelessWidget {
     super.key,
     required this.entry,
     required this.onOpen,
-    required this.onOpenDetail,
     this.selecting = false,
     this.selected = false,
     this.onLongPress,
@@ -24,9 +23,6 @@ class ProjectCard extends StatelessWidget {
 
   /// Open the feature board / tracker.
   final VoidCallback onOpen;
-
-  /// Open the full Forge project detail (interview/spec pipeline).
-  final VoidCallback onOpenDetail;
 
   /// Multi-select state for bulk delete.
   final bool selecting;
@@ -130,26 +126,12 @@ class ProjectCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 6),
-              Row(
-                children: [
-                  Text(
-                    _reviewedLabel(),
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: Color(0xFF6B7280),
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    tooltip: 'Open Forge project (interview / spec)',
-                    icon: const Icon(Icons.build_outlined,
-                        size: 16, color: Color(0xFF8A8A8E)),
-                    onPressed: onOpenDetail,
-                  ),
-                ],
+              Text(
+                _reviewedLabel(),
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: Color(0xFF6B7280),
+                ),
               ),
             ],
           ),

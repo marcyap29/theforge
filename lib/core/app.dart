@@ -2,16 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../features/interview/providers/interview_providers.dart';
-import '../features/interview/ui/interview_screen.dart';
 import '../features/launch/launch_screen.dart';
-import '../features/projects/screens/projects_list_screen.dart';
 import '../features/projects/screens/pull_ingestion_progress_screen.dart';
 import '../features/projects/screens/pull_ingestion_summary_screen.dart';
-import '../features/pull_interview/state/pull_interview_state.dart';
-import '../features/pull_interview/ui/pull_interview_screen.dart';
 import '../features/settings/settings_screen.dart';
-import '../features/spec_generation/as_built_spec_screen.dart';
 import '../features/tracker/screens/portfolio_dashboard_screen.dart';
 import '../features/watch/briefing_screen.dart';
 import '../features/watch/decision_screen.dart';
@@ -86,14 +80,6 @@ class TheForgeApp extends ConsumerWidget {
       routes: {
         '/': (context) => const LaunchScreen(),
         '/home': (context) => const PortfolioDashboardScreen(),
-        '/projects': (context) => const ProjectsListScreen(),
-        '/interview': (context) {
-          final args = ModalRoute.of(context)?.settings.arguments;
-          if (args is InterviewArgs) {
-            return InterviewScreen(args: args);
-          }
-          return const _MissingInterviewArgs();
-        },
         '/settings': (context) => const SettingsScreen(),
         '/watch': (context) => const WatchDashboardScreen(),
         '/watch/briefing': (context) => const BriefingScreen(),
@@ -120,27 +106,6 @@ class TheForgeApp extends ConsumerWidget {
             body: Center(child: Text('Invalid arguments')),
           );
         },
-        '/reverse-interview': (context) {
-          final args = ModalRoute.of(context)?.settings.arguments;
-          if (args is PullInterviewArgs) {
-            return PullInterviewScreen(args: args);
-          }
-          return const Scaffold(
-            body: Center(child: Text('Invalid pull interview args')),
-          );
-        },
-        '/as-built-spec': (context) {
-          final args = ModalRoute.of(context)?.settings.arguments;
-          if (args is Map<String, String>) {
-            return AsBuiltSpecScreen(
-              projectPath: args['projectPath']!,
-              projectName: args['projectName']!,
-            );
-          }
-          return const Scaffold(
-            body: Center(child: Text('Invalid as-built spec args')),
-          );
-        },
       },
     );
   }
@@ -156,27 +121,4 @@ class DecreaseTextScaleIntent extends Intent {
 
 class ResetTextScaleIntent extends Intent {
   const ResetTextScaleIntent();
-}
-
-class _MissingInterviewArgs extends StatelessWidget {
-  const _MissingInterviewArgs();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text(
-            'Missing interview arguments.\n\n'
-            'Navigate with:\n'
-            'Navigator.pushNamed(context, "/interview", '
-            'arguments: InterviewArgs(path: p, name: n));',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontFamily: 'Menlo', fontSize: 13, height: 1.5),
-          ),
-        ),
-      ),
-    );
-  }
 }

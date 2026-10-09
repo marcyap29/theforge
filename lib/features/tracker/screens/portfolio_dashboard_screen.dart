@@ -5,7 +5,6 @@ import '../../../data/filesystem/project_file_repository.dart';
 import '../../projects/project_actions.dart';
 import '../../projects/providers/providers.dart';
 import '../../projects/screens/new_project_screen.dart';
-import '../../projects/screens/project_detail_screen.dart';
 import '../providers/tracker_providers.dart';
 import '../widgets/active_model_chip.dart';
 import '../widgets/portfolio_digest.dart';
@@ -204,11 +203,6 @@ class _PortfolioDashboardScreenState
             ForgeAppHeader(trailing: [
               const ActiveModelChip(),
               IconButton(
-                icon: const Icon(Icons.folder_outlined, size: 18),
-                tooltip: 'All projects',
-                onPressed: () => Navigator.of(context).pushNamed('/projects'),
-              ),
-              IconButton(
                 icon: const Icon(Icons.monitor_heart_outlined, size: 18),
                 tooltip: 'Watch Mode',
                 onPressed: () => Navigator.of(context).pushNamed('/watch'),
@@ -292,7 +286,6 @@ class _PortfolioDashboardScreenState
                               onContextMenu: (pos) =>
                                   _showContextMenu(pos, entry),
                               onOpen: () => _openTracker(entry),
-                              onOpenDetail: () => _openDetail(entry),
                             );
                           },
                           childCount: entries.length,
@@ -325,21 +318,6 @@ class _PortfolioDashboardScreenState
     if (target != null && mounted) _openTracker(target);
   }
 
-  Future<void> _openDetail(PortfolioEntry entry) async {
-    final repo = ref.read(projectFileRepositoryProvider);
-    final db = ref.read(forgeDatabaseProvider);
-    final navigator = Navigator.of(context);
-    await ref
-        .read(activeProjectProvider.notifier)
-        .open(entry.project.path, repo, db);
-    if (mounted) {
-      navigator.push(
-        MaterialPageRoute<void>(
-          builder: (_) => ProjectDetailScreen(project: entry.project),
-        ),
-      );
-    }
-  }
 }
 
 class _SummaryStrip extends StatelessWidget {

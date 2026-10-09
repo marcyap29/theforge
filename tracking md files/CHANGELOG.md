@@ -2,6 +2,29 @@
 
 ---
 
+## v0.5.34 — 2026-10-09 — Remove interview / spec-generation workflow
+
+Build-with-AI is the primary path. The 8-dimension interview flow, spec generation, worksheet generation, as-built spec, and all associated screens are removed.
+
+**Deleted folders/files (~4,000 lines):**
+- `lib/features/interview/` (6 files)
+- `lib/features/addendum_interview/` (2 files)
+- `lib/features/pull_interview/` (3 files)
+- `lib/features/spec_generation/` (13 files)
+- `lib/features/import/` (3 files — fed only into spec gen)
+- `project_detail_screen.dart` (3,964 lines)
+- `projects_list_screen.dart` (old flat project list, superseded by portfolio dashboard)
+- `active_project_notifier.dart` (only used by detail screen)
+
+**Simplified:**
+- `app.dart`: removed `/interview`, `/reverse-interview`, `/as-built-spec`, `/projects` routes.
+- `new_project_screen.dart`: stripped to name field + create → pop to portfolio. No mode cards.
+- `portfolio_dashboard_screen.dart`: removed `_openDetail`, removed "All projects" toolbar button.
+- `project_card.dart`: removed `onOpenDetail` / wrench icon.
+- `dart analyze lib` clean.
+
+---
+
 ## v0.5.33 — 2026-10-09 — Forge Docs button + Ask Anything button
 
 - **Forge Docs button** (folder icon, AppBar): opens the project's `.forge/` artifacts folder in macOS Finder. Creates the folder if it doesn't exist yet (first run on a fresh project). Instant access to specs, worksheets, handoffs, audit logs, exports, and any other artifact the Forge has produced.

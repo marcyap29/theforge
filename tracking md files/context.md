@@ -4,6 +4,23 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-10-09 — Claude Code [Remove interview/spec-generation workflow — v0.5.34]
+
+**Branch:** main · **App:** v0.5.34
+
+### Why
+Build-with-AI supersedes the old 8-dimension interview → spec → worksheet → executor pipeline. The old UX (project detail screen with FILES sidebar + interview progress) was a design inconsistency vs the portfolio dashboard + tracker. Decision: remove all interview/spec-gen code; the FILES sidebar returns later as a tracker drawer.
+
+### Done
+- Deleted: `features/interview/`, `features/addendum_interview/`, `features/pull_interview/`, `features/spec_generation/`, `features/import/`, `project_detail_screen.dart`, `projects_list_screen.dart`, `active_project_notifier.dart` (~4,000+ lines removed).
+- Simplified: `app.dart` (routes), `new_project_screen.dart` (name + create only), `portfolio_dashboard_screen.dart` (no `_openDetail`), `project_card.dart` (no wrench button).
+- `dart analyze lib` clean. App deployed.
+
+### Verify
+`dart analyze lib` clean. Build 26.6 MB (was 27.3 MB).
+
+---
+
 ## Session: 2026-10-09 — Claude Code [Forge Docs + Ask Anything buttons — v0.5.33]
 
 **Branch:** main · **App:** v0.5.33

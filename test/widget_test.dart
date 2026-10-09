@@ -43,7 +43,7 @@ void main() {
           updatedAt: 0,
         );
 
-    final project = Project(
+    const project = Project(
       id: 'p1',
       name: 'Demo',
       path: '/tmp/demo',
@@ -73,7 +73,7 @@ void main() {
     test('reviewDue: no cadence => never due', () {
       final entry = PortfolioEntry(
         project: project,
-        tracking: ProjectTrackingData(projectId: 'p1', status: 'active'),
+        tracking: const ProjectTrackingData(projectId: 'p1', status: 'active'),
         features: const [],
       );
       expect(entry.reviewDue, false);
@@ -82,7 +82,7 @@ void main() {
     test('reviewDue: cadence set but never reviewed => due', () {
       final entry = PortfolioEntry(
         project: project,
-        tracking: ProjectTrackingData(
+        tracking: const ProjectTrackingData(
             projectId: 'p1', status: 'active', reviewCadenceDays: 7),
         features: const [],
       );

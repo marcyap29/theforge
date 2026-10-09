@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/theme/forge_theme.dart';
-import '../../core/widgets/hearth_dial.dart';
-import '../projects/screens/new_project_screen.dart';
+import '../lib/core/theme/forge_theme.dart';
+import '../lib/core/widgets/hearth_dial.dart';
+import '../lib/features/projects/screens/new_project_screen.dart';
 
 /// What a brand-new user sees before anything is tracked.
 ///
@@ -89,8 +89,9 @@ class FirstRunScreen extends ConsumerWidget {
                             ),
                             child: Text(
                               'LOOK AROUND FIRST',
-                              style: t.labelSmall
-                                  ?.copyWith(color: ForgeColors.steelDim),
+                              style: t.labelSmall?.copyWith(
+                                color: ForgeColors.steelDim,
+                              ),
                             ),
                           ),
                         ],
@@ -107,44 +108,43 @@ class FirstRunScreen extends ConsumerWidget {
   }
 
   Widget _header(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: ForgeColors.hairline)),
+    padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+    decoration: const BoxDecoration(
+      border: Border(bottom: BorderSide(color: ForgeColors.hairline)),
+    ),
+    child: Row(
+      children: [
+        const HearthDial(size: 20, progress: 0),
+        const SizedBox(width: 9),
+        Text(
+          'THE FORGE',
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: ForgeColors.ivory,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 2.1,
+          ),
         ),
-        child: Row(
-          children: [
-            const HearthDial(size: 20, progress: 0),
-            const SizedBox(width: 9),
-            Text(
-              'THE FORGE',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: ForgeColors.ivory,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 2.1,
-                  ),
-            ),
-            const Spacer(),
-            IconButton(
-              icon: const Icon(Icons.settings_outlined, size: 17),
-              color: ForgeColors.steel,
-              tooltip: 'Settings',
-              onPressed: () => Navigator.of(context).pushNamed('/settings'),
-            ),
-          ],
+        const Spacer(),
+        IconButton(
+          icon: const Icon(Icons.settings_outlined, size: 17),
+          color: ForgeColors.steel,
+          tooltip: 'Settings',
+          onPressed: () => Navigator.of(context).pushNamed('/settings'),
         ),
-      );
+      ],
+    ),
+  );
 
   void _addProject(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const NewProjectScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const NewProjectScreen()));
   }
 
   void _skip(BuildContext context) {
-    // Both buttons land in the same place today: NewProjectScreen already
-    // branches between naming a project and pointing at a folder. Split them
-    // only once those are genuinely different flows.
-    Navigator.of(context).pushReplacementNamed('/');
+    // "Look around" drops into the (empty) portfolio home, not back to the
+    // splash — which would just bounce here again while there are no projects.
+    Navigator.of(context).pushReplacementNamed('/home');
   }
 }
 
@@ -155,7 +155,10 @@ class _Steps extends StatelessWidget {
 
   static const _items = [
     ('01', 'Name what you\'re building'),
-    ('02', 'List what it should do, or let The Forge read your folder and draft it'),
+    (
+      '02',
+      'List what it should do, or let The Forge read your folder and draft it',
+    ),
     ('03', 'Come back whenever. It tells you what moved'),
   ];
 
@@ -185,8 +188,7 @@ class _Steps extends StatelessWidget {
                     children: [
                       Text(
                         _items[i].$1,
-                        style: t.labelSmall
-                            ?.copyWith(color: ForgeColors.brass),
+                        style: t.labelSmall?.copyWith(color: ForgeColors.brass),
                       ),
                       const SizedBox(height: 7),
                       Text(

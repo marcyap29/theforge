@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/theme/forge_theme.dart';
-import '../../../core/widgets/hearth_dial.dart';
-import '../../projects/providers/providers.dart';
-import '../models/tracker_enums.dart';
-import '../providers/tracker_providers.dart';
+import '../lib/core/theme/forge_theme.dart';
+import '../lib/core/widgets/hearth_dial.dart';
+import '../lib/features/tracker/models/tracker_enums.dart';
+import '../lib/features/tracker/providers/tracker_providers.dart';
 
 // ============================================================================
 // 1. The digest model + provider
@@ -101,14 +100,17 @@ final portfolioDigestProvider = FutureProvider<PortfolioDigest>((ref) async {
       }
     }
 
-    deltas.add(ProjectDelta(
-      entry: entry,
-      movedCount: moved,
-      newlyShipped: shipped,
-      blockedCount: entry.blockedCount,
-      lastActivity:
-          latest == 0 ? null : DateTime.fromMillisecondsSinceEpoch(latest),
-    ));
+    deltas.add(
+      ProjectDelta(
+        entry: entry,
+        movedCount: moved,
+        newlyShipped: shipped,
+        blockedCount: entry.blockedCount,
+        lastActivity: latest == 0
+            ? null
+            : DateTime.fromMillisecondsSinceEpoch(latest),
+      ),
+    );
   }
 
   // Loudest first: most movement, then most recent activity.
@@ -229,7 +231,8 @@ class PortfolioDigestPanel extends ConsumerWidget {
     }
     final u = d.totalMoved;
     final p = d.projectsMoved;
-    final base = '$u update${u == 1 ? '' : 's'} across '
+    final base =
+        '$u update${u == 1 ? '' : 's'} across '
         '$p project${p == 1 ? '' : 's'}.';
     if (d.totalNewlyShipped == 0) return base;
     final s = d.totalNewlyShipped;
@@ -285,9 +288,7 @@ class _DigestRow extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: const BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: ForgeColors.hairline),
-          ),
+          border: Border(bottom: BorderSide(color: ForgeColors.hairline)),
         ),
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 2),
         child: Row(
@@ -316,9 +317,7 @@ class _DigestRow extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Text(
-              delta.lastActivity == null
-                  ? '—'
-                  : _relative(delta.lastActivity!),
+              delta.lastActivity == null ? '—' : _relative(delta.lastActivity!),
               style: t.labelMedium?.copyWith(color: ForgeColors.steelDim),
             ),
           ],
@@ -332,11 +331,15 @@ class _DigestRow extends StatelessWidget {
       if (d.lastActivity == null) return 'Nothing tracked yet.';
       return 'Quiet since ${_relative(d.lastActivity!)}.';
     }
-    final parts = <String>['${d.movedCount} update${d.movedCount == 1 ? '' : 's'}.'];
+    final parts = <String>[
+      '${d.movedCount} update${d.movedCount == 1 ? '' : 's'}.',
+    ];
     if (d.newlyShipped > 0) {
-      parts.add(d.newlyShipped == 1
-          ? 'One looks done, waiting on you to confirm.'
-          : '${d.newlyShipped} look done, waiting on you to confirm.');
+      parts.add(
+        d.newlyShipped == 1
+            ? 'One looks done, waiting on you to confirm.'
+            : '${d.newlyShipped} look done, waiting on you to confirm.',
+      );
     }
     if (d.blockedCount > 0) {
       parts.add('${d.blockedCount} stuck.');
@@ -387,10 +390,10 @@ class ForgeAppHeader extends ConsumerWidget {
           Text(
             'THE FORGE',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: ForgeColors.ivory,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 2.1,
-                ),
+              color: ForgeColors.ivory,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 2.1,
+            ),
           ),
           const Spacer(),
           ...?trailing,
