@@ -94,7 +94,7 @@ class ProjectFileRepository {
   /// All Forge-generated deliverables for a project live under this hidden
   /// subfolder inside the project workspace. README.md and user_notes.md stay
   /// at the project root as the human-facing entry points.
-  static const forgeDirName = '.forge';
+  static const forgeDirName = 'Forge';
 
   /// The canonical, fixed home for all Forge project workspaces. It is
   /// deliberately NOT user-configurable and is never a code repo, so the Forge

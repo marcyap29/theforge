@@ -318,7 +318,7 @@ Respond with ONLY this JSON, no prose, no code fences:
   Future<List<String>> _scanForSecretHits(String repoPath) async {
     const skipDirs = {
       '.git', 'build', '.dart_tool', 'node_modules', 'Pods',
-      'DerivedData', '.forge', '.idea', 'ephemeral',
+      'DerivedData', 'Forge', '.idea', 'ephemeral',
     };
     const textExt = {
       '.dart', '.yaml', '.yml', '.json', '.env', '.sh', '.js', '.ts',
