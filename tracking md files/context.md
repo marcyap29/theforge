@@ -4,6 +4,23 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-10-09 — Claude Code [In-app Forge Files drawer — v0.5.35]
+
+**Branch:** main · **App:** v0.5.35
+
+### Why
+After renaming `.forge/` → `Forge/`, macOS Finder was showing the folder as empty (a display/cache artefact). Files were all present on disk (247 confirmed). Rather than rely on Finder refreshing, replaced the Finder-open button with an in-app `ForgeFilesPanel` endDrawer that reads the artifact tree directly, making files reliably accessible and shareable.
+
+### Done
+- **New:** `lib/features/tracker/widgets/forge_files_panel.dart` — `ForgeFilesPanel` `StatefulWidget` with 5 sections (Specs / Handoffs / Worksheets / Ingested Docs / Audit), each an `ExpansionTile`. Files open in default app on tap; "Reveal in Finder" in header preserves the old behaviour.
+- **Modified:** `project_tracker_screen.dart` — `GlobalKey<ScaffoldState>` + `endDrawer`, `_openForgeFolder()` now calls `openEndDrawer()`, removed unused `path` import.
+- `dart analyze lib/features/tracker/` clean.
+
+### Verify
+Open any project tracker → tap folder icon → drawer slides in → files visible → tap opens in default app.
+
+---
+
 ## Session: 2026-10-09 — Claude Code [Remove interview/spec-generation workflow — v0.5.34]
 
 **Branch:** main · **App:** v0.5.34

@@ -4,7 +4,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path/path.dart' as p;
 
 import '../../../data/filesystem/project_file_repository.dart';
 import '../../../data/local_db/forge_database.dart';
@@ -27,6 +26,7 @@ import '../widgets/active_model_chip.dart';
 import '../widgets/architect_review_sheet.dart';
 import '../widgets/dedup_review_sheet.dart';
 import '../widgets/feature_edit_dialog.dart';
+import '../widgets/forge_files_panel.dart';
 import '../widgets/platform_picker.dart';
 import '../widgets/relocate_repo.dart';
 import '../widgets/roadmap_review_sheet.dart';
@@ -58,6 +58,8 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
   bool _bannerDismissed = false;
   String? _repoPath;
   bool _repoLoaded = false;
+
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
 
   /// Board grouping: false = by status (default), true = by target version in
   /// build order (the sequence to feed features into Build-with-AI).
@@ -146,6 +148,8 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
         ProjectStatus.fromWire(trackingAsync.valueOrNull?.status ?? 'active');
 
     return Scaffold(
+      key: _scaffoldKey,
+      endDrawer: ForgeFilesPanel(project: project),
       appBar: AppBar(
         title: Row(
           children: [
@@ -1421,12 +1425,9 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     ));
   }
 
-  /// Opens the project's `.forge/` artifacts folder in macOS Finder.
-  /// Creates the folder if it doesn't exist yet (first run on a new project).
-  Future<void> _openForgeFolder() async {
-    final forgePath = p.join(project.path, ProjectFileRepository.forgeDirName);
-    await Directory(forgePath).create(recursive: true);
-    await Process.run('open', [forgePath]);
+  /// Opens the in-app Forge Files drawer (slides in from the right).
+  void _openForgeFolder() {
+    _scaffoldKey.currentState?.openEndDrawer();
   }
 
   /// Opens the AI chat screen with no pre-selected feature, giving the user

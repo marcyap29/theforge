@@ -2,6 +2,25 @@
 
 ---
 
+## v0.5.35 — 2026-10-09 — In-app Forge Files drawer
+
+The folder icon in the tracker AppBar now opens a slide-out **Forge Files** panel instead of calling macOS Finder. Finder was showing the `Forge/` folder as empty (a cache/display artefact after renaming from the hidden `.forge/`); the files are all there on disk, but the in-app drawer makes them reliably accessible and more useful.
+
+**New:** `lib/features/tracker/widgets/forge_files_panel.dart`
+- `ForgeFilesPanel` is a `StatefulWidget` `endDrawer` on the tracker `Scaffold`.
+- Reads 5 user-facing subdirs from `Forge/`: Specs, Handoffs, Worksheets, Ingested Docs, Audit.
+- Each section is an `ExpansionTile` (auto-expanded when non-empty). Tapping a file opens it in the default app (`Process.run('open', [path])`).
+- Header has a **Reveal in Finder** icon (preserves the original `open [forgePath]` behaviour as a secondary action).
+- Internal folders (`build_memory/`, `impl_backups/`, `tracker/`, `conversations/`, `forge/`) are intentionally excluded from the panel.
+
+**Modified:** `project_tracker_screen.dart`
+- Added `GlobalKey<ScaffoldState>` + `endDrawer:` to the `Scaffold`.
+- `_openForgeFolder()` now calls `openEndDrawer()` instead of `Process.run`.
+- Removed now-unused `package:path/path.dart` import.
+- `dart analyze lib` clean.
+
+---
+
 ## v0.5.34 — 2026-10-09 — Remove interview / spec-generation workflow
 
 Build-with-AI is the primary path. The 8-dimension interview flow, spec generation, worksheet generation, as-built spec, and all associated screens are removed.
