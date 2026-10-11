@@ -2212,9 +2212,7 @@ class _TileAction {
   static const _TileAction delete_ = _TileAction(_ActionKind.delete);
 }
 
-/// The board grouping toggle: "By status" (the columns) vs "Build order"
-/// (features grouped by target version in the sequence to build them). When in
-/// build-order mode it offers a shortcut to re-run "Plan build order".
+/// Single toggle button that flips between "Status" and "Build order" grouping.
 class _GroupModeBar extends StatelessWidget {
   const _GroupModeBar({
     required this.buildOrder,
@@ -2231,24 +2229,41 @@ class _GroupModeBar extends StatelessWidget {
     return Material(
       color: const Color(0xFF141416),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
+        padding: const EdgeInsets.fromLTRB(16, 6, 12, 6),
         child: Row(
           children: [
-            const Text('Group by',
-                style: TextStyle(color: Color(0xFF8A8A8E), fontSize: 12)),
-            const SizedBox(width: 10),
-            _Segment(
-              label: 'Status',
-              icon: Icons.view_column_outlined,
-              selected: !buildOrder,
-              onTap: () => onChanged(false),
-            ),
-            const SizedBox(width: 6),
-            _Segment(
-              label: 'Build order',
-              icon: Icons.low_priority,
-              selected: buildOrder,
-              onTap: () => onChanged(true),
+            InkWell(
+              borderRadius: BorderRadius.circular(6),
+              onTap: () => onChanged(!buildOrder),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E1E22),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(
+                    buildOrder
+                        ? Icons.low_priority
+                        : Icons.view_column_outlined,
+                    size: 14,
+                    color: const Color(0xFFCFCFD2),
+                  ),
+                  const SizedBox(width: 6),
+                  const Text('Groupings',
+                      style: TextStyle(
+                          fontSize: 12.5, color: Color(0xFFCFCFD2))),
+                  const SizedBox(width: 8),
+                  Text(
+                    buildOrder ? 'Build order' : 'Status',
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF8A8A8E)),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.swap_horiz,
+                      size: 13, color: Color(0xFF8A8A8E)),
+                ]),
+              ),
             ),
             const Spacer(),
             if (buildOrder)
@@ -2266,45 +2281,6 @@ class _GroupModeBar extends StatelessWidget {
   }
 }
 
-class _Segment extends StatelessWidget {
-  const _Segment({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final fg = selected ? const Color(0xFF0E0E10) : const Color(0xFFCFCFD2);
-    return InkWell(
-      borderRadius: BorderRadius.circular(6),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFF64B5F6) : const Color(0xFF1E1E22),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 14, color: fg),
-          const SizedBox(width: 6),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 12.5,
-                  color: fg,
-                  fontWeight:
-                      selected ? FontWeight.w600 : FontWeight.w400)),
-        ]),
-      ),
-    );
-  }
-}
 
 /// Section header for a target version in build-order mode, tagging the
 /// earliest concrete version as the one to build next.
