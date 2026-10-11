@@ -78,6 +78,11 @@ class _ForgeFilesPanelState extends State<ForgeFilesPanel> {
                   tooltip: 'Reveal in Finder',
                   onPressed: () => Process.run('open', [_forgePath]),
                 ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 18),
+                  tooltip: 'Close',
+                  onPressed: () => Navigator.pop(context),
+                ),
               ],
             ),
           ),
