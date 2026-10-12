@@ -428,6 +428,36 @@ class ProjectFileRepository {
     return s.isEmpty ? null : s;
   }
 
+  // ── Examples ─────────────────────────────────────────────────────────────
+
+  /// Path to the project's curated example files. Files here are gold-standard
+  /// samples the Inspector uses as format anchors.
+  static String examplesPath(String projectPath) =>
+      p.join(projectPath, forgeDirName, 'examples');
+
+  /// Copies [filePath] into the examples directory, naming it after the
+  /// [exampleName] key (e.g. "build_brief"). Overwrites any prior example.
+  static Future<void> setAsExample(
+      String filePath, String projectPath, String exampleName) async {
+    final ext = p.extension(filePath);
+    final dest = Directory(examplesPath(projectPath));
+    await dest.create(recursive: true);
+    await File(filePath)
+        .copy(p.join(dest.path, '$exampleName$ext'));
+  }
+
+  /// Reads an example file by [name] (without extension). Returns null when
+  /// no example exists yet — the caller falls back to a bundled default.
+  static Future<String?> readExample(
+      String projectPath, String name) async {
+    final dir = examplesPath(projectPath);
+    for (final ext in ['.md', '.txt', '']) {
+      final f = File(p.join(dir, '$name$ext'));
+      if (f.existsSync()) return f.readAsString();
+    }
+    return null;
+  }
+
   static List<String> _cleanLines(String s) => s
       .split('\n')
       .map((l) =>

@@ -2,6 +2,33 @@
 
 ---
 
+## v0.5.36 — 2026-10-12 — New project SOP + Inspector role
+
+**Three interconnected changes that introduce agile scoping discipline:**
+
+**New project goal interview** (`lib/features/projects/screens/goal_interview_screen.dart`)
+- After creating a new project, `NewProjectScreen` pushes `GoalInterviewScreen` instead of popping back to home.
+- Five-question form (goal / first user / MVP demo / out of scope / constraints) → Architect LLM proposes 4-8 seed features.
+- User checks/unchecks proposed features; confirmed ones land on the board in `planned` status (`source: 'goal_interview'`).
+- "Skip" exits without adding features. All questions are required before the AI call fires.
+
+**Inspector model role** (third LLM role)
+- Added `LlmRole.inspector` to `llm_provider.dart`; defaults added to `LlmSettings.defaults`.
+- Settings screen shows a third "Inspector" role card (description: "Build brief review · output quality").
+- New `lib/services/inspector_service.dart` — `InspectorService.inspectBrief()`: independent-context LLM call that evaluates a build brief for specificity, scope, and actionability. Returns `InspectorVerdict(passes, concern, suggestion)`. Fails gracefully (returns passing verdict on error).
+
+**Pre-build brief dialog** (`lib/features/tracker/widgets/build_brief_dialog.dart`)
+- `showBuildBriefDialog()` fires in `_buildFeature()` after `_preBuildChecks` and before the `ImplBrief` is built.
+- Optionally accepts developer notes → calls Architect to generate a one-paragraph build brief.
+- Inspector evaluates the brief against `Forge/examples/build_brief.md` (if it exists) and shows a live badge: ✓ Looks good / ⚠ Review brief.
+- Returns: `null` = Cancel (abort build), `''` = Skip brief (proceed without), `String` = approved brief (injected as `goalStatement` into `ImplBrief`).
+
+**Forge/examples/ + "Set as example" in ForgeFilesPanel**
+- `ProjectFileRepository.setAsExample()`, `readExample()`, `examplesPath()` added.
+- Long-press on any file in ForgeFilesPanel shows a bottom sheet with "Set as example" — copies the file to `Forge/examples/<key>` for the Inspector to use as a format anchor.
+
+---
+
 ## v0.5.35 — 2026-10-09 — In-app Forge Files drawer
 
 The folder icon in the tracker AppBar now opens a slide-out **Forge Files** panel instead of calling macOS Finder. Finder was showing the `Forge/` folder as empty (a cache/display artefact after renaming from the hidden `.forge/`); the files are all there on disk, but the in-app drawer makes them reliably accessible and more useful.

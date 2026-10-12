@@ -118,6 +118,10 @@ class LlmSettings {
         providerType: LlmProviderType.ollama,
         modelId: 'gpt-oss:120b-cloud',
       ),
+      LlmRole.inspector: ModelAssignment(
+        providerType: LlmProviderType.ollama,
+        modelId: 'gpt-oss:120b-cloud',
+      ),
     },
     apiKeys: {
       LlmProviderType.ollama: null,

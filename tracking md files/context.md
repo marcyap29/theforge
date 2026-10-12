@@ -4,6 +4,35 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-10-12 — Claude Code [New project SOP + Inspector role — v0.5.36]
+
+**Branch:** main · **App:** v0.5.36
+
+### Why
+User requested a new SOP for new project creation: interview the user to find the real goal, bias toward small compartmentalized specs, make the user verify key decisions explicitly. Also added: verification criteria before builds (Inspector role), "set as example" format anchoring, and a pre-build brief dialog that gates every Build-with-AI run.
+
+### Done
+- **New:** `lib/features/projects/screens/goal_interview_screen.dart` — 5-question goal interview that runs immediately after new project creation; AI proposes 4-8 seed features; user checks/unchecks; confirmed features land on board.
+- **Modified:** `lib/features/projects/screens/new_project_screen.dart` — after `_create()`, pushReplacement to `GoalInterviewScreen` instead of pop.
+- **Modified:** `lib/services/llm/llm_provider.dart` — added `LlmRole.inspector` to enum.
+- **Modified:** `lib/services/llm/llm_model_config.dart` — added inspector to `LlmSettings.defaults`.
+- **Modified:** `lib/features/settings/settings_screen.dart` — 3rd role card for Inspector; corrected executor description.
+- **New:** `lib/services/inspector_service.dart` — `InspectorService.inspectBrief()`, `InspectorVerdict`.
+- **Modified:** `lib/data/filesystem/project_file_repository.dart` — `setAsExample()`, `readExample()`, `examplesPath()`.
+- **Modified:** `lib/features/tracker/widgets/forge_files_panel.dart` — long-press → `_showFileMenu` → "Set as example" bottom sheet.
+- **New:** `lib/features/tracker/widgets/build_brief_dialog.dart` — `showBuildBriefDialog()` gates every Build-with-AI run; generates brief; Inspector badge shows verdict.
+- **Modified:** `lib/features/tracker/screens/project_tracker_screen.dart` — `_buildFeature()` calls `showBuildBriefDialog()`; injects approved brief as `goalStatement` into `ImplBrief`; added `build_brief_dialog.dart` import.
+- Version bumped `0.5.35` → `0.5.36`.
+- `dart analyze lib/` clean.
+
+### Verify
+1. Create new project → goal interview fires → answer 5 questions → features proposed → check/uncheck → features on board.
+2. Settings → Model Roles shows 3 cards (Architect / Executor / Inspector).
+3. Build any feature → BuildBriefDialog appears → "Generate brief" → brief + Inspector badge → "Build with this brief" proceeds.
+4. Long-press a file in Forge Files drawer → "Set as example" → file copied to `Forge/examples/`.
+
+---
+
 ## Session: 2026-10-09 — Claude Code [In-app Forge Files drawer — v0.5.35]
 
 **Branch:** main · **App:** v0.5.35

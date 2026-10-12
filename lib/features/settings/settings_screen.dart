@@ -87,7 +87,12 @@ class SettingsScreen extends ConsumerWidget {
               const SizedBox(height: 12),
               const _RoleCard(
                 role: LlmRole.executor,
-                description: 'Interview turns',
+                description: 'Build with AI · implementation',
+              ),
+              const SizedBox(height: 12),
+              const _RoleCard(
+                role: LlmRole.inspector,
+                description: 'Build brief review · output quality',
               ),
               const SizedBox(height: 24),
               const _SectionHeader('Diagnostics'),

@@ -1,6 +1,6 @@
 # The Forge — Feature Catalog
 
-**Last Updated:** 2026-10-09 (v0.5.35)
+**Last Updated:** 2026-10-12 (v0.5.36)
 
 ---
 
@@ -51,6 +51,10 @@
 | Subtasks nest under their epic (all views) | Shipped v0.4.52 | ↳ indented under epic in status and build-order views; `_splitEpics` + `_withSubtasks` |
 | Remove duplicate features | Shipped v0.4.11 | `FeatureDeduplicator` (exact + semantic LLM pass) + `showDedupReviewSheet` |
 | In-app Forge Files drawer | Shipped v0.5.35 | AppBar folder icon → slide-out `ForgeFilesPanel` (right endDrawer); 5 sections (Specs/Handoffs/Worksheets/Ingested Docs/Audit), auto-expanded when non-empty; tap file → opens in default app; "Reveal in Finder" in header. `lib/features/tracker/widgets/forge_files_panel.dart` |
+| Forge/examples/ + Set as example | Shipped v0.5.36 | Long-press any file in ForgeFilesPanel → bottom sheet → "Set as example" copies it to `Forge/examples/<key>`. Inspector uses these as format anchors. `ProjectFileRepository.setAsExample/readExample/examplesPath` |
+| New project goal interview | Shipped v0.5.36 | After new project creation, 5-question interview screen fires (goal/first-user/demo/out-of-scope/constraints). Architect AI proposes 4-8 seed features; user checks/unchecks; confirmed features land on board as `planned`. `lib/features/projects/screens/goal_interview_screen.dart` |
+| Inspector model role | Shipped v0.5.36 | Third LLM role (Architect / Executor / **Inspector**) in Settings. `LlmRole.inspector` + `InspectorService.inspectBrief()` — independent-context quality check on build briefs; returns `InspectorVerdict(passes, concern, suggestion)`. `lib/services/inspector_service.dart` |
+| Pre-build brief dialog | Shipped v0.5.36 | `showBuildBriefDialog()` gates every Build-with-AI run after pre-build checks. Developer adds optional notes; Architect generates a one-paragraph brief; Inspector evaluates it live (badge: ✓ / ⚠). Cancel aborts, Skip proceeds without brief, Approve injects brief as `goalStatement` into `ImplBrief`. `lib/features/tracker/widgets/build_brief_dialog.dart` |
 | Ask Anything button | Shipped v0.5.33 | AppBar chat-bubble icon → `RefineFeaturesScreen` with no pre-selected feature; free-form AI chat |
 | Virtual-PM check-ins | Shipped | `CheckinService` diffs git since last review → status changes/new features/flags + staleness banner |
 | Status reconciliation (self-heal lost "shipped") | Shipped v0.4.57 | `reconcileStatuses` heals `in_progress` features with a build-memory record but no live run |

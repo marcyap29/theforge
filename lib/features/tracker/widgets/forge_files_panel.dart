@@ -136,6 +136,8 @@ class _ForgeFilesPanelState extends State<ForgeFilesPanel> {
                                   ),
                                   onTap: () =>
                                       Process.run('open', [f.path]),
+                                  onLongPress: () =>
+                                      _showFileMenu(context, f),
                                 ),
                               )
                               .toList(),
@@ -146,6 +148,69 @@ class _ForgeFilesPanelState extends State<ForgeFilesPanel> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Long-press context menu for a file — currently just "Set as example".
+  void _showFileMenu(BuildContext context, File f) {
+    final baseName = p.basenameWithoutExtension(f.path).toLowerCase();
+    // Infer example key from filename: "build_brief_example" → "build_brief"
+    final key = baseName
+        .replaceAll(RegExp(r'[_\-]?(example|sample|template)$'), '')
+        .trim()
+        .replaceAll(' ', '_');
+    final displayKey = key.isEmpty ? p.basenameWithoutExtension(f.path) : key;
+
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+              child: Text(
+                p.basename(f.path),
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFCFCFD2)),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.star_outline, size: 18),
+              title: const Text('Set as example'),
+              subtitle: Text(
+                'Saves as Forge/examples/$displayKey — Inspector uses this '
+                'as the quality benchmark.',
+                style: const TextStyle(fontSize: 11),
+              ),
+              onTap: () async {
+                Navigator.pop(ctx);
+                try {
+                  await ProjectFileRepository.setAsExample(
+                      f.path, widget.project.path, displayKey);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(
+                          'Saved as example: $displayKey'),
+                      duration: const Duration(seconds: 2),
+                    ));
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('Failed to save example: $e'),
+                      backgroundColor: const Color(0xFFEF4444),
+                    ));
+                  }
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }

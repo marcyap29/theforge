@@ -24,6 +24,7 @@ import '../scan/feature_dedup.dart';
 import '../scan/feature_scan.dart';
 import '../widgets/active_model_chip.dart';
 import '../widgets/architect_review_sheet.dart';
+import '../widgets/build_brief_dialog.dart';
 import '../widgets/dedup_review_sheet.dart';
 import '../widgets/feature_edit_dialog.dart';
 import '../widgets/forge_files_panel.dart';
@@ -1231,6 +1232,19 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     if (!mounted) return;
     if (!await _preBuildChecks(feature, repoPath)) return;
 
+    // Build brief: optional clarification before the build runs.
+    // Returns null (Cancel — abort), '' (Skip — proceed without brief),
+    // or a non-empty string (brief approved by the user).
+    if (!mounted) return;
+    final briefResult = await showBuildBriefDialog(
+      context: context,
+      ref: ref,
+      feature: feature,
+      projectPath: project.path,
+    );
+    if (!mounted) return;
+    if (briefResult == null) return; // user cancelled
+
     // Load spec/handoff context if a spec has been generated.
     String? lockedSpec;
     String? goalStatement;
@@ -1256,6 +1270,10 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
       }
     }
 
+    // briefResult: '' = skipped (use loaded goalStatement), non-empty = use it.
+    final effectiveGoal =
+        briefResult.isNotEmpty ? briefResult : goalStatement;
+
     final brief = ImplBrief(
       projectPath: project.path,
       projectName: project.name,
@@ -1265,7 +1283,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
       featureDescription: feature.description,
       targetVersion: feature.targetVersion,
       lockedSpec: lockedSpec,
-      goalStatement: goalStatement,
+      goalStatement: effectiveGoal,
       components: components,
       checklist: checklist,
     );

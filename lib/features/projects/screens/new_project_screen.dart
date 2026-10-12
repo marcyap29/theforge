@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/filesystem/project_file_repository.dart';
 import '../../../data/local_db/forge_database.dart';
 import '../providers/providers.dart';
+import 'goal_interview_screen.dart';
 
 class NewProjectScreen extends ConsumerStatefulWidget {
   const NewProjectScreen({super.key});
@@ -57,7 +58,17 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
         ),
       );
       await ref.read(projectListProvider.notifier).refresh();
-      if (mounted) navigator.pop();
+      if (!mounted) return;
+      // Replace this screen with the goal interview so the user lands on the
+      // tracker (the interview pops itself) rather than back at home.
+      navigator.pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => GoalInterviewScreen(
+            projectId: name,
+            projectName: name,
+          ),
+        ),
+      );
     } on ProjectAlreadyExistsException {
       if (!mounted) return;
       setState(() => _creating = false);
