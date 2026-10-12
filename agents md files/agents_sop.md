@@ -90,6 +90,51 @@ Use this before starting any non-trivial implementation task.
 
 ---
 
+## SOP-ROLE — Adding a New LLM Role
+
+Use when introducing a new AI role (e.g. a reviewer, a specialized scanner).
+**All four steps are required.** Skipping step 2 causes a crash on startup (missing map key in `LlmSettings.defaults`). Skipping step 3 means the user can't configure the role and doesn't know it exists.
+
+1. **`lib/services/llm/llm_provider.dart`** — add the value to `enum LlmRole`
+2. **`lib/services/llm/llm_model_config.dart`** — add a `LlmRole.<name>: ModelAssignment(...)` entry to `LlmSettings.defaults`. Default to the same provider/model as `architect` unless there's a reason to differ.
+3. **`lib/features/settings/settings_screen.dart`** — add a `_RoleCard(role: LlmRole.<name>, description: '...')` after the executor card. Description should name what it does (e.g. `'Build brief review · output quality'`).
+4. **`lib/services/<name>_service.dart`** (new file) — the service that calls `LlmService.complete(role: LlmRole.<name>, ...)`. Must fail gracefully: catch all exceptions and return a safe default so a misconfigured Inspector/Reviewer never blocks a build.
+
+Then: `dart analyze lib/` clean → update FEATURES.md row → CHANGELOG entry → commit.
+
+---
+
+## SOP-GATE — Adding a Pre-Build Gate Dialog
+
+Use when adding a new check that must run before Build-with-AI fires (e.g. security pre-check, dependency scan).
+
+**Injection point** in `project_tracker_screen.dart`, inside `_buildFeature()`:
+```
+after:   if (!await _preBuildChecks(feature, repoPath)) return;
+before:  // Load spec/handoff context...
+```
+
+**Three-state return convention** — all gate dialogs must follow this:
+```dart
+// In the dialog:
+TextButton(onPressed: () => Navigator.pop(context),     // Cancel → null
+TextButton(onPressed: () => Navigator.pop(context, ''), // Skip   → ''
+FilledButton(onPressed: () => Navigator.pop(context, result), // Approve → String
+
+// In _buildFeature():
+final result = await showMyGateDialog(...);
+if (!mounted) return;
+if (result == null) return; // user cancelled — abort
+// result == '' → skip (proceed without gate output)
+// result.isNotEmpty → use result (e.g. inject as goalStatement)
+```
+
+`null` = Cancel (abort build). `''` = Skip (proceed without gate output). Non-empty string = approved output to inject. **Never collapse cancel and skip** — the user losing work vs. consciously skipping are different outcomes.
+
+The gate must always have a **Skip** option. Gates that block without escape will frustrate users mid-flow.
+
+---
+
 ## SOP-WORKTREE — Branch Isolation Protocol
 
 **Use a worktree when:** multi-session work, risky/shared paths (Firestore schema, spec gen function), external agent doing the work, experimental change.
@@ -134,4 +179,4 @@ Use this before starting any non-trivial implementation task.
 
 ---
 
-*The Forge — v1.0.0*
+*The Forge — v1.1.0 — Added SOP-ROLE (new LLM role checklist) and SOP-GATE (pre-build gate pattern) 2026-10-12*
