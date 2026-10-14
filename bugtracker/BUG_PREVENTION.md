@@ -83,6 +83,27 @@
 
 ---
 
+## Flutter Widget Lifecycle Rules
+
+**Rules:**
+- **Disposable objects must be owned by `State`, never constructed in `build()`.**
+  `TextEditingController`, `ScrollController`, `AnimationController`, and `FocusNode`
+  all hold subscriptions and must be disposed. Creating them inline in `build()` leaks
+  them on every rebuild — Flutter never calls `dispose()` on them automatically.
+  Pattern: convert the widget to `StatefulWidget`, initialize in `initState()`, sync
+  in `didUpdateWidget()` when the parent passes new values, dispose in `dispose()`.
+  See BUG-UI-004.
+- **Grep to catch this before it ships:**
+  ```bash
+  grep -rn "TextEditingController(\|ScrollController(\|AnimationController(\|FocusNode(" lib/ \
+    | grep -v "//\|\.dispose\|State<\|_controller\s*=\|_focus\s*=\|late final\|final _"
+  ```
+  A non-empty result means a disposable is being constructed outside a `State` field — investigate.
+
+**Past bugs:** Oct 2026 — BUG-UI-004: `_BriefBlock` (StatelessWidget) created a `TextEditingController` in `build()` on every rebuild with no disposal; fixed by converting to `StatefulWidget` with controller in `initState` + `didUpdateWidget` + `dispose`.
+
+---
+
 ## Flutter Navigation / State Rules
 
 **Rules:**

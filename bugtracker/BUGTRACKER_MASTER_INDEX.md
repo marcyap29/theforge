@@ -28,6 +28,7 @@ Records go in `bugtracker/records/` — one file per bug.
 | BUG-SETTINGS-001 | SETTINGS | `gemini-3.5-flash` (retired) persisted in SharedPreferences caused Gemini API 404 on every LLM call; no validation on load | 2026-06-20 |
 | BUG-SPECGEN-001 | SPECGEN | `HandoffPackage.json` always had `setupWorksheetComplete: false` and `v2SeedItems: []`; component names included `**` markdown bold | 2026-06-19 |
 | BUG-SETTINGS-002 | SETTINGS | Changing a role's provider left `modelId` empty → every LLM call threw "No model selected"; provider dropdown now auto-selects first model | 2026-09-10 |
+| BUG-UI-004 | UI | `TextEditingController` created inline in `StatelessWidget.build()` — leaked on every rebuild, never disposed; fixed by converting to `StatefulWidget` | 2026-10-14 |
 | BUG-UI-003 | UI | macOS folder picker silently did nothing — app-modal `getDirectoryPath` failed to present; added `lockParentWindow` + error snackbars | 2026-09-10 |
 | BUG-DATA-001 | DATA | Deleting a project could rm-rf a real source repo — no guard that path was inside canonical root; fenced deletion + prune stale index rows | 2026-09-10 |
 | BUG-DATA-002 | DATA | Relocating code into a folder NESTED inside the repo duplicated the whole repo (rename-into-own-subtree fails → recursive copy-into-itself). Added a nesting guard (`p.isWithin` both directions, canonicalized) that refuses before moving; `RepoRelocation.refused` + UI abort without repointing config | 2026-10-02 |
