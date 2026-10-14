@@ -27,9 +27,9 @@ void main() {
       expect(read!['markdown'], contains('Takes photos'));
       expect(read['commit'], 'abc123');
       expect(read['generatedAt'], isNotEmpty);
-      // Cached under .forge/, not the project root.
+      // Cached under Forge/, not the project root.
       expect(
-          File('${tmp.path}/.forge/capability_summary.json').existsSync(),
+          File('${tmp.path}/Forge/capability_summary.json').existsSync(),
           isTrue);
     });
 

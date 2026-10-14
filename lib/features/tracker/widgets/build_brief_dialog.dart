@@ -272,7 +272,7 @@ Write the build brief.
   }
 }
 
-class _BriefBlock extends StatelessWidget {
+class _BriefBlock extends StatefulWidget {
   const _BriefBlock({
     required this.brief,
     required this.verdict,
@@ -282,6 +282,36 @@ class _BriefBlock extends StatelessWidget {
   final String brief;
   final InspectorVerdict? verdict;
   final ValueChanged<String> onChanged;
+
+  @override
+  State<_BriefBlock> createState() => _BriefBlockState();
+}
+
+class _BriefBlockState extends State<_BriefBlock> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.brief)
+      ..selection = TextSelection.collapsed(offset: widget.brief.length);
+  }
+
+  @override
+  void didUpdateWidget(_BriefBlock oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.brief != oldWidget.brief && widget.brief != _controller.text) {
+      _controller.text = widget.brief;
+      _controller.selection =
+          TextSelection.collapsed(offset: widget.brief.length);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -298,7 +328,7 @@ class _BriefBlock extends StatelessWidget {
                   color: Color(0xFF9CA3AF)),
             ),
             const Spacer(),
-            _InspectorBadge(verdict: verdict),
+            _InspectorBadge(verdict: widget.verdict),
           ],
         ),
         const SizedBox(height: 6),
@@ -312,8 +342,7 @@ class _BriefBlock extends StatelessWidget {
           ),
           child: SingleChildScrollView(
             child: TextField(
-              controller: TextEditingController(text: brief)
-                ..selection = TextSelection.collapsed(offset: brief.length),
+              controller: _controller,
               maxLines: null,
               style: const TextStyle(
                   fontFamily: 'Menlo',
@@ -324,11 +353,13 @@ class _BriefBlock extends StatelessWidget {
                 isDense: true,
                 contentPadding: EdgeInsets.zero,
               ),
-              onChanged: onChanged,
+              onChanged: widget.onChanged,
             ),
           ),
         ),
-        if (verdict != null && !verdict!.passes && verdict!.concern != null)
+        if (widget.verdict != null &&
+            !widget.verdict!.passes &&
+            widget.verdict!.concern != null)
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Container(
@@ -342,14 +373,14 @@ class _BriefBlock extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    verdict!.concern!,
+                    widget.verdict!.concern!,
                     style: const TextStyle(
                         fontSize: 12, color: Color(0xFFE8A04C)),
                   ),
-                  if (verdict!.suggestion != null) ...[
+                  if (widget.verdict!.suggestion != null) ...[
                     const SizedBox(height: 4),
                     Text(
-                      'Suggestion: ${verdict!.suggestion}',
+                      'Suggestion: ${widget.verdict!.suggestion}',
                       style: const TextStyle(
                           fontSize: 11, color: Color(0xFF9CA3AF)),
                     ),
