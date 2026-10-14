@@ -222,11 +222,10 @@ Focus on the concepts that recur across 80% of tasks: state ownership, widget tr
 
 - **Locked specs are immutable.** Once written, a locked spec is never modified. Amendments produce a new versioned spec. Never overwrite.
 - **No executor starts without a complete project folder.** The `README.md`, locked spec, bullet handoff, and setup worksheet must all exist before any executor agent is invoked.
-- **Firestore writes are append-only for audit trail.** The `/audit/` subcollection is never modified — only appended. Same pattern as CHRONICLE.
-- **Secrets are never hardcoded.** Firebase config, API keys, and SwarmSpace tokens are read from environment variables or `.env` files that are gitignored.
+- **Secrets are never hardcoded.** API keys go in macOS Keychain via `flutter_secure_storage`. Never `.env`, never `shared_preferences`, never logged.
 - **`dart analyze` must be clean.** Zero new warnings or errors before reporting done.
 - **A feature isn't done until its docs are updated, committed, and pushed** (Standing Rules #1–2). Every implemented/shipped feature updates the docs (via `templates/`) in the same commit, then pushes.
-- **Interview state lives in the Flutter app.** Do not push mid-interview state to Firestore — only write on phase completion (spec locked, worksheet complete, handoff generated).
+- **Inspector always runs in an independent context window.** Never pass generation history or reasoning context to the Inspector — it receives only criteria + optional example + output. See `agents md files/agents.md` Key Invariants.
 
 ---
 
@@ -234,14 +233,13 @@ Focus on the concepts that recur across 80% of tasks: state ownership, widget tr
 
 | Situation | Files to read |
 |---|---|
-| Touching Firestore schema or data layer | `backend.md`, `bugtracker/BUG_PREVENTION.md` |
-| Touching interview logic or confidence dimensions | `DOCS/forge/workflow_template.md` |
-| Touching spec generation (Firebase Function) | `backend.md`, `bugtracker/BUG_PREVENTION.md` |
 | Touching UI / UX | `tracking md files/UI_UX.md` |
 | Touching auth or billing | `bugtracker/BUG_PREVENTION.md`, `agents md files/SECURITY_CHECKLIST.md` |
 | Refactoring / simplifying | `agents md files/agents_code_simplifier.md` |
 | Bugtracker work | `agents md files/agents_bugtracker.md`, `bugtracker/BUGTRACKER_MASTER_INDEX.md` |
 | Assigning work to an external agent | `agents md files/agent_scoping.md`, `agents md files/llm_tier_field_guide.md` |
+| Adding a new LLM role | `agents md files/agents_sop.md` → **SOP-ROLE** |
+| Adding a pre-build gate dialog | `agents md files/agents_sop.md` → **SOP-GATE** |
 
 ---
 
@@ -257,6 +255,10 @@ Focus on the concepts that recur across 80% of tasks: state ownership, widget tr
 
 **SOP-WORKTREE:** Decide isolation → create `wt/<id>` off main → implement → user review → user approval → merge `--no-ff` → status-clean teardown
 
+**SOP-ROLE:** 4-file checklist for adding a new LLM role (enum → defaults → Settings card → service file). See `agents_sop.md`.
+
+**SOP-GATE:** Three-state return convention for pre-build gate dialogs (null/''/ String). See `agents_sop.md`.
+
 ---
 
-*Version 1.0.0 — Initial setup from Starter Repo. The Forge — Orbital AI.*
+*Version 1.1.0 — 2026-10-12: Removed stale Firestore/interview invariants and triggers; added SOP-ROLE + SOP-GATE triggers; updated Inspector invariant. The Forge — Orbital AI.*
