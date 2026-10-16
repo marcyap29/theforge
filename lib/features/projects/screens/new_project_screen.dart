@@ -66,6 +66,7 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
           builder: (_) => GoalInterviewScreen(
             projectId: name,
             projectName: name,
+            projectPath: projectPath,
           ),
         ),
       );

@@ -4,6 +4,35 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session: 2026-10-16 — Claude Code [Multi-file context ingestion — v0.5.37]
+
+**Branch:** main · **App:** v0.5.37
+
+### Why
+User wants to attach screenshots, mockups, PDFs, and text documents as context when creating a new project (and at any time during development). Vision-capable reasoning models can describe images into text that feeds into future builds. Key insight: extract at ingest time → save to `reference_context.md` → all future Build-with-AI runs get the context automatically, regardless of which model is used for building.
+
+### Done
+- **New:** `lib/services/ingest_service.dart` — `IngestService.ingestFiles()`: images → Architect LLM vision call → text description; text/MD → direct read. Appends to `Forge/ingested/reference_context.md`; copies originals to `Forge/ingested/source/`.
+- **Modified:** `lib/services/llm/llm_provider.dart` — added `LlmImage` class (`base64`, `mimeType`) + optional `List<LlmImage>? images` param to `LlmProvider.complete()`.
+- **Modified:** `lib/services/llm/llm_service.dart` — `complete()` accepts and passes through `List<LlmImage>? images`.
+- **Modified:** `lib/services/llm/providers/claude_provider.dart` — multimodal content blocks when images provided.
+- **Modified:** `lib/services/llm/providers/ollama_provider.dart` — `images` array in user message.
+- **Modified:** `lib/services/llm/providers/openai_provider.dart` — `image_url` content array.
+- **Modified:** `lib/services/llm/providers/gemini_provider.dart` — `inlineData` parts in user contents.
+- **Modified:** `lib/data/filesystem/project_file_repository.dart` — static `appendReferenceContext()` appends with datestamped header.
+- **Modified:** `lib/features/tracker/screens/project_tracker_screen.dart` — paperclip AppBar icon + `_addContextFiles()` method; imports `IngestService` + `llmServiceProvider`.
+- **Modified:** `lib/features/projects/screens/goal_interview_screen.dart` — new required `projectPath` param; "Reference files" file picker section; picked files ingested before generation, extracted context included in Architect prompt.
+- **Modified:** `lib/features/projects/screens/new_project_screen.dart` — passes `projectPath` to `GoalInterviewScreen`.
+- Version bumped `0.5.36` → `0.5.37`.
+- `dart analyze lib/` clean.
+
+### Verify
+1. Tracker AppBar → tap paperclip → pick a PNG screenshot → snackbar: "1 file added to project context" → check `Forge/ingested/reference_context.md` has an extracted description.
+2. Create new project → goal interview → "Attach files" → pick image → chips appear → "Generate Features →" → features informed by the reference image.
+3. Settings → Architect role set to a vision model (GLM-5.x, Claude, gpt-4o) for image extraction to work; text/MD files work with any model.
+
+---
+
 ## Session: 2026-10-12 — Claude Code [New project SOP + Inspector role — v0.5.36]
 
 **Branch:** main · **App:** v0.5.36

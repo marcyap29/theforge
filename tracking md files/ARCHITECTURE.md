@@ -1,7 +1,7 @@
 # The Forge — Architecture
 
-**Version:** 4.0.0
-**Last Updated:** 2026-09-10
+**Version:** 4.1.0
+**Last Updated:** 2026-10-16
 
 ---
 
@@ -113,16 +113,18 @@ The Forge/
 │   │       └── workspace_health_screen.dart    — velocity trend + CI stats
 │   ├── main.dart
 │   └── services/
+│       ├── ingest_service.dart                 — IngestService: images→vision extraction, text→direct read → appends to reference_context.md
+│       ├── inspector_service.dart              — InspectorService: independent-context build brief quality check
 │       ├── llm/
 │       │   ├── llm_model_config.dart           — ModelInfo, LlmSettings, model catalogs
-│       │   ├── llm_provider.dart               — LlmProvider abstract + LlmRole enum
-│       │   ├── llm_service.dart                — resolves role → provider → complete()
+│       │   ├── llm_provider.dart               — LlmProvider abstract + LlmRole enum + LlmImage (vision)
+│       │   ├── llm_service.dart                — resolves role → provider → complete() (supports images param)
 │       │   ├── llm_service_provider.dart       — llmServiceProvider
 │       │   └── providers/
-│       │       ├── claude_provider.dart        — Anthropic Messages API
-│       │       ├── gemini_provider.dart        — Google Generative Language API
-│       │       ├── ollama_provider.dart        — HTTP to local Ollama
-│       │       └── openai_provider.dart        — OpenAI Chat Completions
+│       │       ├── claude_provider.dart        — Anthropic Messages API (multimodal content blocks)
+│       │       ├── gemini_provider.dart        — Google Generative Language API (inlineData parts)
+│       │       ├── ollama_provider.dart        — HTTP to local Ollama (images array in message)
+│       │       └── openai_provider.dart        — OpenAI Chat Completions (image_url content)
 │       └── watch/
 │           ├── alert_engine.dart               — deduplicates signals into AlertEntry log
 │           ├── alert_log_notifier.dart         — persists alert log to forge_config.json
@@ -199,7 +201,8 @@ Every Forge project is a folder on the user's machine. Default root: `~/Document
     ├── worksheets/
     │   └── {ProjectName}_SetupWorksheet_v1.md
     ├── ingested/
-    │   ├── reference_context.md                   — extracted facts from reference docs
+    │   ├── reference_context.md                   — extracted context (appended, datestamped); always-on slot in Build-with-AI
+    │   ├── source/                                — original files added via "Add context files" picker
     │   └── {ProjectName}_V2Seeds.md               — deferred capabilities list (written at L3)
     ├── build_memory/
     │   └── <featureId>.md                         — per-shipped-feature "what/why/files" record (§CTX2); read back into every build
@@ -219,7 +222,13 @@ All LLM calls flow through `LlmService.complete(role:)`. The service resolves th
 
 ```dart
 // Roles
-enum LlmRole { architect, executor }
+enum LlmRole { architect, executor, inspector }
+
+// Vision image attachment
+class LlmImage {
+  final String base64;   // base64-encoded image bytes
+  final String mimeType; // e.g. 'image/jpeg', 'image/png'
+}
 
 // Abstract provider interface
 abstract class LlmProvider {
@@ -229,9 +238,18 @@ abstract class LlmProvider {
     required double temperature,
     required String modelId,
     int? maxTokens,
+    bool? think,
+    bool jsonMode = false,
+    List<LlmImage>? images,  // vision: passed as provider-specific multimodal blocks
   });
 }
 ```
+
+When `images` is provided, each provider formats them in its native multimodal style:
+- **Claude**: content array with `{type: image, source: {type: base64, media_type, data}}` blocks + text
+- **Ollama**: `images` array in the user message (supported by GLM-5.x, Qwen vision models)
+- **OpenAI**: content array with `{type: image_url, image_url: {url: data:<mime>;base64,...}}` blocks
+- **Gemini**: `inlineData` parts in the user `contents`
 
 | Provider | Class | API |
 |---|---|---|

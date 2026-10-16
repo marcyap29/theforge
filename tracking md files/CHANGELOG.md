@@ -2,6 +2,35 @@
 
 ---
 
+## v0.5.37 — 2026-10-16 — Multi-file context ingestion
+
+Users can now attach reference files to a project so the AI builds with richer context. Two entry points: a **paperclip icon** in the tracker AppBar (works any time) and a **"Reference files" section** in the goal interview form (files inform seed feature proposals).
+
+**`lib/services/ingest_service.dart`** (new)
+- `IngestService.ingestFiles(filePaths, projectPath)` — processes each file based on type.
+- Images (PNG, JPG, HEIC, GIF, WEBP): reads bytes → calls Architect LLM with the image (vision) → extracts a plain-text description of the UI/layout/requirements shown.
+- Text/markdown: read directly, no LLM call.
+- Appends all extracted blocks to `Forge/ingested/reference_context.md` with a datestamped header (accumulates, does not overwrite).
+- Copies original files to `Forge/ingested/source/`.
+
+**Vision support added across all 4 LLM providers**
+- `llm_provider.dart`: new `LlmImage` class (`base64`, `mimeType`); optional `List<LlmImage>? images` param on `LlmProvider.complete()`.
+- `LlmService.complete()` passes `images` through to the provider.
+- Claude: multimodal content blocks (`type: image, source: {type: base64, ...}`).
+- Ollama: `images` array in the user message (supported by GLM-5.x, Qwen vision models).
+- OpenAI: `image_url` content array (`data:<mime>;base64,...`).
+- Gemini: `inlineData` parts in the user `contents`.
+
+**`ProjectFileRepository.appendReferenceContext()`** (static, new)
+- Appends content to `reference_context.md` with a `_Ingested YYYY-MM-DD_` header. Creates the file if it doesn't exist.
+
+**UI changes**
+- `ProjectTrackerScreen`: paperclip AppBar icon → `_addContextFiles()` → FilePicker → IngestService → snackbar result.
+- `GoalInterviewScreen`: new required `projectPath` param; "Reference files" section with `FilePicker` + chip list; picked files are ingested before feature generation and their extracted context is included in the Architect prompt.
+- `NewProjectScreen`: passes `projectPath` to `GoalInterviewScreen`.
+
+---
+
 ## v0.5.36 — 2026-10-12 — New project SOP + Inspector role
 
 **Three interconnected changes that introduce agile scoping discipline:**

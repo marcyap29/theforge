@@ -17,7 +17,20 @@ class OpenAiProvider extends LlmProvider {
     int? maxTokens,
     bool? think, // accepted for interface parity; not used by OpenAI chat
     bool jsonMode = false, // parity; OpenAI JSON is via response_format
+    List<LlmImage>? images,
   }) async {
+    final Object userContent = (images != null && images.isNotEmpty)
+        ? [
+            for (final img in images)
+              {
+                'type': 'image_url',
+                'image_url': {
+                  'url': 'data:${img.mimeType};base64,${img.base64}',
+                },
+              },
+            {'type': 'text', 'text': userPrompt},
+          ]
+        : userPrompt;
     final response = await http.post(
       Uri.parse('https://api.openai.com/v1/chat/completions'),
       headers: {
@@ -29,7 +42,7 @@ class OpenAiProvider extends LlmProvider {
         'temperature': temperature,
         'messages': [
           {'role': 'system', 'content': systemPrompt},
-          {'role': 'user', 'content': userPrompt},
+          {'role': 'user', 'content': userContent},
         ],
       }),
     );

@@ -9,6 +9,13 @@ class LlmDelta {
   final bool thinking;
 }
 
+/// A base64-encoded image to pass to a vision-capable model.
+class LlmImage {
+  const LlmImage({required this.base64, required this.mimeType});
+  final String base64;
+  final String mimeType; // e.g. 'image/jpeg', 'image/png'
+}
+
 abstract class LlmProvider {
   Future<String> complete({
     required String systemPrompt,
@@ -18,6 +25,7 @@ abstract class LlmProvider {
     int? maxTokens,
     bool? think,
     bool jsonMode = false,
+    List<LlmImage>? images,
   });
 
   /// Streams the completion as incremental deltas. The default falls back to a

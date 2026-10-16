@@ -381,6 +381,28 @@ class ProjectFileRepository {
     return summaryFile.readAsString();
   }
 
+  /// Appends [content] to reference_context.md under a timestamped header.
+  /// Creates the file if it does not exist. Each call adds a new dated section
+  /// so multiple ingestion sessions accumulate rather than overwriting.
+  static Future<void> appendReferenceContext(
+      String projectPath, String content) async {
+    final ingestedDir =
+        Directory(p.join(projectPath, forgeDirName, 'ingested'));
+    await ingestedDir.create(recursive: true);
+    final file =
+        File(p.join(ingestedDir.path, 'reference_context.md'));
+    final now = DateTime.now();
+    final dateStr =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    if (file.existsSync()) {
+      await file.writeAsString(
+          '\n\n---\n_Ingested ${dateStr}_\n\n$content',
+          mode: FileMode.append);
+    } else {
+      await file.writeAsString('# Reference Context\n\n_Ingested ${dateStr}_\n\n$content');
+    }
+  }
+
   /// Writes/overwrites the durable build-memory record for one feature into
   /// `.forge/build_memory/<featureId>.md`. One file per feature (overwritten on
   /// re-ship) so re-building a feature updates its record instead of appending a

@@ -28,6 +28,7 @@ class OllamaProvider extends LlmProvider {
     int? maxTokens,
     bool? think,
     bool jsonMode = false,
+    List<LlmImage>? images,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/chat'),
@@ -35,25 +36,21 @@ class OllamaProvider extends LlmProvider {
       body: jsonEncode({
         'model': modelId,
         'stream': false,
-        // Toggle a reasoning model's chain-of-thought (off = whole budget to the
-        // answer). Only sent when explicitly set, so non-thinking models are
-        // unaffected.
         if (think != null) 'think': think,
-        // Force valid-JSON output so the model can't return prose instead of the
-        // required JSON object.
         if (jsonMode) 'format': 'json',
         'options': {
           'temperature': temperature,
-          // Ensure the model has room to finish (thinking + answer); without
-          // this a long reasoning phase can starve the actual response.
           if (maxTokens != null) 'num_predict': maxTokens,
-          // Discourage the verbatim-paragraph repetition loops some models fall
-          // into while reasoning (BUG-IMPL-007); default 1.1 is too weak.
           'repeat_penalty': 1.3,
         },
         'messages': [
           {'role': 'system', 'content': systemPrompt},
-          {'role': 'user', 'content': userPrompt},
+          {
+            'role': 'user',
+            'content': userPrompt,
+            if (images != null && images.isNotEmpty)
+              'images': [for (final img in images) img.base64],
+          },
         ],
       }),
     );

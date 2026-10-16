@@ -1,6 +1,6 @@
 # The Forge — Feature Catalog
 
-**Last Updated:** 2026-10-12 (v0.5.36)
+**Last Updated:** 2026-10-16 (v0.5.37)
 
 ---
 
@@ -55,6 +55,7 @@
 | New project goal interview | Shipped v0.5.36 | After new project creation, 5-question interview screen fires (goal/first-user/demo/out-of-scope/constraints). Architect AI proposes 4-8 seed features; user checks/unchecks; confirmed features land on board as `planned`. `lib/features/projects/screens/goal_interview_screen.dart` |
 | Inspector model role | Shipped v0.5.36 | Third LLM role (Architect / Executor / **Inspector**) in Settings. `LlmRole.inspector` + `InspectorService.inspectBrief()` — independent-context quality check on build briefs; returns `InspectorVerdict(passes, concern, suggestion)`. `lib/services/inspector_service.dart` |
 | Pre-build brief dialog | Shipped v0.5.36 | `showBuildBriefDialog()` gates every Build-with-AI run after pre-build checks. Developer adds optional notes; Architect generates a one-paragraph brief; Inspector evaluates it live (badge: ✓ / ⚠). Cancel aborts, Skip proceeds without brief, Approve injects brief as `goalStatement` into `ImplBrief`. `lib/features/tracker/widgets/build_brief_dialog.dart` |
+| Multi-file context ingestion | Shipped v0.5.37 | Paperclip icon in tracker AppBar + "Reference files" section in goal interview form. Picks PNG/JPG/HEIC/GIF/WEBP (vision LLM → extracted description) or TXT/MD (direct read); appends to `Forge/ingested/reference_context.md` (already fed into every Build-with-AI run). Original files saved to `Forge/ingested/source/`. `lib/services/ingest_service.dart` (new). Vision support added to all 4 LLM providers via `LlmImage` class + optional `images` param on `LlmProvider.complete()`. |
 | Ask Anything button | Shipped v0.5.33 | AppBar chat-bubble icon → `RefineFeaturesScreen` with no pre-selected feature; free-form AI chat |
 | Virtual-PM check-ins | Shipped | `CheckinService` diffs git since last review → status changes/new features/flags + staleness banner |
 | Status reconciliation (self-heal lost "shipped") | Shipped v0.4.57 | `reconcileStatuses` heals `in_progress` features with a build-memory record but no live run |

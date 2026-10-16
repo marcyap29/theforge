@@ -1,8 +1,12 @@
 import 'dart:convert';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 
+import '../../../data/filesystem/project_file_repository.dart';
+import '../../../services/ingest_service.dart';
 import '../../../services/llm/llm_provider.dart';
 import '../../../services/llm/llm_service_provider.dart';
 import '../../tracker/models/tracker_enums.dart';
@@ -16,10 +20,12 @@ class GoalInterviewScreen extends ConsumerStatefulWidget {
     super.key,
     required this.projectId,
     required this.projectName,
+    required this.projectPath,
   });
 
   final String projectId;
   final String projectName;
+  final String projectPath;
 
   @override
   ConsumerState<GoalInterviewScreen> createState() =>
@@ -47,6 +53,7 @@ class _GoalInterviewScreenState
   final _q5 = TextEditingController(); // Hard constraints?
 
   List<_ProposedFeature> _proposed = [];
+  List<String> _pickedFiles = [];
 
   @override
   void dispose() {
@@ -72,6 +79,29 @@ class _GoalInterviewScreenState
     });
     try {
       final llm = ref.read(llmServiceProvider);
+
+      // Ingest any picked files first — extracts context into reference_context.md
+      // and makes that context available to all future builds as well.
+      String referenceBlock = '';
+      if (_pickedFiles.isNotEmpty) {
+        final ingestResult = await IngestService(llm).ingestFiles(
+          filePaths: _pickedFiles,
+          projectPath: widget.projectPath,
+        );
+        if (ingestResult.hasProcessed) {
+          // Read back the freshly written context so we can include it in
+          // this prompt directly (not just persisted for later).
+          try {
+            final repo = ProjectFileRepository();
+            final ctx = await repo.readIngestedSummary(widget.projectPath);
+            if (ctx != null && ctx.isNotEmpty) {
+              referenceBlock =
+                  '\nReference material extracted from attached files:\n$ctx\n';
+            }
+          } catch (_) {}
+        }
+      }
+
       const system = '''
 You help set up new software projects by proposing seed features for the first version.
 
@@ -103,7 +133,7 @@ ${_q4.text.trim()}
 
 Q5 – Any hard constraints? (platforms, integrations, existing code)
 ${_q5.text.trim()}
-''';
+$referenceBlock''';
       final raw = await llm.complete(
         systemPrompt: system,
         userPrompt: userPrompt,
@@ -151,6 +181,27 @@ ${_q5.text.trim()}
       );
     }
     if (mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _pickFiles() async {
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
+      type: FileType.custom,
+      allowedExtensions: [
+        'png', 'jpg', 'jpeg', 'heic', 'gif', 'webp',
+        'txt', 'md', 'markdown',
+      ],
+    );
+    if (result == null) return;
+    final paths =
+        result.files.map((f) => f.path).whereType<String>().toList();
+    if (paths.isEmpty) return;
+    setState(() {
+      _pickedFiles = [
+        ..._pickedFiles,
+        ...paths.where((path) => !_pickedFiles.contains(path)),
+      ];
+    });
   }
 
   @override
@@ -225,6 +276,52 @@ ${_q5.text.trim()}
           hint: 'e.g. iOS only, must use existing Firebase project',
           controller: _q5,
         ),
+        const SizedBox(height: 20),
+        const Text(
+          'Reference files (optional)',
+          style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFFE5E5E7)),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Screenshots, mockups, or docs the AI should use as context.',
+          style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+        ),
+        const SizedBox(height: 8),
+        if (_pickedFiles.isNotEmpty)
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final path in _pickedFiles)
+                Chip(
+                  label: Text(
+                    p.basename(path),
+                    style:
+                        const TextStyle(fontSize: 11, color: Color(0xFFE5E5E7)),
+                  ),
+                  deleteIcon: const Icon(Icons.close, size: 14),
+                  onDeleted: () =>
+                      setState(() => _pickedFiles.remove(path)),
+                  backgroundColor: const Color(0xFF1C1C1E),
+                  side:
+                      const BorderSide(color: Color(0xFF3C3C3E)),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+            ],
+          ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: _pickFiles,
+          icon: const Icon(Icons.attach_file_outlined, size: 15),
+          label: Text(_pickedFiles.isEmpty ? 'Attach files' : 'Add more files'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFFCFCFD2),
+            side: const BorderSide(color: Color(0xFF3C3C3E)),
+          ),
+        ),
         const SizedBox(height: 24),
         ListenableBuilder(
           listenable: Listenable.merge([_q1, _q2, _q3, _q4, _q5]),
@@ -250,15 +347,20 @@ ${_q5.text.trim()}
   }
 
   Widget _buildGenerating() {
-    return const Center(
+    final label = _pickedFiles.isNotEmpty && _stage == _Stage.generating
+        ? 'Processing files & proposing features…'
+        : _stage == _Stage.saving
+            ? 'Saving features…'
+            : 'Proposing features…';
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CircularProgressIndicator(),
-          SizedBox(height: 16),
+          const CircularProgressIndicator(),
+          const SizedBox(height: 16),
           Text(
-            'Proposing features…',
-            style: TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)),
+            label,
+            style: const TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)),
           ),
         ],
       ),

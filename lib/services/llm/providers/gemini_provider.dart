@@ -23,12 +23,21 @@ class GeminiProvider extends LlmProvider {
     int? maxTokens,
     bool? think, // parity — Gemini has no separate thinking toggle here
     bool jsonMode = false,
+    List<LlmImage>? images,
   }) async {
     final gen = <String, dynamic>{
       'temperature': temperature,
       if (maxTokens != null) 'maxOutputTokens': maxTokens,
       if (jsonMode) 'responseMimeType': 'application/json',
     };
+    final userParts = <Map<String, dynamic>>[
+      if (images != null)
+        for (final img in images)
+          {
+            'inlineData': {'mimeType': img.mimeType, 'data': img.base64},
+          },
+      {'text': userPrompt},
+    ];
     final body = <String, dynamic>{
       if (systemPrompt.trim().isNotEmpty)
         'systemInstruction': {
@@ -39,9 +48,7 @@ class GeminiProvider extends LlmProvider {
       'contents': [
         {
           'role': 'user',
-          'parts': [
-            {'text': userPrompt},
-          ],
+          'parts': userParts,
         },
       ],
       'generationConfig': gen,

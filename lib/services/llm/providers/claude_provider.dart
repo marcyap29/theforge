@@ -17,7 +17,24 @@ class ClaudeProvider extends LlmProvider {
     int? maxTokens,
     bool? think, // accepted for interface parity; Claude thinking is separate
     bool jsonMode = false, // parity; Claude JSON is via tool/response_format
+    List<LlmImage>? images,
   }) async {
+    // When images are provided build a multimodal content block list;
+    // otherwise pass the prompt string directly (text-only call).
+    final Object userContent = (images != null && images.isNotEmpty)
+        ? [
+            for (final img in images)
+              {
+                'type': 'image',
+                'source': {
+                  'type': 'base64',
+                  'media_type': img.mimeType,
+                  'data': img.base64,
+                },
+              },
+            {'type': 'text', 'text': userPrompt},
+          ]
+        : userPrompt;
     final response = await http.post(
       Uri.parse('https://api.anthropic.com/v1/messages'),
       headers: {
@@ -30,7 +47,7 @@ class ClaudeProvider extends LlmProvider {
         'max_tokens': maxTokens ?? 2048,
         'system': systemPrompt,
         'messages': [
-          {'role': 'user', 'content': userPrompt},
+          {'role': 'user', 'content': userContent},
         ],
         'temperature': temperature,
       }),

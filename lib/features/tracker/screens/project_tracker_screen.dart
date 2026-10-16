@@ -8,6 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/filesystem/project_file_repository.dart';
 import '../../../data/local_db/forge_database.dart';
 import '../../../services/diag_log.dart';
+import '../../../services/ingest_service.dart';
+import '../../../services/llm/llm_service_provider.dart';
 import '../../game/base_view_screen.dart';
 import '../../implementation/models/run_session.dart';
 import '../../implementation/providers/implementation_notifier.dart';
@@ -189,6 +191,11 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
                 Icons.shield_outlined, 'Security check', _openSecurityCheck),
             _menuEntry(Icons.fact_check_outlined, 'Run check-in', _runCheckin),
           ]),
+          IconButton(
+            icon: const Icon(Icons.attach_file_outlined),
+            tooltip: 'Add context files',
+            onPressed: _addContextFiles,
+          ),
           IconButton(
             icon: const Icon(Icons.folder_open_outlined),
             tooltip: 'Forge docs',
@@ -1441,6 +1448,46 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
         onBuildFeature: _buildFeature,
       ),
     ));
+  }
+
+  /// Picks files from disk and ingests them into the project's reference
+  /// context. Images are described by the Architect LLM; text/markdown is read
+  /// directly. Output appends to Forge/ingested/reference_context.md.
+  Future<void> _addContextFiles() async {
+    final picked = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
+      type: FileType.custom,
+      allowedExtensions: [
+        'png', 'jpg', 'jpeg', 'heic', 'gif', 'webp',
+        'txt', 'md', 'markdown',
+      ],
+    );
+    if (picked == null || !mounted) return;
+    final paths =
+        picked.files.map((f) => f.path).whereType<String>().toList();
+    if (paths.isEmpty) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Processing context files…')),
+    );
+
+    final llm = ref.read(llmServiceProvider);
+    final result = await IngestService(llm).ingestFiles(
+      filePaths: paths,
+      projectPath: project.path,
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
+
+    final msg = result.hasProcessed
+        ? '${result.processed.length} file${result.processed.length == 1 ? '' : 's'} added to project context'
+        : result.hasErrors
+            ? 'Error: ${result.errors.first}'
+            : 'No supported files — use PNG, JPG, HEIC, TXT, or MD';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg)),
+    );
   }
 
   /// Opens the in-app Forge Files drawer (slides in from the right).

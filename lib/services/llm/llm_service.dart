@@ -17,6 +17,7 @@ class LlmService {
     int? maxTokens,
     bool jsonMode = false,
     bool? think,
+    List<LlmImage>? images,
   }) async {
     final assignment = settings.roleAssignments[role];
     if (assignment == null) {
@@ -48,6 +49,7 @@ class LlmService {
       maxTokens: maxTokens,
       think: effectiveThink ? null : false,
       jsonMode: jsonMode,
+      images: images,
     );
   }
 
