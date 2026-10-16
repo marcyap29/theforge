@@ -3,6 +3,16 @@ import 'dart:convert';
 import 'llm/llm_provider.dart';
 import 'llm/llm_service.dart';
 
+/// Strips markdown code fences that models sometimes wrap JSON in.
+String _stripFences(String raw) {
+  final t = raw.trim();
+  if (!t.startsWith('`')) return t;
+  final firstNewline = t.indexOf('\n');
+  if (firstNewline == -1) return t;
+  final inner = t.substring(firstNewline + 1).trimRight();
+  return inner.endsWith('```') ? inner.substring(0, inner.length - 3).trim() : inner;
+}
+
 class InspectorVerdict {
   const InspectorVerdict({
     required this.passes,
@@ -83,7 +93,7 @@ Respond with ONLY valid JSON, no prose:
 
   static InspectorVerdict _parse(String raw) {
     try {
-      final json = jsonDecode(raw) as Map<String, dynamic>;
+      final json = jsonDecode(_stripFences(raw)) as Map<String, dynamic>;
       final passes = (json['passes'] as bool?) ?? true;
       final concern = json['concern'] as String?;
       final suggestion = json['suggestion'] as String?;

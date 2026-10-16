@@ -113,7 +113,7 @@ ${_q5.text.trim()}
         think: false,
         jsonMode: true,
       );
-      final json = jsonDecode(raw) as Map<String, dynamic>;
+      final json = jsonDecode(_stripFences(raw)) as Map<String, dynamic>;
       final list = (json['features'] as List?) ?? [];
       setState(() {
         _proposed = list.map((e) {
@@ -346,6 +346,17 @@ ${_q5.text.trim()}
       ],
     );
   }
+}
+
+/// Strips markdown code fences that some models wrap JSON in despite jsonMode.
+/// e.g. ```json\n{...}\n``` → {...}
+String _stripFences(String raw) {
+  final t = raw.trim();
+  if (!t.startsWith('`')) return t;
+  final firstNewline = t.indexOf('\n');
+  if (firstNewline == -1) return t;
+  final inner = t.substring(firstNewline + 1).trimRight();
+  return inner.endsWith('```') ? inner.substring(0, inner.length - 3).trim() : inner;
 }
 
 class _Question extends StatelessWidget {
