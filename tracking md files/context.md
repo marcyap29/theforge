@@ -4,6 +4,23 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session — 2026-10-17 — v0.5.38 Donor repo
+
+**Task:** Implement donor repo feature — ground Build-with-AI in real code from a reference repo instead of hallucinating similar utilities.
+
+**Completed:**
+- `DonorService` (new) — walks donor path, scores files, caps at 48 KB, writes `donor_context.md` + `donor_meta.json`
+- `ProjectFileRepository` — 4 new static donor methods
+- `ImplAgent.proposePlan()` — `donorContext` param + `## Donor code` prompt block
+- `implementation_notifier._plan()` — reads donor context and passes to `proposePlan()`
+- Tracker screen — Donor bar (purple, below code bar), `_changeDonorRepo()`, `_indexDonorRepo()`, AI tools menu entry
+- Build brief dialog — donor badge when donor is indexed
+- All docs updated; committed and pushed
+
+**Version shipped:** v0.5.38
+
+---
+
 ## Session: 2026-10-16 — Claude Code [Multi-file context ingestion — v0.5.37]
 
 **Branch:** main · **App:** v0.5.37

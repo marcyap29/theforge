@@ -48,6 +48,18 @@ class _BuildBriefDialogState extends State<_BuildBriefDialog> {
   final _notesController = TextEditingController();
   String _brief = '';
   InspectorVerdict? _verdict;
+  Map<String, dynamic>? _donorMeta;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDonorMeta();
+  }
+
+  Future<void> _loadDonorMeta() async {
+    final meta = await ProjectFileRepository.readDonorMeta(widget.projectPath);
+    if (mounted) setState(() => _donorMeta = meta);
+  }
 
   @override
   void dispose() {
@@ -160,6 +172,19 @@ Write the build brief.
                         fontSize: 12, color: Color(0xFF8A8A8E)),
                   ),
                 ),
+              if (_donorMeta != null) ...[
+                const SizedBox(height: 8),
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.account_tree_outlined,
+                      size: 11, color: Color(0xFFBA68C8)),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Donor: ${(_donorMeta!['repoName'] as String?) ?? ''}',
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFFBA68C8)),
+                  ),
+                ]),
+              ],
               const SizedBox(height: 16),
               const Text(
                 'Anything to add or clarify before the build? (optional)',

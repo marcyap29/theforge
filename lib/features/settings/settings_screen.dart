@@ -772,7 +772,11 @@ class _RoleCard extends ConsumerWidget {
     final configured = assignment.modelId.isNotEmpty;
 
     return _ProviderCardShell(
-      title: role == LlmRole.architect ? 'Architect' : 'Executor',
+      title: switch (role) {
+        LlmRole.architect => 'Architect',
+        LlmRole.executor => 'Executor',
+        LlmRole.inspector => 'Inspector',
+      },
       status: configured ? '● Configured' : '○ Not configured',
       statusColor:
           configured ? const Color(0xFF22C55E) : const Color(0xFF9CA3AF),

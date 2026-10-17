@@ -1174,6 +1174,45 @@ class ProjectFileRepository {
     }
   }
 
+  // ── Donor repo ───────────────────────────────────────────────────────────
+
+  /// Full indexed content from the donor repo — included in every executor
+  /// prompt so the model can adapt real utilities instead of hallucinating them.
+  static Future<void> writeDonorContext(
+      String projectPath, String content) async {
+    final dir = Directory(p.join(projectPath, forgeDirName, 'ingested'));
+    await dir.create(recursive: true);
+    await File(p.join(dir.path, 'donor_context.md')).writeAsString(content);
+  }
+
+  static Future<String?> readDonorContext(String projectPath) async {
+    final f = File(
+        p.join(projectPath, forgeDirName, 'ingested', 'donor_context.md'));
+    if (!f.existsSync()) return null;
+    return f.readAsString();
+  }
+
+  /// Metadata written after indexing: repoName, donorPath, indexedAt, fileCount.
+  static Future<void> writeDonorMeta(
+      String projectPath, Map<String, dynamic> meta) async {
+    final dir = Directory(p.join(projectPath, forgeDirName, 'ingested'));
+    await dir.create(recursive: true);
+    await File(p.join(dir.path, 'donor_meta.json'))
+        .writeAsString(jsonEncode(meta));
+  }
+
+  static Future<Map<String, dynamic>?> readDonorMeta(
+      String projectPath) async {
+    final f =
+        File(p.join(projectPath, forgeDirName, 'ingested', 'donor_meta.json'));
+    if (!f.existsSync()) return null;
+    try {
+      return jsonDecode(await f.readAsString()) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<List<File>> listReferenceDocs(String projectPath) async {
     final ingestedDir = Directory(p.join(projectPath, forgeDirName, 'ingested'));
     if (!ingestedDir.existsSync()) return [];

@@ -275,6 +275,18 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
           'Loaded build memory ($n prior feature${n == 1 ? '' : 's'})');
     }
 
+    // Donor repo context — real code from a related project the user designated
+    // for reference. Included so the executor adapts actual utilities instead of
+    // hallucinating plausible-looking code.
+    String? donorContext;
+    try {
+      DiagLog.breadcrumb('plan: readDonorContext');
+      donorContext = await ProjectFileRepository.readDonorContext(brief.projectPath);
+    } catch (_) {}
+    if (donorContext != null && donorContext.trim().isNotEmpty) {
+      _log(ConsoleLineKind.info, 'Loaded donor reference code');
+    }
+
     // A manifest of the whole doc pool the scout may pull from on demand — used
     // for pools too large to sit fully in the always-on context above.
     var docManifest = const <DocPoolEntry>[];
@@ -311,6 +323,7 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
         goalStatement: brief.goalStatement,
         ingestedContext: ingestedContext,
         buildMemory: buildMemory,
+        donorContext: donorContext,
         docManifest: docManifest,
         readDoc: (id) => repo.readDocEntry(brief.projectPath, id),
         components: brief.components,

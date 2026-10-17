@@ -38,6 +38,7 @@ class ImplAgent {
     String? goalStatement,
     String? ingestedContext,
     String? buildMemory,
+    String? donorContext,
     List<DocPoolEntry> docManifest = const [],
     Future<String> Function(String id)? readDoc,
     List<String> components = const [],
@@ -59,6 +60,7 @@ class ImplAgent {
       goalStatement: goalStatement,
       ingestedContext: ingestedContext,
       buildMemory: buildMemory,
+      donorContext: donorContext,
       components: components,
       files: files,
       keyDocs: keyDocs,
@@ -475,6 +477,7 @@ it). The JSON must be a single top-level object with no code fences:
     String? goalStatement,
     String? ingestedContext,
     String? buildMemory,
+    String? donorContext,
     List<String> components = const [],
     required List<String> files,
     String? keyDocs,
@@ -521,6 +524,19 @@ it). The JSON must be a single top-level object with no code fences:
         ..writeln('## Prior builds on this project '
             '(what shipped before — reuse these patterns and files)')
         ..writeln(_cap(buildMemory.trim(), _memCap, what: 'build memory'))
+        ..writeln();
+    }
+    // Real code from a donor project the user designated as a reference.
+    // The model should adapt these implementations — the import paths and
+    // package names belong to the donor and must NOT be copied verbatim.
+    if (donorContext != null && donorContext.trim().isNotEmpty) {
+      b
+        ..writeln('## Donor code (reference — adapt, do not import)')
+        ..writeln(
+            'The following utilities come from a related project. Use them as '
+            'a blueprint: adapt the logic and patterns for the current '
+            "project's file structure. Never copy the donor's import paths.")
+        ..writeln(_cap(donorContext.trim(), 30000, what: 'donor context'))
         ..writeln();
     }
     if (keyDocs != null && keyDocs.trim().isNotEmpty) {

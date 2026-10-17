@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/filesystem/project_file_repository.dart';
 import '../../../data/local_db/forge_database.dart';
 import '../../../services/diag_log.dart';
+import '../../../services/donor_service.dart';
 import '../../../services/ingest_service.dart';
 import '../../../services/llm/llm_service_provider.dart';
 import '../../game/base_view_screen.dart';
@@ -61,6 +62,9 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
   bool _bannerDismissed = false;
   String? _repoPath;
   bool _repoLoaded = false;
+  String? _donorPath;
+  String? _donorRepoName;
+  bool _donorLoaded = false;
 
   final _scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -77,6 +81,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     super.initState();
     Future.microtask(_loadStaleness);
     Future.microtask(_loadRepoPath);
+    Future.microtask(_loadDonorMeta);
     Future.microtask(_reconcileStatuses);
   }
 
@@ -109,6 +114,66 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
         _repoPath = config['repoPath'] as String?;
         _repoLoaded = true;
       });
+    }
+  }
+
+  Future<void> _loadDonorMeta() async {
+    final meta = await ProjectFileRepository.readDonorMeta(project.path);
+    if (mounted) {
+      setState(() {
+        _donorPath = meta?['donorPath'] as String?;
+        _donorRepoName = meta?['repoName'] as String?;
+        _donorLoaded = true;
+      });
+    }
+  }
+
+  Future<void> _changeDonorRepo() async {
+    final picked = await FilePicker.platform.getDirectoryPath(
+      dialogTitle: 'Select donor repo for ${project.name}',
+      lockParentWindow: true,
+    );
+    if (picked == null || !mounted) return;
+    final repoName = picked.split('/').last;
+    await ProjectFileRepository.writeDonorMeta(project.path, {
+      'donorPath': picked,
+      'repoName': repoName,
+    });
+    if (mounted) {
+      setState(() {
+        _donorPath = picked;
+        _donorRepoName = repoName;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Donor repo set to $repoName — tap Index to scan it'),
+      ));
+    }
+  }
+
+  Future<void> _indexDonorRepo() async {
+    final donorPath = _donorPath;
+    if (donorPath == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Set a donor repo first')),
+      );
+      return;
+    }
+    _showBlockingSpinner('Indexing donor repo…');
+    try {
+      final result = await DonorService.indexDonor(
+        donorPath: donorPath,
+        projectPath: project.path,
+      );
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      if (!mounted) return;
+      setState(() => _donorRepoName = result.repoName);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+            'Indexed ${result.fileCount} files from ${result.repoName}'),
+      ));
+    } catch (e) {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      if (mounted) await _showError('Index donor repo', e);
     }
   }
 
@@ -190,6 +255,9 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             _menuEntry(
                 Icons.shield_outlined, 'Security check', _openSecurityCheck),
             _menuEntry(Icons.fact_check_outlined, 'Run check-in', _runCheckin),
+            const PopupMenuDivider(),
+            _menuEntry(Icons.account_tree_outlined, 'Index donor repo',
+                _indexDonorRepo),
           ]),
           IconButton(
             icon: const Icon(Icons.attach_file_outlined),
@@ -235,6 +303,13 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
               repoPath: _repoPath,
               onChange: _changeCodeLocation,
               onScan: _scanRepo,
+            ),
+          if (_donorLoaded)
+            _DonorBar(
+              donorPath: _donorPath,
+              donorRepoName: _donorRepoName,
+              onChange: _changeDonorRepo,
+              onIndex: _indexDonorRepo,
             ),
           if (_showStalenessBanner) _StalenessBanner(
             info: _staleness!,
@@ -2520,6 +2595,88 @@ class _CodeLocationBar extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Compact row showing the donor repo name and quick actions (Set / Change /
+/// Index). Mirrors [_CodeLocationBar] but uses a purple accent to distinguish
+/// it from the primary code repo.
+class _DonorBar extends StatelessWidget {
+  const _DonorBar({
+    required this.donorPath,
+    required this.donorRepoName,
+    required this.onChange,
+    required this.onIndex,
+  });
+  final String? donorPath;
+  final String? donorRepoName;
+  final VoidCallback onChange;
+  final VoidCallback onIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    final linked = donorPath != null && donorPath!.isNotEmpty;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 6, 12, 6),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0A0A0D),
+        border: Border(bottom: BorderSide(color: Color(0xFF1C1C1E))),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.account_tree_outlined,
+              size: 15,
+              color: linked
+                  ? const Color(0xFFBA68C8)
+                  : const Color(0xFF6B7280)),
+          const SizedBox(width: 8),
+          Text('Donor:',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              linked ? (donorRepoName ?? donorPath!) : 'No donor repo set',
+              style: TextStyle(
+                fontFamily: 'Menlo',
+                fontSize: 12,
+                color: linked
+                    ? const Color(0xFFD4B2E8)
+                    : const Color(0xFF6B7280),
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (linked)
+            TextButton.icon(
+              onPressed: onIndex,
+              icon: const Icon(Icons.sync, size: 15),
+              label: const Text('Index'),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFFBA68C8),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          linked
+              ? TextButton(
+                  onPressed: onChange,
+                  style:
+                      TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                  child:
+                      const Text('Change', style: TextStyle(fontSize: 12)),
+                )
+              : TextButton.icon(
+                  onPressed: onChange,
+                  icon: const Icon(Icons.add, size: 15),
+                  label: const Text('Set donor repo'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFBA68C8),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
         ],
       ),
     );

@@ -2,6 +2,37 @@
 
 ---
 
+## v0.5.38 — 2026-10-17 — Donor repo (reference code injection)
+
+Prevents the Forge from hallucinating utility code by grounding it in real implementations from a related ("donor") repo.
+
+**`lib/services/donor_service.dart`** (new)
+- `DonorService.indexDonor({donorPath, projectPath})` — walks the donor directory, skipping build/generated/test/UI paths.
+- Files scored: utility/service/model/provider dirs rank first; screen/widget/UI dirs last (so they're cut by the cap before core logic is).
+- Each file capped at 180 lines; total content capped at 48 KB.
+- Writes `Forge/ingested/donor_context.md` (code blocks with file paths) and `Forge/ingested/donor_meta.json` (`{donorPath, repoName, indexedAt, fileCount}`).
+
+**`lib/features/tracker/screens/project_tracker_screen.dart`** (modified)
+- New "Donor:" bar below the code-location bar; purple `account_tree_outlined` icon.
+- Shows donor repo name when indexed; "Set donor repo" / "Change" button; "Index" button triggers `DonorService.indexDonor()`.
+- "AI tools ▾" → "Index donor repo" menu item.
+- State: `_donorPath`, `_donorRepoName`, `_donorLoaded`; loaded from `donor_meta.json` on open.
+
+**`lib/features/tracker/widgets/build_brief_dialog.dart`** (modified)
+- Reads `donor_meta.json` on open; shows "Donor: <repoName>" chip (purple) below feature description when a donor is indexed.
+
+**`lib/features/implementation/data/impl_agent.dart`** (modified)
+- `proposePlan()` + `buildUserContext()` now accept `String? donorContext`.
+- Injected as `## Donor code (reference — adapt, do not import)` block (capped at 30 KB) between build memory and key docs in the executor prompt.
+
+**`lib/features/implementation/providers/implementation_notifier.dart`** (modified)
+- `_plan()` reads `donor_context.md` before assembling the brief; passes `donorContext` to `proposePlan()`.
+
+**`lib/data/filesystem/project_file_repository.dart`** (modified)
+- Added `writeDonorContext`, `readDonorContext`, `writeDonorMeta`, `readDonorMeta` static methods (read/write `Forge/ingested/donor_context.md` and `Forge/ingested/donor_meta.json`).
+
+---
+
 ## v0.5.37 — 2026-10-16 — Multi-file context ingestion
 
 Users can now attach reference files to a project so the AI builds with richer context. Two entry points: a **paperclip icon** in the tracker AppBar (works any time) and a **"Reference files" section** in the goal interview form (files inform seed feature proposals).

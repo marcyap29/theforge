@@ -1,7 +1,7 @@
 # The Forge — Architecture
 
 **Version:** 4.1.0
-**Last Updated:** 2026-10-16
+**Last Updated:** 2026-10-17
 
 ---
 
@@ -114,6 +114,7 @@ The Forge/
 │   ├── main.dart
 │   └── services/
 │       ├── ingest_service.dart                 — IngestService: images→vision extraction, text→direct read → appends to reference_context.md
+│       ├── donor_service.dart                  — DonorService.indexDonor(): walks donor repo, scores files, writes donor_context.md + donor_meta.json
 │       ├── inspector_service.dart              — InspectorService: independent-context build brief quality check
 │       ├── llm/
 │       │   ├── llm_model_config.dart           — ModelInfo, LlmSettings, model catalogs
@@ -202,6 +203,8 @@ Every Forge project is a folder on the user's machine. Default root: `~/Document
     │   └── {ProjectName}_SetupWorksheet_v1.md
     ├── ingested/
     │   ├── reference_context.md                   — extracted context (appended, datestamped); always-on slot in Build-with-AI
+    │   ├── donor_context.md                       — indexed donor repo code (utility/service/model files, capped at 48 KB); injected into executor prompt
+    │   ├── donor_meta.json                        — donor metadata: donorPath, repoName, indexedAt, fileCount
     │   ├── source/                                — original files added via "Add context files" picker
     │   └── {ProjectName}_V2Seeds.md               — deferred capabilities list (written at L3)
     ├── build_memory/
@@ -432,7 +435,7 @@ The Forge's first hands-on-keyboard mode: an in-app agent that implements a trac
 | **Hands (repo)** | `data/impl_workspace.dart` | Gather repo files + `gatherKeyDocs`, apply edits with `.forge/impl_backups/` Undo, checklist verify |
 | **Hands (shell)** | `data/command_runner.dart` | `Process.start` streamed subprocess + denylist + 3-min timeout — the FIRST streamed subprocess in the app |
 | **Honesty check** | `data/completion_guard.dart` | Pure `CompletionGuard.inspect(appliedEdits) → CompletionVerdict`; classifies a run's applied diff (noEdits / docsConfigOnly / placeholderOnly / none). No I/O, unit-tested |
-| **Conductor** | `providers/implementation_notifier.dart` | keepAlive per-feature run state machine; `_plan` shared by start / revise / fix (loads ingested + build-memory pools each round); `shipFeature` writes a build-memory record via `buildMemoryRecord`; generation counter for stale-stream safety |
+| **Conductor** | `providers/implementation_notifier.dart` | keepAlive per-feature run state machine; `_plan` shared by start / revise / fix (loads ingested + build-memory pools each round); also loads donor_context.md and passes donorContext to proposePlan(); `shipFeature` writes a build-memory record via `buildMemoryRecord`; generation counter for stale-stream safety |
 | **Registry** | `providers/implementation_providers.dart` | Entitlement stub + `implActiveRunsProvider` registry |
 | **Window** | `screens/implementation_screen.dart` | Streamed console, collapsible thinking, approval / edit / revise controls |
 | **Diff** | `widgets/diff_view.dart` | LCS line diff for proposed edits |
