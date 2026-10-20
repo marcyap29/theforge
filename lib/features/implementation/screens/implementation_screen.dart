@@ -55,10 +55,31 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
   /// window session (re-appears next time they open a build).
   bool _modelWarnDismissed = false;
 
+  /// The goal text for this build — the brief approved in the "Before you
+  /// build" dialog (goalStatement) when one exists, else the feature
+  /// description. Pasted into the compose box so the brief stays visible and
+  /// editable on the build screen instead of vanishing between the two.
+  String get _prefill =>
+      widget.brief.goalStatement ?? widget.brief.featureDescription ?? '';
+
   /// Shared prompt/compose text — used by the bottom box AND the right-side
-  /// "Build this feature" button.
+  /// "Build this feature" button. Opens pre-pasted with [_prefill].
   late final TextEditingController _input =
-      TextEditingController(text: widget.brief.featureDescription ?? '');
+      TextEditingController(text: _prefill);
+
+  /// Whether an approved build brief exists for this feature.
+  bool get _hasBrief =>
+      (widget.brief.goalStatement ?? '').trim().isNotEmpty;
+
+  /// The instruction to start a run with: the compose box's text, or null when
+  /// it's empty or still holds the unedited pre-pasted brief (the planning
+  /// context already carries that text as the project goal — sending it again
+  /// as an instruction would only duplicate the prompt).
+  String? _instructionFromInput() {
+    final text = _input.text.trim();
+    if (text.isEmpty || text == _prefill.trim()) return null;
+    return text;
+  }
 
   String get _featureId => widget.brief.featureId;
 
@@ -103,7 +124,7 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
     final phase = ref.read(implRunProvider(_featureId)).phase;
     final text = _input.text.trim();
     if (phase == RunPhase.idle) {
-      _notifier.start(widget.brief, instruction: text.isEmpty ? null : text);
+      _notifier.start(widget.brief, instruction: _instructionFromInput());
       _input.clear();
     } else if (text.isNotEmpty) {
       _notifier.steer(text);
@@ -184,7 +205,7 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
     final phase = ref.read(implRunProvider(_featureId)).phase;
     final text = _input.text.trim();
     if (phase == RunPhase.idle) {
-      _notifier.start(widget.brief, instruction: text.isEmpty ? null : text);
+      _notifier.start(widget.brief, instruction: _instructionFromInput());
     } else {
       // Already ran once — treat "Build" as a re-plan.
       _notifier.action(
@@ -358,7 +379,10 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
                     Expanded(
                       child: (state.phase == RunPhase.idle &&
                               state.console.isEmpty)
-                          ? _ComposeHints(featureTitle: widget.brief.featureTitle)
+                          ? _ComposeHints(
+                              featureTitle: widget.brief.featureTitle,
+                              hasBrief: _hasBrief,
+                            )
                           : _Console(
                               lines: state.console,
                               controller: _scroll,
@@ -436,6 +460,7 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
                       idle: state.phase == RunPhase.idle,
                       busy: state.phase.isBusy,
                       onSend: _sendInput,
+                      hasBrief: _hasBrief,
                     ),
                   ],
                 ),
@@ -489,8 +514,9 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
 
 /// Empty-state hints shown when the build window opens — nothing has run yet.
 class _ComposeHints extends StatelessWidget {
-  const _ComposeHints({required this.featureTitle});
+  const _ComposeHints({required this.featureTitle, this.hasBrief = false});
   final String featureTitle;
+  final bool hasBrief;
 
   @override
   Widget build(BuildContext context) {
@@ -514,9 +540,13 @@ class _ComposeHints extends StatelessWidget {
               style: TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)),
             ),
             const SizedBox(height: 10),
-            _hint('Type what you want done in the box below, then press ↑ (or '
-                'just press "Build this feature" to use the feature\'s '
-                'description).'),
+            _hint(hasBrief
+                ? 'The build brief is pasted in the box below — edit or add to '
+                    'it, then press ↑ (or just press "Build this feature" to '
+                    'build it as-is).'
+                : 'Type what you want done in the box below, then press ↑ (or '
+                    'just press "Build this feature" to use the feature\'s '
+                    'description).'),
             _hint('Use an action on the right → Build, Run checks, Fix errors, '
                 'or Commit & push.'),
             _hint('While it works, press Esc to stop.'),
@@ -674,11 +704,13 @@ class _PromptBox extends StatelessWidget {
     required this.idle,
     required this.busy,
     required this.onSend,
+    this.hasBrief = false,
   });
   final TextEditingController controller;
   final bool idle;
   final bool busy;
   final VoidCallback onSend;
+  final bool hasBrief;
 
   @override
   Widget build(BuildContext context) {
@@ -704,7 +736,10 @@ class _PromptBox extends StatelessWidget {
                 hintText: busy
                     ? 'Working… press Esc to stop'
                     : idle
-                        ? 'Describe what to build (or press Build to use the feature\'s description)…'
+                        ? (hasBrief
+                            ? 'Describe what to build (or press Build to use the brief)…'
+                            : 'Describe what to build (or press Build to use the '
+                                'feature\'s description)…')
                         : 'Message the AI — what should it build or change next?',
                 hintStyle: const TextStyle(
                     color: Color(0xFF6B7280), fontSize: 12.5),
