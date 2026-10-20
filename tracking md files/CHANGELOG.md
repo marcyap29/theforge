@@ -2,6 +2,17 @@
 
 ---
 
+## v0.5.39 — 2026-10-19 — Settings UX: single model-selection location
+
+Removed the duplicate model picker from BYOK provider cards (Claude, OpenAI, Gemini). Model selection now lives in one place only — the **Model Roles** section (Architect, Executor, Inspector). Previously the provider cards showed a model dropdown that propagated silently to all roles using that provider, creating a confusing "two sets of settings" appearance.
+
+**`lib/features/settings/settings_screen.dart`** (modified)
+- `_ByokCard`: removed `_selectedModel` field, `_onModelChanged()` method, and the `if (showModelPicker) ...` block.
+- `_ByokCard._runTest()`: no longer passes `modelOverride`; test uses the role-assigned model for that provider (correct behaviour).
+- Gemini `initState` auto-refresh and manual "Refresh models" button retained — they still populate the live model list for `_RoleCard` pickers.
+
+---
+
 ## v0.5.38 — 2026-10-17 — Donor repo (reference code injection)
 
 Prevents the Forge from hallucinating utility code by grounding it in real implementations from a related ("donor") repo.

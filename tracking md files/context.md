@@ -4,6 +4,20 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session — 2026-10-19 — v0.5.39 Settings UX fix
+
+**Task:** Fix "two sets of model settings" confusion in the Settings screen. User saw model pickers in both the LLM Providers section (Claude/OpenAI/Gemini cards) and the Model Roles section (Architect/Executor/Inspector cards).
+
+**Root cause:** `_ByokCard` had a model dropdown that silently pushed to all roles using that provider. Combined with the per-role model dropdowns in `_RoleCard`, models appeared in two places.
+
+**Fix:** Removed `_selectedModel`, `_onModelChanged()`, and the model picker block from `_ByokCard`. Model selection now lives only in the Model Roles section.
+
+**Note:** Plumbline (`/Users/mymac/Development/Plumbline`) has NO LLM settings — it's a simple requirements-generation tool. The "duplicate settings" the user described were in The Forge, not Plumbline.
+
+**Version shipped:** v0.5.39
+
+---
+
 ## Session — 2026-10-17 — v0.5.38 Donor repo
 
 **Task:** Implement donor repo feature — ground Build-with-AI in real code from a reference repo instead of hallucinating similar utilities.

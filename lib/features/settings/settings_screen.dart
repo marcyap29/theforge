@@ -469,15 +469,11 @@ class _ByokCardState extends ConsumerState<_ByokCard> {
   bool _testing = false;
   bool? _testPassed;
   String _testError = '';
-  // Locally selected model — null means "use whatever the role assigns".
-  String? _selectedModel;
 
   @override
   void initState() {
     super.initState();
     _controller.addListener(() => setState(() {}));
-    // Auto-refresh Gemini model list on first open when a key is already
-    // configured and we have no live models cached yet (new session).
     if (widget.providerType == LlmProviderType.gemini) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final s = ref.read(settingsProvider).valueOrNull;
@@ -501,30 +497,13 @@ class _ByokCardState extends ConsumerState<_ByokCard> {
     setState(() { _testing = true; _testPassed = null; });
     final error = await ref
         .read(settingsProvider.notifier)
-        .testProvider(widget.providerType, modelOverride: _selectedModel);
+        .testProvider(widget.providerType);
     if (!mounted) return;
     setState(() {
       _testing = false;
       _testPassed = error == null;
       _testError = error ?? '';
     });
-  }
-
-  /// Updates [_selectedModel] and also propagates to any role assignments
-  /// already using this provider, so the role cards stay in sync.
-  Future<void> _onModelChanged(String id) async {
-    setState(() => _selectedModel = id);
-    final settings =
-        ref.read(settingsProvider).valueOrNull?.settings;
-    if (settings == null) return;
-    for (final entry in settings.roleAssignments.entries) {
-      if (entry.value.providerType == widget.providerType) {
-        await ref.read(settingsProvider.notifier).setRoleAssignment(
-              entry.key,
-              entry.value.copyWith(modelId: id),
-            );
-      }
-    }
   }
 
   String _maskKey(String key) {
@@ -538,27 +517,6 @@ class _ByokCardState extends ConsumerState<_ByokCard> {
     final apiKey = settingsState?.settings.apiKeys[widget.providerType];
     final hasKey = apiKey != null;
     final masked = hasKey ? _maskKey(apiKey) : '';
-
-    // Model picker — shown for non-Ollama BYOK providers (Gemini, Claude, OpenAI).
-    // For Gemini, prefer the live model list fetched from the API over the
-    // static seed so the picker always reflects current available models.
-    final liveGemini = settingsState?.geminiLiveModels ?? const [];
-    final availableModels = (widget.providerType == LlmProviderType.gemini &&
-            liveGemini.isNotEmpty)
-        ? liveGemini
-        : modelsFor(widget.providerType);
-    final showModelPicker =
-        widget.providerType != LlmProviderType.ollama && availableModels.isNotEmpty;
-
-    // Derive displayed model: local selection → role assignment → catalog first.
-    final assignedModel = settingsState?.settings.roleAssignments.values
-        .where((a) => a.providerType == widget.providerType)
-        .map((a) => a.modelId)
-        .firstOrNull;
-    final currentModel =
-        _selectedModel ?? assignedModel ?? availableModels.firstOrNull?.id ?? '';
-    final modelInList =
-        availableModels.any((m) => m.id == currentModel);
 
     return _ProviderCardShell(
       title: widget.displayName,
@@ -588,49 +546,6 @@ class _ByokCardState extends ConsumerState<_ByokCard> {
             ),
           ),
         ),
-        if (showModelPicker) ...[
-          const SizedBox(height: 8),
-          // Use DropdownButton (not FormField) so `value` is fully reactive:
-          // when availableModels changes (e.g. after Gemini live-list fetch),
-          // a null value shows the hint rather than throwing an assertion.
-          InputDecorator(
-            decoration: const InputDecoration(
-              labelText: 'Model',
-              isDense: true,
-              contentPadding:
-                  EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            ),
-            child: DropdownButton<String>(
-              value: modelInList ? currentModel : null,
-              hint: currentModel.isNotEmpty
-                  ? Text('$currentModel (not in list)',
-                      style: const TextStyle(
-                          fontSize: 13, color: Color(0xFF9CA3AF)))
-                  : const Text('Pick a model',
-                      style: TextStyle(color: Color(0xFF9CA3AF))),
-              isExpanded: true,
-              underline: const SizedBox.shrink(),
-              isDense: true,
-              items: [
-                ...availableModels.map((m) => DropdownMenuItem(
-                    value: m.id, child: Text(m.displayName))),
-                // "Custom…" uses a sentinel so its onChanged branch opens dialog.
-                const DropdownMenuItem(
-                    value: _customModelSentinel, child: Text('Custom…')),
-              ],
-              onChanged: (id) async {
-                if (id == _customModelSentinel) {
-                  final custom =
-                      await _promptCustomModel(context, currentModel);
-                  if (custom == null || custom.isEmpty || !mounted) return;
-                  await _onModelChanged(custom);
-                } else if (id != null) {
-                  await _onModelChanged(id);
-                }
-              },
-            ),
-          ),
-        ],
         const SizedBox(height: 8),
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
