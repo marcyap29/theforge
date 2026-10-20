@@ -337,6 +337,8 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
       );
       // Ignore a stream that finished after the user stopped or restarted.
       if (gen != _gen || state.phase == RunPhase.stopped) return;
+      DiagLog.breadcrumb(
+          'plan: proposePlan returned (${plan.edits.length}e ${plan.commands.length}c)');
       // Always surface a plain-English takeaway in green.
       if (plan.summary.isNotEmpty) {
         _log(ConsoleLineKind.presentation, 'Summary: ${plan.summary}');
@@ -348,15 +350,28 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
         '${plan.edits.length == 1 ? '' : 's'} and ${plan.commands.length} '
         'command${plan.commands.length == 1 ? '' : 's'}.',
       );
+      // Print each proposed edit and command so the plan is readable in the
+      // console without having to open the approval cards.
+      for (final edit in plan.edits) {
+        final marker = edit.isNewFile ? '+' : '~';
+        final note = edit.rationale.isNotEmpty ? '  — ${edit.rationale}' : '';
+        _log(ConsoleLineKind.info, '  $marker ${edit.path}$note');
+      }
+      for (final cmd in plan.commands) {
+        _log(ConsoleLineKind.info, '  \$ ${cmd.human}');
+      }
       // A fresh plan clears prior skip decisions and the fixable state.
       _fixContext = null;
+      DiagLog.breadcrumb('plan: setState plan + skips');
       state = state.copyWith(
         plan: plan,
         skippedEdits: {},
         skippedCommands: {},
         canFix: false,
       );
+      DiagLog.breadcrumb('plan: _phase awaitingApproval');
       _phase(RunPhase.awaitingApproval);
+      DiagLog.breadcrumb('plan: done → awaitingApproval');
     } catch (e) {
       if (gen != _gen || state.phase == RunPhase.stopped) return;
       // Surface the model's raw output so the user can see (and copy) exactly
@@ -610,10 +625,18 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     }
   }
 
+  /// Info/warning-level lint rules that cause runtime crashes and must be
+  /// treated as blocking errors during the analyze gate.
+  ///
+  /// `valid_regexps` is info-level but throws FormatException at runtime
+  /// when the invalid pattern is compiled — a silent ship blocker.
+  static const _blockingLintRules = {'valid_regexps'};
+
   /// Runs the project's static analyzer after edits and folds any compile-level
   /// errors into [failures] (which drives canFix / "Fix it"). Only gates
-  /// Dart/Flutter repos; treats analyzer-unavailable/timeout as "skip", and
-  /// ignores warning/info-level lints so it fails only on real errors.
+  /// Dart/Flutter repos; treats analyzer-unavailable/timeout as "skip".
+  /// Errors are always blocking; info/warning rules in [_blockingLintRules]
+  /// are promoted to errors because they cause runtime crashes.
   Future<void> _analyzeGate(ImplBrief brief, StringBuffer failures) async {
     final pubspec =
         await ImplWorkspace.readRepoFile(brief.repoPath, 'pubspec.yaml');
@@ -640,8 +663,10 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
       _log(ConsoleLineKind.info, 'Skipped analyze ($cmd unavailable).');
       return;
     }
-    final errs =
-        captured.where((l) => l.contains('error •')).toList();
+    final errs = captured.where((l) {
+      if (l.contains('error •')) return true;
+      return _blockingLintRules.any((rule) => l.contains('• $rule'));
+    }).toList();
     if (errs.isEmpty) {
       _log(ConsoleLineKind.success, '✓ analyze clean (no compile errors)');
       state = state.copyWith(analyzeClean: true, error: state.error);

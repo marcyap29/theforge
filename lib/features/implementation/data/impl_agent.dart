@@ -213,8 +213,12 @@ class ImplAgent {
       jsonMode: true,
     );
     DiagLog.breadcrumb('proposePlan: pass2 done, parsing JSON');
+    DiagLog.breadcrumb('proposePlan: _parse start');
     try {
-      return _parse(planRaw, repoPath);
+      final result = await _parse(planRaw, repoPath);
+      DiagLog.breadcrumb(
+          'proposePlan: _parse ok (${result.edits.length}e ${result.commands.length}c)');
+      return result;
     } on ImplAgentException {
       // Two common failures, handled differently on retry:
       //  • Truncation — a big multi-file plan overran the output budget, so the
@@ -240,7 +244,11 @@ class ImplAgent {
         onDelta: onDelta,
         jsonMode: true,
       );
-      return _parse(retry, repoPath);
+      DiagLog.breadcrumb('proposePlan: retry _parse start');
+      final retryResult = await _parse(retry, repoPath);
+      DiagLog.breadcrumb(
+          'proposePlan: retry _parse ok (${retryResult.edits.length}e ${retryResult.commands.length}c)');
+      return retryResult;
     }
   }
 
@@ -315,13 +323,17 @@ class ImplAgent {
     return buffer.toString();
   }
 
-  /// True if the last ~1200 chars of [s] already appear earlier in it — a
-  /// verbatim repeat long enough to be a genuine model loop. 1200 chars avoids
-  /// false positives from find/replace hunks whose function bodies share the
-  /// same opening or parameter list (those overlaps are typically 500–1000 chars
-  /// and are not loops). Real loops (model reprinting its reasoning block)
-  /// repeat thousands of chars. Bounded to the last 12 000 chars so the scan
-  /// stays cheap.
+  /// True if the last ~1200 chars of [s] appear at least TWICE earlier in it —
+  /// a verbatim repeat that can only be a genuine model loop.
+  ///
+  /// Why two occurrences in hay (three total)?  A find/replace hunk where "find"
+  /// and "replace" are nearly identical (e.g. a large widget-test rewrite) will
+  /// produce exactly ONE prior match — the probe comes from "replace" and matches
+  /// once inside "find".  That is normal JSON, not a loop.  A model that is
+  /// truly looping reprints the same block continuously, so the probe will appear
+  /// two or more times before the final copy.  Requiring two matches in hay
+  /// eliminates the find/replace false-positive while still catching real loops
+  /// early.  Bounded to the last 12 000 chars to keep the scan cheap.
   static bool _looksLooping(String s) {
     if (s.length < 3000) return false;
     final window = s.length > 12000 ? s.substring(s.length - 12000) : s;
@@ -330,7 +342,14 @@ class ImplAgent {
     final probe = window.substring(window.length - probeLen);
     // Search only the part before the probe so it can't match itself.
     final hay = window.substring(0, window.length - probeLen);
-    return hay.contains(probe);
+    var count = 0;
+    var pos = 0;
+    while ((pos = hay.indexOf(probe, pos)) != -1) {
+      count++;
+      if (count >= 2) return true; // three total appearances → real loop
+      pos += probe.length;
+    }
+    return false;
   }
 
   String _revisionBlock(AgentPlan? prev, String feedback) {
@@ -552,9 +571,11 @@ it). The JSON must be a single top-level object with no code fences:
   }
 
   Future<AgentPlan> _parse(String raw, String repoPath) async {
+    DiagLog.breadcrumb('_parse: extractJson');
     final jsonText = _extractJsonObject(raw);
     dynamic decoded;
     try {
+      DiagLog.breadcrumb('_parse: jsonDecode (len=${raw.length})');
       decoded = jsonDecode(jsonText);
     } catch (_) {
       throw ImplAgentException('The agent did not return valid JSON.', raw: raw);
@@ -568,12 +589,15 @@ it). The JSON must be a single top-level object with no code fences:
     final summary = (decoded['summary'] ?? '').toString().trim();
 
     final edits = <ProposedEdit>[];
-    for (final e in (decoded['edits'] as List?) ?? const []) {
+    final rawEdits = (decoded['edits'] as List?) ?? const [];
+    DiagLog.breadcrumb('_parse: processing ${rawEdits.length} edits');
+    for (final e in rawEdits) {
       if (e is! Map) continue;
       final path = (e['path'] ?? '').toString().trim();
       if (path.isEmpty) continue;
       // Never let the model write outside the linked repo.
       if (!ImplWorkspace.isPathSafe(repoPath, path)) continue;
+      DiagLog.breadcrumb('_parse: readRepoFile $path');
       final oldContent = await ImplWorkspace.readRepoFile(repoPath, path);
       var rationale = (e['rationale'] ?? '').toString().trim();
       final content = e['content']?.toString();
@@ -631,11 +655,14 @@ it). The JSON must be a single top-level object with no code fences:
       ));
     }
 
+    DiagLog.breadcrumb('_parse: ${edits.length} edits built, processing commands');
     if (edits.isEmpty && commands.isEmpty) {
       throw ImplAgentException(
           'The agent proposed no changes. Try refining the feature description.',
           raw: raw);
     }
+    DiagLog.breadcrumb(
+        '_parse: done — ${edits.length}e ${commands.length}c, returning plan');
     return AgentPlan(
       summary: summary.isNotEmpty ? summary : rationale,
       rationale: rationale,

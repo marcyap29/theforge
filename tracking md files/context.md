@@ -4,6 +4,20 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session — 2026-10-20 — v0.5.40 Build quality fixes
+
+**Tasks:** Two Build-with-AI robustness fixes surfaced by real builds on the Plumbline project.
+
+**Fix 1 — Loop detector false positive (`impl_agent.dart`):**
+`_looksLooping()` was firing on valid plans that contained large find/replace hunks where "find" and "replace" were nearly identical (e.g. a full widget-test file rewrite). The probe (last 1200 chars) matched once in the earlier "find" field — not a loop. Fixed by requiring the probe to appear **twice** in `hay` (3+ total) before flagging. Real model loops repeat continuously; find/replace pairs produce exactly one prior match.
+
+**Fix 2 — Blocking lint promotion (`implementation_notifier.dart`):**
+`_analyzeGate()` only blocked on `error •` lines. `valid_regexps` is an `info`-level lint but throws `FormatException` at runtime when the compiled regex hits an invalid Unicode escape (e.g. `\•`, `\›`). Added `_blockingLintRules = {'valid_regexps'}` — any captured line matching `• <rule>` is promoted to a blocking error and included in fix-cycle feedback.
+
+**Version shipped:** v0.5.40
+
+---
+
 ## Session — 2026-10-19 — v0.5.39 Settings UX fix
 
 **Task:** Fix "two sets of model settings" confusion in the Settings screen. User saw model pickers in both the LLM Providers section (Claude/OpenAI/Gemini cards) and the Model Roles section (Architect/Executor/Inspector cards).

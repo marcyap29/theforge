@@ -2,6 +2,18 @@
 
 ---
 
+## v0.5.40 — 2026-10-20 — Build quality: loop-detector fix + blocking lint promotion
+
+Two fixes that prevent the Build-with-AI feature from false-failing or silently shipping broken code.
+
+**`lib/features/implementation/data/impl_agent.dart`** (modified)
+- `_looksLooping()`: changed from "probe appears once in hay" to "probe appears **twice** in hay" (three total occurrences). A find/replace hunk where "find" and "replace" share a long common prefix (e.g. a widget-test rewrite) produces exactly one prior match — not a loop. Real model loops repeat the same block continuously, so the probe appears 2+ times before the final copy. Eliminates the false-positive class triggered by large nearly-identical find/replace pairs.
+
+**`lib/features/implementation/providers/implementation_notifier.dart`** (modified)
+- `_analyzeGate()`: added `_blockingLintRules` set — info/warning-level Dart lint rules that are promoted to blocking errors because they cause runtime crashes. First entry: `valid_regexps` (shows as `info` in `flutter analyze` but throws `FormatException` when the invalid pattern is compiled at runtime). Models can generate invalid Unicode regex escapes (e.g. `\•`, `\›`) that pass the old "error •" gate but crash at runtime.
+
+---
+
 ## v0.5.39 — 2026-10-19 — Settings UX: single model-selection location
 
 Removed the duplicate model picker from BYOK provider cards (Claude, OpenAI, Gemini). Model selection now lives in one place only — the **Model Roles** section (Architect, Executor, Inspector). Previously the provider cards showed a model dropdown that propagated silently to all roles using that provider, creating a confusing "two sets of settings" appearance.
