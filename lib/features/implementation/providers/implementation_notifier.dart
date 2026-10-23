@@ -521,6 +521,9 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
 
     // --- Run commands (streamed) ---
     _phase(RunPhase.running);
+    // Collect per-command outcome for the Inspector so it can't hallucinate
+    // failures that the test runner itself contradicted.
+    final commandResults = <String>[];
     for (var i = 0; i < plan.commands.length; i++) {
       if (state.skippedCommands.contains(i)) continue;
       final cmd = plan.commands[i];
@@ -539,6 +542,12 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
       );
       if (result.ok) {
         _log(ConsoleLineKind.success, '✓ command succeeded');
+        // Keep the last meaningful line (e.g. "86 tests passed") for the Inspector.
+        final last = captured.lastWhere(
+          (l) => l.trim().isNotEmpty,
+          orElse: () => 'exit 0',
+        );
+        commandResults.add('✓ ${cmd.raw} — $last');
       } else {
         _log(ConsoleLineKind.error,
             '✗ command exited with code ${result.exitCode}');
@@ -546,6 +555,8 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
           ..writeln('Command failed (exit ${result.exitCode}): ${cmd.raw}')
           ..writeln(_tail(captured, 40))
           ..writeln();
+        commandResults
+            .add('✗ ${cmd.raw} — exit ${result.exitCode}: ${_tail(captured, 3)}');
       }
     }
 
@@ -593,7 +604,8 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     ];
 
     // --- Post-build Inspector: streams a live quality review to the console ---
-    final inspectorOutput = await _inspectBuild(brief, plan, appliedEdits);
+    final inspectorOutput =
+        await _inspectBuild(brief, plan, appliedEdits, commandResults);
 
     final baseReport = failures.toString().trim();
     final inspectorConcern = (inspectorOutput != null &&
@@ -657,8 +669,8 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
   /// Returns the Inspector's content output (non-thinking text) so the caller
   /// can decide whether to fold concerns into the fix context.
   /// Non-blocking: any error is logged as info and null is returned.
-  Future<String?> _inspectBuild(
-      ImplBrief brief, AgentPlan plan, List<ProposedEdit> applied) async {
+  Future<String?> _inspectBuild(ImplBrief brief, AgentPlan plan,
+      List<ProposedEdit> applied, List<String> commandResults) async {
     if (applied.isEmpty) return null;
     final gen = _gen;
     // Keep Verify as the active step while the Inspector runs — it should
@@ -674,7 +686,20 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     if (plan.summary.isNotEmpty) {
       buf..writeln()..writeln("Executor's plan summary:\n${plan.summary}");
     }
-    buf..writeln()..writeln('Applied changes:');
+    // Ground the Inspector in the actual test/command outcomes so it can't
+    // hallucinate compile errors or missing tests that the runner contradicted.
+    if (commandResults.isNotEmpty) {
+      buf
+        ..writeln()
+        ..writeln('## Actual command results (run after the edits)')
+        ..writeln(commandResults.join('\n'))
+        ..writeln()
+        ..writeln('IMPORTANT: A ✓ line means that command compiled and ran '
+            'successfully. Do NOT raise concerns about syntax errors, compile '
+            'failures, or missing tests for commands that already passed — the '
+            'code is provably correct for those.');
+    }
+    buf..writeln()..writeln('Applied changes (what changed in this build):');
     for (final edit in applied) {
       buf
         ..writeln()
