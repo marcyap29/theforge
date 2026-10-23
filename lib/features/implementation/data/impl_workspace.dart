@@ -51,6 +51,7 @@ class ImplWorkspace {
   /// Well-known documentation files, in priority order, that ground the agent
   /// in the project's architecture and conventions.
   static const _keyDocPaths = [
+    'FORGE_RULES.md',       // project hard rules injected by the user
     'README.md',
     'CLAUDE.md',
     'claude.md',
@@ -64,15 +65,20 @@ class ImplWorkspace {
 
   /// Concatenates the project's key docs (README, architecture, agent guide…)
   /// within a size budget so the agent understands the codebase's structure and
-  /// conventions before proposing changes. Returns null if none are found.
+  /// conventions before proposing changes. After the priority list, any `.md`
+  /// files found under the `docs/` folder are appended (alphabetically) so
+  /// project briefs, build rules, and development logs are included
+  /// automatically without needing to be hardcoded here.
   static Future<String?> gatherKeyDocs(
     String repoPath, {
-    int budget = 12000,
-    int perFileCap = 4000,
+    int budget = 40000,
+    int perFileCap = 10000,
   }) async {
     final buf = StringBuffer();
     var remaining = budget;
     final seen = <String>{}; // dedupe case-insensitive-filesystem duplicates
+
+    // 1. Priority list — always checked first.
     for (final rel in _keyDocPaths) {
       if (remaining <= 0) break;
       final f = File(p.join(repoPath, rel));
@@ -90,6 +96,40 @@ class ImplWorkspace {
       buf..writeln('### $rel')..writeln(c)..writeln();
       remaining -= c.length;
     }
+
+    // 2. `docs/` folder — any .md file not already included, sorted
+    //    alphabetically. This auto-loads project briefs, build rules,
+    //    development logs, and architecture docs without needing hardcoded names.
+    if (remaining > 1000) {
+      final docsDir = Directory(p.join(repoPath, 'docs'));
+      if (docsDir.existsSync()) {
+        final extras = docsDir
+            .listSync()
+            .whereType<File>()
+            .where((f) => f.path.toLowerCase().endsWith('.md'))
+            .toList()
+          ..sort((a, b) => p.basename(a.path).compareTo(p.basename(b.path)));
+        for (final f in extras) {
+          if (remaining <= 0) break;
+          if (!seen.add(f.absolute.path.toLowerCase())) continue;
+          String c;
+          try {
+            c = await f.readAsString();
+          } catch (_) {
+            continue;
+          }
+          if (c.trim().isEmpty) continue;
+          final rel = 'docs/${p.basename(f.path)}';
+          if (c.length > perFileCap) {
+            c = '${c.substring(0, perFileCap)}\n…(truncated)';
+          }
+          if (c.length > remaining) c = c.substring(0, remaining);
+          buf..writeln('### $rel')..writeln(c)..writeln();
+          remaining -= c.length;
+        }
+      }
+    }
+
     final s = buf.toString().trim();
     return s.isEmpty ? null : s;
   }

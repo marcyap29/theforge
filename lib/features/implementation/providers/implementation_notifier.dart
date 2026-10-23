@@ -68,9 +68,16 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
   ConsoleLineKind _partialKind = ConsoleLineKind.thinking;
   bool _streamStarted = false;
   Timer? _waitTimer;
+  // True once any thinking-token arrives in the current gen — used to decide
+  // whether content tokens should be shown (non-thinking models) or suppressed
+  // (reasoning models whose content is raw JSON parsed by the agent).
+  bool _sawThinkingThisGen = false;
 
   /// The last run's failure report, fed back to the agent by [fix].
   String? _fixContext;
+
+  /// Guards against an Inspector-triggered re-plan loop. Capped at 1 per run.
+  int _inspectorReplanCount = 0;
 
   // Incremented on every start/stop/reset so a stale in-flight stream (which
   // we can't hard-cancel) can't mutate the state of a newer run.
@@ -144,7 +151,15 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
   void _onDelta(String text, bool thinking, int gen) {
     if (gen != _gen) return; // stale stream from a stopped/reset run
     _waitTimer?.cancel();
-    if (thinking) _appendStream(text, ConsoleLineKind.thinking);
+    if (thinking) {
+      _sawThinkingThisGen = true;
+      _appendStream(text, ConsoleLineKind.thinking);
+    } else if (!_sawThinkingThisGen) {
+      // Non-thinking model (e.g. Kimi): content IS the plan JSON. Show it dim
+      // so the user sees the model writing — suppressed for reasoning models
+      // because their content is the same JSON, already conveyed by thinking.
+      _appendStream(text, ConsoleLineKind.thinking);
+    }
   }
 
   /// Kicks off the run: streams the agent's plan, then waits for approval. The
@@ -155,6 +170,7 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
       {String? instruction, AgentPlan? existingPlan}) async {
     if (state.phase != RunPhase.idle) return;
     _brief = brief;
+    _inspectorReplanCount = 0;
     state = state.copyWith(startedAt: DateTime.now(), error: null);
     _log(ConsoleLineKind.narration, 'Building: "${brief.featureTitle}"');
     _log(ConsoleLineKind.info, 'Repo: ${brief.repoPath}');
@@ -240,6 +256,7 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     _partial = '';
     _streamStarted = false;
     _partialKind = ConsoleLineKind.thinking;
+    _sawThinkingThisGen = false;
     DiagLog.breadcrumb('plan: enter (phase→planning)');
     _phase(RunPhase.planning);
 
@@ -575,11 +592,46 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
       if (substitution != null) substitution,
     ];
 
-    final report = failures.toString().trim();
+    // --- Post-build Inspector: streams a live quality review to the console ---
+    final inspectorOutput = await _inspectBuild(brief, plan, appliedEdits);
+
+    final baseReport = failures.toString().trim();
+    final inspectorConcern = (inspectorOutput != null &&
+            inspectorOutput.isNotEmpty &&
+            _inspectorRaisedConcerns(inspectorOutput))
+        ? inspectorOutput
+        : '';
+
+    // When tests/analyzer passed but the Inspector found real implementation
+    // gaps, re-plan once. If the Inspector fires again on the follow-up build we
+    // surface it as a warning instead — prevents infinite loops on incremental
+    // builds where pre-existing code already satisfies the brief.
+    if (baseReport.isEmpty && inspectorConcern.isNotEmpty) {
+      if (_inspectorReplanCount == 0) {
+        _inspectorReplanCount++;
+        _log(ConsoleLineKind.error,
+            '⚠ Inspector found gaps — generating a revised plan…');
+        await _plan(
+          previousPlan: plan,
+          feedback: 'The build passed tests but the Inspector found that the '
+              'implementation is incomplete or incorrect:\n\n$inspectorConcern\n\n'
+              'Revise the plan to close these gaps.',
+        );
+        return;
+      } else {
+        _log(ConsoleLineKind.info,
+            'Inspector: concern noted — review manually if needed.');
+      }
+    }
+
+    final report =
+        [baseReport, if (inspectorConcern.isNotEmpty) 'Inspector: $inspectorConcern']
+            .where((s) => s.isNotEmpty)
+            .join('\n\n');
     _fixContext = report.isEmpty ? null : report;
     _log(
-        report.isEmpty ? ConsoleLineKind.narration : ConsoleLineKind.error,
-        report.isEmpty
+        baseReport.isEmpty ? ConsoleLineKind.narration : ConsoleLineKind.error,
+        baseReport.isEmpty
             ? 'Run complete.'
             : 'Run finished with issues — you can ask the AI to fix them.');
     state = state.copyWith(
@@ -588,6 +640,106 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
       clearCompletionWarning: warnings.isEmpty,
     );
     _phase(RunPhase.done);
+  }
+
+  static const _postBuildInspectorSystem =
+      'You are a quality inspector reviewing code changes an AI executor just '
+      'wrote for a software project.\n\n'
+      'Your job — 3 to 6 sentences total:\n'
+      '1. Did the executor actually implement the feature, or stub/fake it?\n'
+      '2. Any obvious gaps: missing logic, broken imports, incomplete '
+      'integration?\n'
+      '3. Does the implementation match the brief\'s success criterion?\n\n'
+      'Lead with a one-sentence verdict. Bullet specific concerns only if '
+      'there are real ones. Skip code that is clearly correct.';
+
+  /// Streams a live quality review of the applied edits to the build console.
+  /// Returns the Inspector's content output (non-thinking text) so the caller
+  /// can decide whether to fold concerns into the fix context.
+  /// Non-blocking: any error is logged as info and null is returned.
+  Future<String?> _inspectBuild(
+      ImplBrief brief, AgentPlan plan, List<ProposedEdit> applied) async {
+    if (applied.isEmpty) return null;
+    final gen = _gen;
+    // Keep Verify as the active step while the Inspector runs — it should
+    // only become ✅ after the Inspector is done, not before it starts.
+    _phase(RunPhase.verifying);
+    _log(ConsoleLineKind.narration, '🔍 Inspector reviewing the build…');
+    final buf = StringBuffer()
+      ..writeln('Feature: ${brief.featureTitle}');
+    final desc = brief.featureDescription;
+    if (desc != null && desc.trim().isNotEmpty) {
+      buf..writeln()..writeln('Brief:\n$desc');
+    }
+    if (plan.summary.isNotEmpty) {
+      buf..writeln()..writeln("Executor's plan summary:\n${plan.summary}");
+    }
+    buf..writeln()..writeln('Applied changes:');
+    for (final edit in applied) {
+      buf
+        ..writeln()
+        ..writeln(
+            '### ${edit.isNewFile ? '[new file]' : '[modified]'} ${edit.path}');
+      if (edit.rationale.isNotEmpty) {
+        buf.writeln('Rationale: ${edit.rationale}');
+      }
+      // Pass a diff-based summary rather than the full file so the Inspector
+      // sees what actually changed, not a 3 000-char slice of an unchanged top.
+      buf.writeln(_buildEditSummary(edit));
+    }
+    final contentOut = StringBuffer();
+    try {
+      final llm = ref.read(llmServiceProvider);
+      final stream = llm.completeStream(
+        role: LlmRole.inspector,
+        temperature: 0.2,
+        systemPrompt: _postBuildInspectorSystem,
+        userPrompt: buf.toString(),
+      );
+      await for (final delta in stream) {
+        if (gen != _gen || state.phase == RunPhase.stopped) break;
+        _appendStream(
+          delta.text,
+          delta.thinking
+              ? ConsoleLineKind.thinking
+              : ConsoleLineKind.narration,
+        );
+        if (!delta.thinking) contentOut.write(delta.text);
+      }
+    } catch (e) {
+      _log(ConsoleLineKind.info, 'Inspector skipped: $e');
+      return null;
+    }
+    return contentOut.toString().trim();
+  }
+
+  /// Builds a compact change summary for the Inspector.
+  /// New files: full content (capped). Modified files: only the net-new lines
+  /// vs the prior version — skips unchanged lines that would swamp the context.
+  static String _buildEditSummary(ProposedEdit edit) {
+    if (edit.isNewFile) {
+      const cap = 4000;
+      final content = edit.newContent.length > cap
+          ? '${edit.newContent.substring(0, cap)}\n… (truncated)'
+          : edit.newContent;
+      return '```\n$content\n```';
+    }
+    final oldLines = edit.oldContent.split('\n').toSet();
+    final added = edit.newContent
+        .split('\n')
+        .where((l) => l.trim().isNotEmpty && !oldLines.contains(l))
+        .toList();
+    if (added.isEmpty) return '(reformatted only — no net-new lines)';
+    final preview = added.take(80).join('\n');
+    final more = added.length > 80 ? '\n… (+${added.length - 80} more)' : '';
+    return '[${added.length} net-new lines]\n```\n$preview$more\n```';
+  }
+
+  /// True when the Inspector's output contains bullet-point concerns.
+  /// The system prompt only produces bullets when it finds real issues, so
+  /// any `- ` line is a reliable signal that something needs attention.
+  static bool _inspectorRaisedConcerns(String text) {
+    return text.split('\n').any((l) => l.trimLeft().startsWith('- '));
   }
 
   /// Auto-cleans the cosmetic debris AI edits leave behind: runs `dart fix
@@ -690,6 +842,10 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     final ctx = _fixContext;
     if (ctx == null || _brief == null) return;
     _log(ConsoleLineKind.command, '⛑ Fix the failures from the last run');
+    _log(ConsoleLineKind.info, 'Sending failure context to AI:');
+    for (final line in ctx.split('\n')) {
+      if (line.trim().isNotEmpty) _log(ConsoleLineKind.stderr, line);
+    }
     await _plan(
       previousPlan: state.plan,
       feedback: 'The previous attempt applied but had problems. Fix them:\n$ctx',

@@ -11,6 +11,7 @@ import '../../../services/diag_log.dart';
 import '../../../services/donor_service.dart';
 import '../../../services/ingest_service.dart';
 import '../../../services/llm/llm_service_provider.dart';
+import '../../chat/screens/direct_chat_screen.dart';
 import '../../game/base_view_screen.dart';
 import '../../implementation/models/run_session.dart';
 import '../../implementation/providers/implementation_notifier.dart';
@@ -70,7 +71,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
 
   /// Board grouping: false = by status (default), true = by target version in
   /// build order (the sequence to feed features into Build-with-AI).
-  bool _buildOrderView = false;
+  bool _buildOrderView = true;
 
   /// The feature the user is currently focused on (highlighted). Set on click,
   /// right-click, or opening a feature's actions menu.
@@ -638,20 +639,29 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
   /// behind the duplicate `_HighlightPainter` / `procedure_model.dart` messes).
   /// Deterministic, no AI call. Returns true to proceed with the build.
   Future<bool> _preBuildChecks(Feature feature, String repoPath) async {
+    DiagLog.breadcrumb('_preBuildChecks: enter');
     // 1. Leftover uncommitted work — a prior/failed build (or manual edits) not
     //    yet committed. Building on top of it stacks changes and, if the last
     //    build failed, recreates code that's already sitting in the tree.
-    if (await ProjectFileRepository.gitHasChanges(repoPath)) {
+    final hasChanges = await ProjectFileRepository.gitHasChanges(repoPath);
+    DiagLog.breadcrumb('_preBuildChecks: gitHasChanges=$hasChanges');
+    if (hasChanges) {
       if (!mounted) return false;
+      DiagLog.breadcrumb('_preBuildChecks: entering _handleUncommittedChanges');
       final proceed = await _handleUncommittedChanges(repoPath);
+      DiagLog.breadcrumb('_preBuildChecks: _handleUncommittedChanges returned proceed=$proceed');
       if (!proceed) return false;
     }
     // 2. Already built before but not marked shipped — a strong sign this work
     //    exists (status may have been lost, or it was partially built). Building
     //    from scratch risks duplicating it.
-    if (FeatureStatus.fromWire(feature.status) != FeatureStatus.shipped &&
-        ProjectFileRepository.hasBuildMemory(project.path, feature.id)) {
+    DiagLog.breadcrumb('_preBuildChecks: checking buildMemory');
+    final hasMem = FeatureStatus.fromWire(feature.status) != FeatureStatus.shipped &&
+        ProjectFileRepository.hasBuildMemory(project.path, feature.id);
+    DiagLog.breadcrumb('_preBuildChecks: hasMem=$hasMem status=${feature.status}');
+    if (hasMem) {
       if (!mounted) return false;
+      DiagLog.breadcrumb('_preBuildChecks: showing _confirmProceed');
       final proceed = await _confirmProceed(
         title: 'This feature may already be built',
         body: 'There\'s a build record for “${feature.title}”, so it was built '
@@ -659,8 +669,10 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             'class or file). Build with AI edits the existing code — make sure '
             'it isn\'t recreating what\'s already there, or cancel and review.',
       );
+      DiagLog.breadcrumb('_preBuildChecks: _confirmProceed returned proceed=$proceed');
       if (!proceed) return false;
     }
+    DiagLog.breadcrumb('_preBuildChecks: returning true');
     return true;
   }
 
@@ -707,13 +719,18 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
   /// Shows the changed files so the choice is informed. Returns true to proceed
   /// with the build. Best-effort git — push is skipped gracefully with no remote.
   Future<bool> _handleUncommittedChanges(String repoPath) async {
+    DiagLog.breadcrumb('_handleUncommittedChanges: enter');
     final changed = await ProjectFileRepository.gitChangedFiles(repoPath);
+    DiagLog.breadcrumb('_handleUncommittedChanges: changed=${changed.length}');
     if (!mounted) return false;
 
     // Analyze the leftover work before offering to commit it. A failed build's
     // stranded edits must not be committed/pushed as-is.
+    DiagLog.breadcrumb('_handleUncommittedChanges: showBlockingSpinner');
     _showBlockingSpinner('Checking the leftover changes compile…');
+    DiagLog.breadcrumb('_handleUncommittedChanges: analyzeClean start');
     final analysis = await ProjectFileRepository.analyzeClean(repoPath);
+    DiagLog.breadcrumb('_handleUncommittedChanges: analyzeClean done (status=${analysis.status})');
     if (mounted) Navigator.of(context, rootNavigator: true).pop(); // spinner
     if (!mounted) return false;
     final broken = analysis.hasErrors;
@@ -1239,6 +1256,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
   }
 
   Future<void> _buildFeature(Feature feature) async {
+    DiagLog.breadcrumb('_buildFeature: enter (${feature.id})');
     final messenger = ScaffoldMessenger.of(context);
     if (!ref.read(entitlementProvider)) {
       messenger.showSnackBar(const SnackBar(
@@ -1252,6 +1270,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     // and come back, without resending the task.
     final activePhase = ref.read(implActiveRunsProvider)[feature.id];
     if (activePhase != null && activePhase != RunPhase.idle) {
+      DiagLog.breadcrumb('_buildFeature: re-attach existing run (phase=$activePhase)');
       // Re-attaching to an existing run: still carry the linked repo path so
       // repo-dependent actions (Commit & push, Make runnable) stay enabled —
       // passing '' here previously greyed them out on any reopened feature.
@@ -1277,6 +1296,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     // Instead, check for existing subtasks and either start with the first
     // unbuilt one (transparent redirect) or offer to break it down first.
     final kind = BuildKind.fromWire(feature.buildKind);
+    DiagLog.breadcrumb('_buildFeature: kind=$kind');
     if (kind == BuildKind.epic) {
       final all =
           ref.read(featureListProvider(project.id)).valueOrNull ?? const [];
@@ -1306,18 +1326,23 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
       if (proceed != true) return;
     }
 
+    DiagLog.breadcrumb('_buildFeature: _ensureRepoPath');
     final repoPath = await _ensureRepoPath();
     if (repoPath == null) return; // user cancelled the create/link prompt
+    DiagLog.breadcrumb('_buildFeature: repoPath ok');
 
     // Pre-build guards: don't blindly re-run a build that stacks onto leftover
     // work or recreates something already built.
     if (!mounted) return;
+    DiagLog.breadcrumb('_buildFeature: _preBuildChecks');
     if (!await _preBuildChecks(feature, repoPath)) return;
+    DiagLog.breadcrumb('_buildFeature: _preBuildChecks passed');
 
     // Build brief: optional clarification before the build runs.
     // Returns null (Cancel — abort), '' (Skip — proceed without brief),
     // or a non-empty string (brief approved by the user).
     if (!mounted) return;
+    DiagLog.breadcrumb('_buildFeature: showBuildBriefDialog');
     final briefResult = await showBuildBriefDialog(
       context: context,
       ref: ref,
@@ -1326,6 +1351,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     );
     if (!mounted) return;
     if (briefResult == null) return; // user cancelled
+    DiagLog.breadcrumb('_buildFeature: briefResult ok (len=${briefResult.length})');
 
     // Load spec/handoff context if a spec has been generated.
     String? lockedSpec;
@@ -1371,15 +1397,18 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     );
 
     // Mark in-progress while the build runs.
+    DiagLog.breadcrumb('_buildFeature: setStatus inProgress');
     await ref
         .read(featureListProvider(project.id).notifier)
         .setStatus(feature, FeatureStatus.inProgress);
     ref.invalidate(portfolioProvider);
 
     if (!mounted) return;
+    DiagLog.breadcrumb('_buildFeature: push ImplementationScreen');
     await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => ImplementationScreen(brief: brief)),
     );
+    DiagLog.breadcrumb('_buildFeature: ImplementationScreen popped');
     if (mounted) await _handleBuildResult(feature);
   }
 
@@ -1570,14 +1599,13 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     _scaffoldKey.currentState?.openEndDrawer();
   }
 
-  /// Opens the AI chat screen with no pre-selected feature, giving the user
-  /// a free-form prompt for any question not covered by Build or Architect.
+  /// Opens the free-form Direct Chat screen — a general-purpose AI chat
+  /// separate from Build (Build Brief) and Architect Mode (RefineFeaturesScreen).
   void _askAnything() {
     Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => RefineFeaturesScreen(
+      builder: (_) => DirectChatScreen(
         project: project,
         repoPath: _repoPath,
-        onBuildFeature: _buildFeature,
       ),
     ));
   }

@@ -119,14 +119,13 @@ class ImplAgent {
     // catastrophic: the model can't see the code it must edit, so its
     // find/replace hunks don't match, it guesses, and the applied edit has
     // unbalanced brackets (then "Fix it" can't see the break either → loops).
-    // That exact failure hit ar_mechanic (BUG-IMPL-012): main.dart is 56k chars
-    // and the edit target sat PAST the old 24k cut (char 24000 = line 735, the
-    // method was at 685). The per-file cap must be large enough that real files
-    // arrive whole; the total [budget] is the real guardrail against overflowing
-    // the context window.
+    // That exact failure hit ar_mechanic (BUG-IMPL-012): main.dart is 103k chars
+    // and the old 80k cut left ~650 lines invisible. The per-file cap must be
+    // large enough that real files arrive whole; [budget] is the real guardrail
+    // against overflowing the context window.
     final readFiles = <String, String>{};
-    const perFileCap = 80000;
-    var budget = 150000;
+    const perFileCap = 150000;
+    var budget = 300000;
     for (final rel in wanted) {
       if (readFiles.length >= 12 || budget <= 0) break;
       final content = await ImplWorkspace.readRepoFile(repoPath, rel);
@@ -421,6 +420,12 @@ Never propose destructive commands (rm -rf, git reset --hard, force-push).
 Use the provided project DOCUMENTATION (README, architecture, agent guide) and
 the SPEC to follow the codebase's existing structure and conventions.
 
+HARD RULES — if the project documentation contains a section labelled "HARD
+RULES", "mandatory constraints", or similar, those rules are NON-NEGOTIABLE and
+override every default. Common examples: no Flutter imports in lib/core/, no
+file > 400 lines, screens never call services directly, main.dart < 60 lines.
+Violating a hard rule is always wrong even if it would be simpler.
+
 HOW TO EDIT — do NOT rewrite whole files. For each EXISTING file you change,
 return a small set of "hunks". Each hunk's "find" is an EXACT, verbatim copy of
 a snippet that currently exists in that file (copy it character-for-character,
@@ -675,13 +680,36 @@ it). The JSON must be a single top-level object with no code fences:
   static String _extractJsonObject(String raw) {
     var text = raw.trim();
     if (text.startsWith('```')) {
-      text = text.replaceFirst(RegExp(r'^```[a-zA-Z]*\n'), '');
-      final end = text.lastIndexOf('```');
-      if (end != -1) text = text.substring(0, end);
+      text = text.replaceFirst(RegExp(r'^```[a-zA-Z]*\n?'), '');
+      final fenceEnd = text.lastIndexOf('```');
+      if (fenceEnd != -1) text = text.substring(0, fenceEnd);
     }
-    final start = text.indexOf('{');
     final end = text.lastIndexOf('}');
-    if (start != -1 && end != -1 && end > start) {
+    if (end == -1) return text.trim();
+
+    // Scan for the first '{' whose next non-whitespace char is '"' — the
+    // unambiguous signature of a JSON object start. This skips braces that
+    // appear in the model's reasoning prose (e.g. "{widget}", "{type: string}")
+    // before the actual plan JSON, which always begins with {"key": ...}.
+    var start = -1;
+    var pos = 0;
+    while (pos <= end) {
+      final brace = text.indexOf('{', pos);
+      if (brace == -1 || brace > end) break;
+      var next = brace + 1;
+      while (next < text.length && ' \t\r\n'.contains(text[next])) {
+        next++;
+      }
+      if (next < text.length && text[next] == '"') {
+        start = brace;
+        break;
+      }
+      pos = brace + 1;
+    }
+    // Fallback: use the first '{' as before.
+    if (start == -1) start = text.indexOf('{');
+
+    if (start != -1 && end > start) {
       return text.substring(start, end + 1);
     }
     return text.trim();
