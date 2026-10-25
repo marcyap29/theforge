@@ -419,7 +419,30 @@ class _ImplementationScreenState extends ConsumerState<ImplementationScreen> {
                                   alreadyShipped: false,
                                   canFix: state.canFix,
                                   completionWarning: state.completionWarning,
+                                  verificationPassed: state.verificationPassed,
                                   onShip: () async {
+                                    final confirmed = await showDialog<bool>(
+                                      context: context,
+                                      builder: (_) => AlertDialog(
+                                        title: const Text('Mark as shipped?'),
+                                        content: const Text(
+                                            'This will write docs, commit, and push to origin. '
+                                            'This cannot be undone from within The Forge.'),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.of(context).pop(false),
+                                            child: const Text('Cancel'),
+                                          ),
+                                          FilledButton(
+                                            onPressed: () =>
+                                                Navigator.of(context).pop(true),
+                                            child: const Text('Ship'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirmed != true || !mounted) return;
                                     setState(() => _shipping = true);
                                     await notifier.shipFeature();
                                     if (mounted) setState(() => _shipping = false);
@@ -1688,6 +1711,7 @@ class _DoneBar extends StatelessWidget {
     required this.alreadyShipped,
     required this.canFix,
     required this.completionWarning,
+    required this.verificationPassed,
     required this.onShip,
     required this.onFix,
     required this.onFollowUp,
@@ -1698,6 +1722,10 @@ class _DoneBar extends StatelessWidget {
 
   /// Set by the completion guard when the diff looks like a fake completion.
   final String? completionWarning;
+
+  /// True when no files changed but all commands passed — a verification run
+  /// that confirmed the feature is already working correctly.
+  final bool verificationPassed;
   final VoidCallback onShip;
   final VoidCallback onFix;
   final VoidCallback onFollowUp;
@@ -1705,6 +1733,41 @@ class _DoneBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Verification pass: no files changed, but all checks green. Distinct from
+    // an error — show it as a success, not a warning.
+    if (verificationPassed) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: const BoxDecoration(
+          color: Color(0x3300C853),
+          border: Border(top: BorderSide(color: Color(0xFF1C1C1E))),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.verified_outlined,
+                size: 18, color: Color(0xFF69F0AE)),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'All checks passed — the feature looks correct and is working.',
+                style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF69F0AE),
+                    fontWeight: FontWeight.w500),
+              ),
+            ),
+            OutlinedButton.icon(
+              onPressed: onFollowUp,
+              icon: const Icon(Icons.reviews_outlined, size: 16),
+              label: const Text('Follow up'),
+            ),
+            const SizedBox(width: 8),
+            FilledButton(onPressed: onClose, child: const Text('Close')),
+          ],
+        ),
+      );
+    }
+
     final flagged = completionWarning != null;
     // Either a failed check or a fake-completion flag makes this a cautious
     // finish: amber bar, and "Ship anyway" instead of a one-click "Mark shipped".

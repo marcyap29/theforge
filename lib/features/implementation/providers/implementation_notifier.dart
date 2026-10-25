@@ -560,6 +560,17 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
       }
     }
 
+    // --- Mandatory post-commands analyze gate (BUG-IMPL-014) ---
+    // The pre-edit gate above only runs when edits were applied. This gate runs
+    // unconditionally after all commands finish — it catches cross-file wiring
+    // errors in newly created files (missing imports, type mismatches, private
+    // symbols referenced across files) that `flutter test` misses when the new
+    // files have no test coverage yet. Skip only if the pre-edit gate already
+    // found errors (no need to surface the same errors twice).
+    if (state.analyzeClean != false) {
+      await _analyzeGate(brief, failures);
+    }
+
     // --- Verify against the Handoff checklist ---
     if (brief.checklist.isNotEmpty) {
       _phase(RunPhase.verifying);
@@ -588,8 +599,16 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
             state.appliedEditPaths.contains(plan.edits[i].path))
           plan.edits[i],
     ];
+
+    // A run that changed nothing but passed all commands is a verification/
+    // inspect pass — the feature was already correct. Show it as a success
+    // rather than a "nothing implemented" warning.
+    final allCommandsPassed = commandResults.isNotEmpty &&
+        commandResults.every((r) => r.startsWith('✓'));
+    final verificationPassed = appliedEdits.isEmpty && allCommandsPassed;
+
     final verdict = CompletionGuard.inspect(appliedEdits);
-    if (verdict.suspicious) {
+    if (verdict.suspicious && !verificationPassed) {
       _log(ConsoleLineKind.error, '⚠ Completion check: ${verdict.reason}');
     }
     // Behavioral-substitution guard: flag a silent format/encoding swap (e.g.
@@ -599,7 +618,7 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
       _log(ConsoleLineKind.error, '⚠ Format change: $substitution');
     }
     final warnings = <String>[
-      if (verdict.suspicious) verdict.reason,
+      if (verdict.suspicious && !verificationPassed) verdict.reason,
       if (substitution != null) substitution,
     ];
 
@@ -650,6 +669,7 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
       canFix: report.isNotEmpty,
       completionWarning: warnings.isEmpty ? null : warnings.join('\n\n'),
       clearCompletionWarning: warnings.isEmpty,
+      verificationPassed: verificationPassed,
     );
     _phase(RunPhase.done);
   }
@@ -657,13 +677,20 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
   static const _postBuildInspectorSystem =
       'You are a quality inspector reviewing code changes an AI executor just '
       'wrote for a software project.\n\n'
-      'Your job — 3 to 6 sentences total:\n'
-      '1. Did the executor actually implement the feature, or stub/fake it?\n'
-      '2. Any obvious gaps: missing logic, broken imports, incomplete '
-      'integration?\n'
-      '3. Does the implementation match the brief\'s success criterion?\n\n'
-      'Lead with a one-sentence verdict. Bullet specific concerns only if '
-      'there are real ones. Skip code that is clearly correct.';
+      'Your output has two parts:\n\n'
+      'PART 1 — Verdict (1 sentence): Did the executor actually implement the '
+      'feature or stub/fake it? Does it match the brief\'s success criterion?\n\n'
+      'PART 2 — Error list (ONLY if there are real problems):\n'
+      'List each concrete problem as a numbered item using this exact format:\n'
+      '  N. [file or area] — What is wrong. Fix: What to change.\n\n'
+      'Example:\n'
+      '  1. [lib/auth/login.dart] — Missing null check on user.email before '
+      'passing to AuthService. Fix: Add `if (user.email == null) return;` '
+      'before the call.\n\n'
+      'Rules:\n'
+      '- Only list real, concrete problems — skip anything provably correct.\n'
+      '- Never raise concerns about commands that already passed (✓ lines).\n'
+      '- If no real problems exist, omit Part 2 entirely.';
 
   /// Streams a live quality review of the applied edits to the build console.
   /// Returns the Inspector's content output (non-thinking text) so the caller
@@ -760,11 +787,14 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     return '[${added.length} net-new lines]\n```\n$preview$more\n```';
   }
 
-  /// True when the Inspector's output contains bullet-point concerns.
-  /// The system prompt only produces bullets when it finds real issues, so
-  /// any `- ` line is a reliable signal that something needs attention.
+  /// True when the Inspector's output contains a numbered error list.
+  /// The system prompt only produces a list when it finds real issues, so
+  /// any `N. ` or `- ` line is a reliable signal that something needs attention.
   static bool _inspectorRaisedConcerns(String text) {
-    return text.split('\n').any((l) => l.trimLeft().startsWith('- '));
+    return text.split('\n').any((l) {
+      final t = l.trimLeft();
+      return t.startsWith('- ') || RegExp(r'^\d+\. ').hasMatch(t);
+    });
   }
 
   /// Auto-cleans the cosmetic debris AI edits leave behind: runs `dart fix
@@ -862,18 +892,21 @@ class ImplRunNotifier extends FamilyNotifier<ImplRunState, String> {
     return t.map((l) => '  $l').join('\n');
   }
 
-  /// Feeds the last run's failures back to the agent for a corrective plan.
+  /// Feeds the last run's failures and Inspector error list back to the agent
+  /// so the planner can create a concrete, targeted fix plan.
   Future<void> fix() async {
     final ctx = _fixContext;
     if (ctx == null || _brief == null) return;
     _log(ConsoleLineKind.command, '⛑ Fix the failures from the last run');
-    _log(ConsoleLineKind.info, 'Sending failure context to AI:');
+    _log(ConsoleLineKind.info, 'Sending error list to planner:');
     for (final line in ctx.split('\n')) {
       if (line.trim().isNotEmpty) _log(ConsoleLineKind.stderr, line);
     }
     await _plan(
       previousPlan: state.plan,
-      feedback: 'The previous attempt applied but had problems. Fix them:\n$ctx',
+      feedback: 'The previous build run had problems. The Inspector produced '
+          'the following error list — create a concrete plan that addresses '
+          'each item precisely:\n\n$ctx',
     );
   }
 

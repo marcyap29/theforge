@@ -10,6 +10,7 @@
 
 | ID | Area | Summary | Status | Fixed |
 |---|---|---|---|---|
+| BUG-IMPL-014 | IMPL | Executor ships cross-file wiring errors undetected — `dart analyze` not in command list | Fixed | 2026-10-23 |
 | BUG-UI-001 | UI | InkWell unresponsive on macOS — missing local Material ancestor | Fixed | 2026-06-10 |
 | BUG-UI-002 | UI | IngestionNotifier state race from concurrent initState callers | Fixed | 2026-06-10 |
 | BUG-INTERVIEW-001 | INTERVIEW | Funnel stuck at L1 — layerComplete gate never satisfied by LLM | Fixed | 2026-06-12 |

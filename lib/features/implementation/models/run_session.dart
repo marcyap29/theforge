@@ -171,6 +171,7 @@ class ImplRunState {
     this.endedAt,
     this.canFix = false,
     this.completionWarning,
+    this.verificationPassed = false,
     this.analyzeClean,
     this.lastCommit,
     this.lastPushOk,
@@ -220,6 +221,11 @@ class ImplRunState {
   /// look. Multiple warnings are joined with a blank line. See [CompletionGuard].
   final String? completionWarning;
 
+  /// True when no files were changed but all commands passed — the run was a
+  /// verification/inspect pass that confirmed the feature is already working.
+  /// Shown as a green success banner instead of the amber "nothing implemented" warning.
+  final bool verificationPassed;
+
   /// Null = analyze hasn't run yet; true = clean; false = errors found.
   final bool? analyzeClean;
 
@@ -250,6 +256,7 @@ class ImplRunState {
     bool? canFix,
     String? completionWarning,
     bool clearCompletionWarning = false,
+    bool? verificationPassed,
     bool? analyzeClean,
     String? lastCommit,
     bool? lastPushOk,
@@ -271,6 +278,7 @@ class ImplRunState {
       completionWarning: clearCompletionWarning
           ? null
           : (completionWarning ?? this.completionWarning),
+      verificationPassed: verificationPassed ?? this.verificationPassed,
       analyzeClean: analyzeClean ?? this.analyzeClean,
       lastCommit: lastCommit ?? this.lastCommit,
       lastPushOk: lastPushOk ?? this.lastPushOk,

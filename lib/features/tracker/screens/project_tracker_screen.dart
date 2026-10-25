@@ -69,9 +69,8 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
 
   final _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  /// Board grouping: false = by status (default), true = by target version in
-  /// build order (the sequence to feed features into Build-with-AI).
-  bool _buildOrderView = true;
+  /// Board grouping mode.
+  _BoardView _boardView = _BoardView.buildOrder;
 
   /// The feature the user is currently focused on (highlighted). Set on click,
   /// right-click, or opening a feature's actions menu.
@@ -318,8 +317,8 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             onDismiss: () => setState(() => _bannerDismissed = true),
           ),
           _GroupModeBar(
-            buildOrder: _buildOrderView,
-            onChanged: (v) => setState(() => _buildOrderView = v),
+            view: _boardView,
+            onChanged: (v) => setState(() => _boardView = v),
             onPlan: _planBuildOrder,
           ),
           Expanded(
@@ -337,8 +336,10 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
                 return ListView(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   children: [
-                    if (_buildOrderView)
+                    if (_boardView == _BoardView.buildOrder)
                       ..._buildOrderGroups(features)
+                    else if (_boardView == _BoardView.recentlyShipped)
+                      ..._recentlyShippedGroups(features)
                     else
                       for (final s in FeatureStatus.board)
                         ..._group(
@@ -518,6 +519,59 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
           )));
     }
     return widgets;
+  }
+
+  /// Recently-shipped view: shipped features sorted by [updatedAt] descending
+  /// (most recent first) so the user can see what just landed.
+  List<Widget> _recentlyShippedGroups(List<Feature> features) {
+    final activeRuns = ref.watch(implActiveRunsProvider);
+    final shipped = features
+        .where((f) => f.status == FeatureStatus.shipped.wire)
+        .toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    if (shipped.isEmpty) {
+      return [
+        const Padding(
+          padding: EdgeInsets.all(32),
+          child: Center(
+            child: Text('No shipped features yet.',
+                style: TextStyle(color: Color(0xFF6B7280), fontSize: 13)),
+          ),
+        ),
+      ];
+    }
+    return [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+        child: Row(children: [
+          const Icon(Icons.check_circle_outline,
+              size: 14, color: Color(0xFF81C784)),
+          const SizedBox(width: 6),
+          Text('${shipped.length} shipped',
+              style: const TextStyle(
+                  fontSize: 12, color: Color(0xFF6B7280))),
+        ]),
+      ),
+      ...shipped.map((f) => _FeatureTile(
+            feature: f,
+            indent: 0,
+            runPhase: activeRuns[f.id],
+            onSetStatus: (s) => ref
+                .read(featureListProvider(project.id).notifier)
+                .setStatus(f, s),
+            onEdit: () => _editFeature(f),
+            onDelete: () => ref
+                .read(featureListProvider(project.id).notifier)
+                .deleteFeature(f),
+            onBuild: () => _buildFeature(f),
+            onAdvice: () => _openBuildAdvice(f),
+            onArchitect: () => _architectFeature(f),
+            onArchitectChat: () => _architectChat(f),
+            onWorkOn: () => _workOnFeature(f),
+            selected: f.id == _focusedFeatureId,
+            onFocus: () => setState(() => _focusedFeatureId = f.id),
+          )),
+    ];
   }
 
   /// Splits [all] into top-level features and a map of epic-id → its subtasks.
@@ -2381,19 +2435,34 @@ class _TileAction {
 }
 
 /// Single toggle button that flips between "Status" and "Build order" grouping.
+enum _BoardView { buildOrder, status, recentlyShipped }
+
 class _GroupModeBar extends StatelessWidget {
   const _GroupModeBar({
-    required this.buildOrder,
+    required this.view,
     required this.onChanged,
     required this.onPlan,
   });
 
-  final bool buildOrder;
-  final ValueChanged<bool> onChanged;
+  final _BoardView view;
+  final ValueChanged<_BoardView> onChanged;
   final VoidCallback onPlan;
+
+  static const _labels = {
+    _BoardView.buildOrder: ('Build order', Icons.low_priority),
+    _BoardView.status: ('Status', Icons.view_column_outlined),
+    _BoardView.recentlyShipped: ('Recently shipped', Icons.check_circle_outline),
+  };
+
+  _BoardView get _next => switch (view) {
+        _BoardView.buildOrder => _BoardView.status,
+        _BoardView.status => _BoardView.recentlyShipped,
+        _BoardView.recentlyShipped => _BoardView.buildOrder,
+      };
 
   @override
   Widget build(BuildContext context) {
+    final (label, icon) = _labels[view]!;
     return Material(
       color: const Color(0xFF141416),
       child: Padding(
@@ -2402,7 +2471,7 @@ class _GroupModeBar extends StatelessWidget {
           children: [
             InkWell(
               borderRadius: BorderRadius.circular(6),
-              onTap: () => onChanged(!buildOrder),
+              onTap: () => onChanged(_next),
               child: Container(
                 padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
                 decoration: BoxDecoration(
@@ -2410,23 +2479,15 @@ class _GroupModeBar extends StatelessWidget {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(
-                    buildOrder
-                        ? Icons.low_priority
-                        : Icons.view_column_outlined,
-                    size: 14,
-                    color: const Color(0xFFCFCFD2),
-                  ),
+                  Icon(icon, size: 14, color: const Color(0xFFCFCFD2)),
                   const SizedBox(width: 6),
                   const Text('Groupings',
                       style: TextStyle(
                           fontSize: 12.5, color: Color(0xFFCFCFD2))),
                   const SizedBox(width: 8),
-                  Text(
-                    buildOrder ? 'Build order' : 'Status',
-                    style: const TextStyle(
-                        fontSize: 11, color: Color(0xFF8A8A8E)),
-                  ),
+                  Text(label,
+                      style: const TextStyle(
+                          fontSize: 11, color: Color(0xFF8A8A8E))),
                   const SizedBox(width: 4),
                   const Icon(Icons.swap_horiz,
                       size: 13, color: Color(0xFF8A8A8E)),
@@ -2434,7 +2495,7 @@ class _GroupModeBar extends StatelessWidget {
               ),
             ),
             const Spacer(),
-            if (buildOrder)
+            if (view == _BoardView.buildOrder)
               TextButton.icon(
                 onPressed: onPlan,
                 icon: const Icon(Icons.route_outlined, size: 15),

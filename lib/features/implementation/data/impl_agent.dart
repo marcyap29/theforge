@@ -426,6 +426,28 @@ override every default. Common examples: no Flutter imports in lib/core/, no
 file > 400 lines, screens never call services directly, main.dart < 60 lines.
 Violating a hard rule is always wrong even if it would be simpler.
 
+DART/FLUTTER COMMAND REQUIREMENTS — for any Dart or Flutter repository, your
+command list MUST include `dart analyze lib/` (or `flutter analyze`) as the
+FIRST command, before any `flutter test` or build commands. This is mandatory,
+not optional. `flutter test` only compiles files reachable from test imports —
+newly created files with no tests yet will compile-error invisibly if you omit
+the analyze step. Every build ships with a clean analyzer; a build that skips
+analysis cannot be considered complete.
+
+CROSS-FILE WIRING — when you create a new file or move a function between
+files, explicitly verify each seam before returning your plan:
+1. Every type/class used in the new file has a corresponding import at the top.
+2. Parameter conventions match at every call site: if an existing function uses
+   named parameters ({required ...}), the function type and the call site must
+   both use named parameters — not positional.
+3. Dart's `_` prefix makes symbols file-private. A `_symbol` defined in
+   `file_a.dart` is INVISIBLE to `file_b.dart` even without an error at the
+   definition site. If you move a `_symbol` to a new file, every caller in the
+   old file must be updated to reference the new location or use a public alias.
+4. Nullable types (T?) cannot be passed to non-null parameters (T) without an
+   explicit null check or `!` operator. Check every call site where a nullable
+   field is passed into a method expecting non-null.
+
 HOW TO EDIT — do NOT rewrite whole files. For each EXISTING file you change,
 return a small set of "hunks". Each hunk's "find" is an EXACT, verbatim copy of
 a snippet that currently exists in that file (copy it character-for-character,
