@@ -104,6 +104,18 @@
 
 ---
 
+## Flutter Row / Layout Overflow Rules
+
+**Rules:**
+- **`RenderFlex overflowed` in flutter test output IS a test failure — never call a build clean when this pattern appears.** The Flutter test framework throws it as an assertion exception that fails the test with exit code 1. The `◢◤◢◤` stripe in test output is a hard signal, not a cosmetic warning. The Inspector must flag `✗ command exited with code 1` caused by overflow as a real failure, never as "unrelated." See BUG-UI-005.
+- **When a Row contains `Expanded` alongside a non-flex button with a text label, wrap the button in `Flexible` AND keep its label short (≤ ~10 chars).** `Expanded` gives the remaining space to the text widget after non-flex children are measured. If the non-flex button's minimum width (driven by its label length) exceeds the Row's available width, it overflows — `Expanded` cannot prevent this. `Flexible` alone is also insufficient if the label text forces a minimum button width that still overflows the panel. Both changes together are required. See BUG-UI-005.
+- **When a RenderFlex overflow error names a line number, edit ONLY that line's widget — not any other Row in the file.** The error traces the exact widget (`Row Row:file:///…/main.dart:581`); a similar Row elsewhere in the same file is a different widget. Confirm the fix landed at the stated line number before re-running tests. See BUG-UI-005.
+- **Always check layout at the Flutter test viewport (400×800px), not just at desktop size.** Sidebar-left layouts leave narrow source panels (~120–227px) in tests. A button that fits at 1200px may overflow at 400px. If a feature adds any button to a flex layout, mentally check it at 400px width.
+
+**Past bugs:** Oct 2026 — BUG-UI-005: `ElevatedButton.icon(label: 'Generate Requirements')` in a 227px-wide source panel Row overflowed by 135px; executor fixed the wrong Row three times; Inspector misread overflow as "unrelated"; fixed with `Flexible` + shortened label.
+
+---
+
 ## Flutter Navigation / State Rules
 
 **Rules:**
