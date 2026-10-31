@@ -4,6 +4,24 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session — 2026-10-31 — v0.6.0 PM Redesign Phase 1: strip executor pipeline
+
+**Branch:** `worktree-phase1-strip-executor` → merged to `main`
+
+**Task:** Phase 1 of The Forge PM Redesign — strip the entire Build-with-AI executor pipeline so the codebase is clean for PM-first rebuilds.
+
+**Completed:**
+- Deleted 14 lib files: `lib/features/implementation/**` (9), `lib/features/run/**` (2), `lib/services/inspector_service.dart`, `lib/features/tracker/screens/build_advice_screen.dart`, `lib/features/tracker/widgets/build_brief_dialog.dart`
+- Deleted 5 test files: `completion_guard_test.dart`, `impl_agent_test.dart`, `impl_workspace_test.dart`, `run_device_test.dart`, `build_memory_test.dart`
+- `base_view_screen.dart` — removed builder-bot loop + `_Bot` widget
+- `settings_screen.dart` — Executor/Inspector role cards removed; Architect-only now
+- `project_tracker_screen.dart` — removed all executor wiring, `_RunDot`, 7 dead pre-build-check methods, `_buildFeature`/`_handleBuildResult`/`_openRunPreview`/`_openBuildAdvice` (stubbed to snackbars)
+- `dart analyze lib/` clean, `flutter test` 82/82 green
+
+**Version shipped:** v0.6.0
+
+---
+
 ## Session — 2026-10-20 — v0.5.40 Build quality fixes
 
 **Tasks:** Two Build-with-AI robustness fixes surfaced by real builds on the Plumbline project.

@@ -3,9 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/filesystem/project_file_repository.dart';
 import '../../data/local_db/forge_database.dart';
-import '../implementation/models/run_session.dart';
-import '../implementation/providers/implementation_notifier.dart';
-import '../implementation/providers/implementation_providers.dart';
 import '../tracker/models/tracker_enums.dart';
 import '../tracker/providers/tracker_providers.dart';
 import '../tracker/scan/feature_scan.dart';
@@ -76,7 +73,6 @@ class _BaseViewScreenState extends ConsumerState<BaseViewScreen> {
   @override
   Widget build(BuildContext context) {
     final featuresAsync = ref.watch(featureListProvider(project.id));
-    final activeRuns = ref.watch(implActiveRunsProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0C1016),
@@ -104,7 +100,7 @@ class _BaseViewScreenState extends ConsumerState<BaseViewScreen> {
               ),
             );
           }
-          return _scene(features, activeRuns);
+          return _scene(features);
         },
       ),
     );
@@ -136,9 +132,8 @@ class _BaseViewScreenState extends ConsumerState<BaseViewScreen> {
     );
   }
 
-  Widget _scene(List<Feature> features, Map<String, RunPhase> activeRuns) {
+  Widget _scene(List<Feature> features) {
     final scene = BaseLayout.scene(features);
-    final byId = {for (final b in scene.buildings) b.feature.id: b};
 
     return InteractiveViewer(
       constrained: false,
@@ -171,20 +166,6 @@ class _BaseViewScreenState extends ConsumerState<BaseViewScreen> {
                   onTap: () => _showBuilding(b.feature),
                 ),
               ),
-            // Builder-bots (one per active run), parked at their building.
-            for (final entry in activeRuns.entries)
-              if (byId[entry.key] != null)
-                Positioned(
-                  left: byId[entry.key]!.center.dx - 22,
-                  top: byId[entry.key]!.rect.bottom - 6,
-                  width: 44,
-                  height: 52,
-                  child: _Bot(
-                    phase: entry.value,
-                    onTap: () =>
-                        _showBot(byId[entry.key]!.feature, entry.value),
-                  ),
-                ),
           ],
         ),
       ),
@@ -229,87 +210,6 @@ class _BaseViewScreenState extends ConsumerState<BaseViewScreen> {
             ],
           ],
         ),
-      ),
-    );
-  }
-
-  void _showBot(Feature feature, RunPhase phase) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: const Color(0xFF15161C),
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (_) => Consumer(
-        builder: (ctx, ref, _) {
-          final run = ref.watch(implRunProvider(feature.id));
-          final tail = run.console.length > 14
-              ? run.console.sublist(run.console.length - 14)
-              : run.console;
-          final elapsed = run.elapsed(DateTime.now());
-          String two(int n) => n.toString().padLeft(2, '0');
-          final clock =
-              '${two(elapsed.inMinutes)}:${two(elapsed.inSeconds % 60)}';
-          return SizedBox(
-            height: MediaQuery.of(ctx).size.height * 0.5,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                          color: run.phase.dotColor, shape: BoxShape.circle),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text('Bot · ${feature.title}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.w600)),
-                    ),
-                    Text('${run.phase.label} · $clock',
-                        style: const TextStyle(
-                            fontSize: 12, color: Color(0xFF8A8A8E))),
-                  ]),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0C0D12),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: tail.isEmpty
-                          ? const Center(
-                              child: Text('Warming up…',
-                                  style: TextStyle(
-                                      color: Color(0xFF6B7280), fontSize: 12)))
-                          : ListView(
-                              children: [
-                                for (final line in tail)
-                                  Padding(
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 1),
-                                    child: Text(line.text,
-                                        style: TextStyle(
-                                            fontFamily: 'monospace',
-                                            fontSize: 11.5,
-                                            color: line.color)),
-                                  ),
-                              ],
-                            ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
       ),
     );
   }
@@ -502,59 +402,3 @@ class _Building extends StatelessWidget {
   }
 }
 
-/// A builder-bot: a little robot colored by the run phase (amber = working,
-/// blue = awaiting approval, green = done, red = failed). Tap for live status.
-class _Bot extends StatelessWidget {
-  const _Bot({required this.phase, required this.onTap});
-  final RunPhase phase;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = phase.dotColor;
-    return GestureDetector(
-      onTap: onTap,
-      child: Tooltip(
-        message: phase.label,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Antenna.
-            Container(width: 2, height: 6, color: const Color(0xFF6B7280)),
-            // Head.
-            Container(
-              width: 26,
-              height: 20,
-              decoration: BoxDecoration(
-                color: const Color(0xFF2A2F38),
-                border: Border.all(color: color, width: 1.5),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Center(
-                child: Container(
-                  width: 12,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
-              ),
-            ),
-            // Body.
-            Container(
-              width: 22,
-              height: 16,
-              margin: const EdgeInsets.only(top: 1),
-              decoration: BoxDecoration(
-                color: const Color(0xFF232830),
-                border: Border.all(color: color.withValues(alpha: 0.6)),
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

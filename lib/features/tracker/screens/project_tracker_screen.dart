@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,12 +11,6 @@ import '../../../services/ingest_service.dart';
 import '../../../services/llm/llm_service_provider.dart';
 import '../../chat/screens/direct_chat_screen.dart';
 import '../../game/base_view_screen.dart';
-import '../../implementation/models/run_session.dart';
-import '../../implementation/providers/implementation_notifier.dart';
-import '../../implementation/providers/implementation_providers.dart';
-import '../../implementation/screens/implementation_screen.dart';
-import '../../projects/providers/providers.dart';
-import '../../run/run_preview_screen.dart';
 import '../checkin/checkin_review_dialog.dart';
 import '../checkin/checkin_service.dart';
 import '../models/tracker_enums.dart';
@@ -28,16 +20,13 @@ import '../scan/feature_dedup.dart';
 import '../scan/feature_scan.dart';
 import '../widgets/active_model_chip.dart';
 import '../widgets/architect_review_sheet.dart';
-import '../widgets/build_brief_dialog.dart';
 import '../widgets/dedup_review_sheet.dart';
 import '../widgets/feature_edit_dialog.dart';
 import '../widgets/forge_files_panel.dart';
-import '../widgets/platform_picker.dart';
 import '../widgets/relocate_repo.dart';
 import '../widgets/roadmap_review_sheet.dart';
 import '../widgets/scan_review_sheet.dart';
 import '../widgets/status_chip.dart';
-import 'build_advice_screen.dart';
 import 'capability_summary_screen.dart';
 import 'refine_features_screen.dart';
 import 'releases_screen.dart';
@@ -87,18 +76,12 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
 
   /// On open, self-heal any feature that was shipped but lost its status (the
   /// pre-v0.4.56 write bug where the shipped→DB write could be skipped on
-  /// navigation). Passes the live-run set so a feature that's currently
-  /// building is never touched; surfaces what it corrected.
+  /// navigation). No active build runs exist in the PM tool, so every
+  /// build-memory record is safe to reconcile.
   Future<void> _reconcileStatuses() async {
-    final busy = ref
-        .read(implActiveRunsProvider)
-        .entries
-        .where((e) => e.value != RunPhase.idle)
-        .map((e) => e.key)
-        .toSet();
     final healed = await ref
         .read(featureListProvider(project.id).notifier)
-        .reconcileStatuses(busy);
+        .reconcileStatuses({});
     if (healed > 0 && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Reconciled $healed feature${healed == 1 ? '' : 's'} to '
@@ -279,11 +262,6 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             tooltip: 'Base view (game)',
             onPressed: _openBaseView,
           ),
-          IconButton(
-            icon: const Icon(Icons.play_circle_outline),
-            tooltip: 'Run & preview',
-            onPressed: _openRunPreview,
-          ),
           _barMenu(Icons.more_horiz, 'More', [
             _menuEntry(Icons.rocket_launch_outlined, 'Releases', _openReleases),
             _menuEntry(Icons.schedule, 'Review cadence',
@@ -406,7 +384,6 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
   List<Widget> _group(FeatureStatus status, List<Feature> roots,
       Map<String, List<Feature>> childrenOf) {
     if (roots.isEmpty) return const [];
-    final activeRuns = ref.watch(implActiveRunsProvider);
     final rows = _withSubtasks(roots, childrenOf);
     return [
       Padding(
@@ -423,7 +400,6 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
       ...rows.map((n) => _FeatureTile(
             feature: n.feature,
             indent: n.depth,
-            runPhase: activeRuns[n.feature.id],
             onSetStatus: (s) => ref
                 .read(featureListProvider(project.id).notifier)
                 .setStatus(n.feature, s),
@@ -484,7 +460,6 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     }
     final byVersion = groupFeaturesByVersion(roots);
     final versions = byVersion.keys.toList()..sort(_compareVersions);
-    final activeRuns = ref.watch(implActiveRunsProvider);
 
     final widgets = <Widget>[];
     var firstConcrete = true;
@@ -501,7 +476,6 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
       widgets.addAll(rows.map((n) => _FeatureTile(
             feature: n.feature,
             indent: n.depth,
-            runPhase: activeRuns[n.feature.id],
             onSetStatus: (s) => ref
                 .read(featureListProvider(project.id).notifier)
                 .setStatus(n.feature, s),
@@ -524,7 +498,6 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
   /// Recently-shipped view: shipped features sorted by [updatedAt] descending
   /// (most recent first) so the user can see what just landed.
   List<Widget> _recentlyShippedGroups(List<Feature> features) {
-    final activeRuns = ref.watch(implActiveRunsProvider);
     final shipped = features
         .where((f) => f.status == FeatureStatus.shipped.wire)
         .toList()
@@ -555,7 +528,6 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
       ...shipped.map((f) => _FeatureTile(
             feature: f,
             indent: 0,
-            runPhase: activeRuns[f.id],
             onSetStatus: (s) => ref
                 .read(featureListProvider(project.id).notifier)
                 .setStatus(f, s),
@@ -686,303 +658,6 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => ReleasesScreen(project: project),
     ));
-  }
-
-  /// Pre-build guards that stop The Forge blindly re-running a build that would
-  /// stack onto leftover work or recreate something already built (the pattern
-  /// behind the duplicate `_HighlightPainter` / `procedure_model.dart` messes).
-  /// Deterministic, no AI call. Returns true to proceed with the build.
-  Future<bool> _preBuildChecks(Feature feature, String repoPath) async {
-    DiagLog.breadcrumb('_preBuildChecks: enter');
-    // 1. Leftover uncommitted work — a prior/failed build (or manual edits) not
-    //    yet committed. Building on top of it stacks changes and, if the last
-    //    build failed, recreates code that's already sitting in the tree.
-    final hasChanges = await ProjectFileRepository.gitHasChanges(repoPath);
-    DiagLog.breadcrumb('_preBuildChecks: gitHasChanges=$hasChanges');
-    if (hasChanges) {
-      if (!mounted) return false;
-      DiagLog.breadcrumb('_preBuildChecks: entering _handleUncommittedChanges');
-      final proceed = await _handleUncommittedChanges(repoPath);
-      DiagLog.breadcrumb('_preBuildChecks: _handleUncommittedChanges returned proceed=$proceed');
-      if (!proceed) return false;
-    }
-    // 2. Already built before but not marked shipped — a strong sign this work
-    //    exists (status may have been lost, or it was partially built). Building
-    //    from scratch risks duplicating it.
-    DiagLog.breadcrumb('_preBuildChecks: checking buildMemory');
-    final hasMem = FeatureStatus.fromWire(feature.status) != FeatureStatus.shipped &&
-        ProjectFileRepository.hasBuildMemory(project.path, feature.id);
-    DiagLog.breadcrumb('_preBuildChecks: hasMem=$hasMem status=${feature.status}');
-    if (hasMem) {
-      if (!mounted) return false;
-      DiagLog.breadcrumb('_preBuildChecks: showing _confirmProceed');
-      final proceed = await _confirmProceed(
-        title: 'This feature may already be built',
-        body: 'There\'s a build record for “${feature.title}”, so it was built '
-            'at least once before. Building again can duplicate code (a second '
-            'class or file). Build with AI edits the existing code — make sure '
-            'it isn\'t recreating what\'s already there, or cancel and review.',
-      );
-      DiagLog.breadcrumb('_preBuildChecks: _confirmProceed returned proceed=$proceed');
-      if (!proceed) return false;
-    }
-    DiagLog.breadcrumb('_preBuildChecks: returning true');
-    return true;
-  }
-
-  /// A simple two-button [Cancel]/[Build anyway] confirmation. Returns true only
-  /// on "Build anyway". Non-destructive — nothing is changed for the user.
-  Future<bool> _confirmProceed({
-    required String title,
-    required String body,
-  }) async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF141416),
-        title: Text(title),
-        content: Text(body,
-            style: const TextStyle(fontSize: 13, color: Color(0xFFE5E5E7))),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Build anyway'),
-          ),
-        ],
-      ),
-    );
-    return result ?? false;
-  }
-
-  /// Handles the "uncommitted changes" pre-build case with real options. First
-  /// it runs the analyzer on the leftover work (the same gate the Build run
-  /// uses): The Forge must never commit un-analyzed AI output — a failed build
-  /// leaves non-compiling edits in the tree, and committing/pushing those is the
-  /// worst outcome (BUG-IMPL-011).
-  ///
-  /// • If the tree **doesn't compile**, "Commit & push" is withheld and replaced
-  ///   with **Discard broken edits** (restore to HEAD) alongside Build anyway /
-  ///   Cancel.
-  /// • If it compiles (or analysis can't run), the user can **Commit & push**
-  ///   the leftover work, **Build anyway**, or **Cancel**.
-  ///
-  /// Shows the changed files so the choice is informed. Returns true to proceed
-  /// with the build. Best-effort git — push is skipped gracefully with no remote.
-  Future<bool> _handleUncommittedChanges(String repoPath) async {
-    DiagLog.breadcrumb('_handleUncommittedChanges: enter');
-    final changed = await ProjectFileRepository.gitChangedFiles(repoPath);
-    DiagLog.breadcrumb('_handleUncommittedChanges: changed=${changed.length}');
-    if (!mounted) return false;
-
-    // Analyze the leftover work before offering to commit it. A failed build's
-    // stranded edits must not be committed/pushed as-is.
-    DiagLog.breadcrumb('_handleUncommittedChanges: showBlockingSpinner');
-    _showBlockingSpinner('Checking the leftover changes compile…');
-    DiagLog.breadcrumb('_handleUncommittedChanges: analyzeClean start');
-    final analysis = await ProjectFileRepository.analyzeClean(repoPath);
-    DiagLog.breadcrumb('_handleUncommittedChanges: analyzeClean done (status=${analysis.status})');
-    if (mounted) Navigator.of(context, rootNavigator: true).pop(); // spinner
-    if (!mounted) return false;
-    final broken = analysis.hasErrors;
-
-    final fileList = changed.isEmpty
-        ? const <Widget>[]
-        : <Widget>[
-            const SizedBox(height: 12),
-            Text('${changed.length} changed file'
-                '${changed.length == 1 ? '' : 's'}:',
-                style:
-                    const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
-            const SizedBox(height: 4),
-            Container(
-              constraints: const BoxConstraints(maxHeight: 140),
-              width: double.maxFinite,
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0F0F10),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: SingleChildScrollView(
-                child: Text(changed.join('\n'),
-                    style: const TextStyle(
-                        fontFamily: 'Menlo',
-                        fontSize: 11,
-                        color: Color(0xFFCFCFD2))),
-              ),
-            ),
-          ];
-
-    final choice = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF141416),
-        title: Text(broken
-            ? 'Leftover changes don\'t compile'
-            : 'Uncommitted changes in the repo'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              broken
-                  ? 'The linked repo has uncommitted changes that fail analysis '
-                      '(${analysis.errorCount} error'
-                      '${analysis.errorCount == 1 ? '' : 's'}) — almost always a '
-                      'build that didn\'t finish. These won\'t be committed as-is. '
-                      'Discard them to restore the last good commit, or build '
-                      'anyway to let the AI edit on top.'
-                  : 'The linked repo has uncommitted changes from a previous '
-                      'build or manual edits. Building now stacks new edits onto '
-                      'them — and if the last build failed, it can recreate code '
-                      'that\'s already there. Commit & push them first, or build '
-                      'anyway.',
-              style: const TextStyle(fontSize: 13, color: Color(0xFFE5E5E7)),
-            ),
-            ...fileList,
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, 'cancel'),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, 'build'),
-            child: const Text('Build anyway',
-                style: TextStyle(color: Color(0xFF8A8A8E))),
-          ),
-          if (broken)
-            FilledButton(
-              style:
-                  FilledButton.styleFrom(backgroundColor: const Color(0xFFB4232A)),
-              onPressed: () => Navigator.pop(ctx, 'discard'),
-              child: const Text('Discard broken edits'),
-            )
-          else
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, 'commit'),
-              child: const Text('Commit & push'),
-            ),
-        ],
-      ),
-    );
-
-    if (choice == 'build') return true;
-    if (choice == 'discard') return _discardLeftoverEdits(repoPath);
-    if (choice != 'commit') return false; // cancel / dismissed
-
-    // Commit & push the leftover work, then proceed with the build. Only
-    // reachable when analysis is clean/unavailable — never for broken code.
-    final messenger = ScaffoldMessenger.of(context);
-    _showBlockingSpinner('Committing & pushing…');
-    final (committed, gitOut) = await ProjectFileRepository.gitCommitAll(
-        repoPath, 'chore: commit work in progress before AI build');
-    final pushed =
-        committed ? await ProjectFileRepository.gitPush(repoPath) : false;
-    if (mounted) Navigator.of(context, rootNavigator: true).pop(); // spinner
-    if (!mounted) return false;
-    messenger.showSnackBar(SnackBar(
-      content: Text(!committed
-          ? (gitOut.isNotEmpty
-              ? 'Commit failed: $gitOut'
-              : 'Nothing was committed (or not a git repo).')
-          : pushed
-              ? 'Committed & pushed the leftover changes.'
-              : 'Committed locally — not pushed (no remote / auth).'),
-    ));
-    // Proceed with the build only if the tree is actually clean now.
-    return !await ProjectFileRepository.gitHasChanges(repoPath);
-  }
-
-  /// Discards the leftover (non-compiling) edits by restoring the repo to HEAD,
-  /// then proceeds with the build if the tree is clean. Returns true to proceed.
-  Future<bool> _discardLeftoverEdits(String repoPath) async {
-    final messenger = ScaffoldMessenger.of(context);
-    _showBlockingSpinner('Discarding broken edits…');
-    final ok = await ProjectFileRepository.gitDiscardAll(repoPath);
-    if (mounted) Navigator.of(context, rootNavigator: true).pop(); // spinner
-    if (!mounted) return false;
-    messenger.showSnackBar(SnackBar(
-      content: Text(ok
-          ? 'Discarded the broken edits — restored the last good commit.'
-          : 'Couldn\'t discard the changes (not a git repo?).'),
-    ));
-    // Proceed only if the tree is genuinely clean now.
-    return !await ProjectFileRepository.gitHasChanges(repoPath);
-  }
-
-  /// The pre-build gate for an epic / manual feature: steer to Architect or
-  /// How-to-build. Returns true only if the user chooses "Build anyway".
-  /// Shown when the user taps Build on an epic that has no subtasks yet.
-  Future<bool?> _offerBreakdown(Feature feature) => showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF141416),
-          title: Text('"${feature.title}" needs subtasks first'),
-          content: const Text(
-            'This feature hasn\'t been broken into subtasks yet. '
-            'Should the AI decompose it into buildable steps first?',
-            style: TextStyle(fontSize: 13, color: Color(0xFFE5E5E7)),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Not yet'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Break it down'),
-            ),
-          ],
-        ),
-      );
-
-  Future<bool?> _confirmBuildDespiteKind(Feature feature, BuildKind kind) {
-    final epic = kind == BuildKind.epic;
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF141416),
-        title: Text(epic ? 'This is an epic' : 'This needs human / ML work'),
-        content: Text(
-          epic
-              ? '“${feature.title}” is too big to build in one go. Break it into '
-                  'sub-features first — otherwise the AI will only scaffold part '
-                  'of it and mark it done.'
-              : '“${feature.title}” isn\'t a code-generation task (it needs a '
-                  'human, a dataset, model training, design, or an external '
-                  'service). Build-with-AI can\'t complete it. See how to '
-                  'approach it instead.',
-          style: const TextStyle(fontSize: 13, color: Color(0xFFE5E5E7)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Build anyway',
-                style: TextStyle(color: Color(0xFF8A8A8E))),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx, false);
-              if (epic) {
-                _architectFeature(feature);
-              } else {
-                _openBuildAdvice(feature);
-              }
-            },
-            child: Text(epic ? 'Architect it' : 'How to build this'),
-          ),
-        ],
-      ),
-    );
   }
 
   /// Walks up [feature]'s parent chain and returns its nesting depth.
@@ -1169,16 +844,10 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     }
   }
 
-  /// Opens scale-aware build advice for a single feature (LLM reads the repo:
-  /// scope, feasibility, approach, effort, risks, breakdown).
   void _openBuildAdvice(Feature feature) {
-    Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => BuildAdviceScreen(
-        project: project,
-        repoPath: _repoPath,
-        feature: feature,
-      ),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Build advice coming in Phase 2.')),
+    );
   }
 
   /// Opens the Security Check for the whole app/repo (secret pre-scan + LLM
@@ -1200,16 +869,6 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     ));
   }
 
-  /// Opens the Run & Preview window: run the app on a simulator/emulator and
-  /// watch it (live screenshot mirror + console). Needs a linked, runnable repo.
-  Future<void> _openRunPreview() async {
-    final repoPath = await _ensureRepoPath();
-    if (repoPath == null || !mounted) return;
-    await Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => RunPreviewScreen(project: project, repoPath: repoPath),
-    ));
-  }
-
   /// Opens the Base View game — the project as a base, features as buildings,
   /// active builds as bots. Read-only, so it doesn't force a repo link (the
   /// already-loaded [_repoPath] is passed for metaphor grounding when present).
@@ -1219,269 +878,10 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     ));
   }
 
-  /// "Build with AI" (Pro): assemble the brief (feature + spec/handoff as
-  /// context), open the implementation window, and update tracking on ship.
-  /// Returns a valid linked repo path, offering to create a fresh code folder
-  /// or link an existing one if the project has none yet. Null = cancelled.
-  Future<String?> _ensureRepoPath() async {
-    final config = await ProjectFileRepository.readProjectConfig(project.path);
-    final existing = config['repoPath'] as String?;
-    if (existing != null && Directory(existing).existsSync()) return existing;
-    if (!mounted) return null;
-
-    final choice = await showDialog<String>(
-      context: context,
-      builder: (ctx) => SimpleDialog(
-        title: const Text('This project has no code repo'),
-        children: [
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(ctx, 'create'),
-            child: const ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.create_new_folder_outlined),
-              title: Text('Create a new code folder'),
-              subtitle: Text('Makes ~/Development/<name> and git-inits it'),
-            ),
-          ),
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(ctx, 'existing'),
-            child: const ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.folder_open_outlined),
-              title: Text('Link an existing folder'),
-            ),
-          ),
-        ],
-      ),
-    );
-    final messenger = ScaffoldMessenger.of(context);
-    if (choice == 'create') {
-      // Ask which platforms so the folder is scaffolded runnable from the start.
-      if (!mounted) return null;
-      final platforms = await pickPlatforms(context, projectName: project.name);
-      if (platforms == null) return null; // cancelled
-      if (mounted) {
-        messenger.showSnackBar(const SnackBar(
-            content: Text('Creating the app… (scaffolding platforms)')));
-      }
-      try {
-        final path = await ProjectFileRepository.createCodeRepo(project.name,
-            platforms: platforms);
-        await ProjectFileRepository.writeProjectConfig(
-            project.path, {'repoPath': path, 'platforms': platforms});
-        if (mounted) {
-          messenger.showSnackBar(
-              SnackBar(content: Text('Created and linked $path')));
-        }
-        return path;
-      } catch (e) {
-        if (mounted) {
-          messenger.showSnackBar(SnackBar(
-            content: Text('Could not create folder: $e'),
-            backgroundColor: const Color(0xFF3F0A0A),
-          ));
-        }
-        return null;
-      }
-    } else if (choice == 'existing') {
-      final picked = await FilePicker.platform.getDirectoryPath(
-        dialogTitle: 'Select code repo for ${project.name}',
-        lockParentWindow: true,
-      );
-      if (picked == null) return null;
-      // Never let the Forge project workspace be used as a code repo — that
-      // scatters generated code among the deliverables (the AR Mechanic bug).
-      if (await ProjectFileRepository.isInsideProjectsRoot(picked)) {
-        if (mounted) {
-          messenger.showSnackBar(const SnackBar(
-            content: Text(
-                "That folder is inside The Forge's project workspace. Pick a "
-                'code folder outside it (e.g. under ~/Development).'),
-            backgroundColor: Color(0xFF3F0A0A),
-          ));
-        }
-        return null;
-      }
-      await ProjectFileRepository.writeProjectConfig(
-          project.path, {'repoPath': picked});
-      return picked;
-    }
-    return null;
-  }
-
   Future<void> _buildFeature(Feature feature) async {
-    DiagLog.breadcrumb('_buildFeature: enter (${feature.id})');
-    final messenger = ScaffoldMessenger.of(context);
-    if (!ref.read(entitlementProvider)) {
-      messenger.showSnackBar(const SnackBar(
-          content: Text('Build with AI is a Pro feature.')));
-      return;
-    }
-
-    // If a run for this feature already exists (still working, awaiting
-    // approval, or finished), just re-open its window — never start a second
-    // run or re-flip status. This is what keeps a build going when you leave
-    // and come back, without resending the task.
-    final activePhase = ref.read(implActiveRunsProvider)[feature.id];
-    if (activePhase != null && activePhase != RunPhase.idle) {
-      DiagLog.breadcrumb('_buildFeature: re-attach existing run (phase=$activePhase)');
-      // Re-attaching to an existing run: still carry the linked repo path so
-      // repo-dependent actions (Commit & push, Make runnable) stay enabled —
-      // passing '' here previously greyed them out on any reopened feature.
-      final config = await ProjectFileRepository.readProjectConfig(project.path);
-      final rp = (config['repoPath'] as String?) ?? '';
-      if (!mounted) return;
-      await Navigator.of(context).push<bool>(MaterialPageRoute(
-        builder: (_) => ImplementationScreen(
-          brief: ImplBrief(
-            projectPath: project.path,
-            projectName: project.name,
-            repoPath: rp,
-            featureId: feature.id,
-            featureTitle: feature.title,
-          ),
-        ),
-      ));
-      if (mounted) await _handleBuildResult(feature);
-      return;
-    }
-
-    // Epic routing: if the feature is an epic, never build it directly.
-    // Instead, check for existing subtasks and either start with the first
-    // unbuilt one (transparent redirect) or offer to break it down first.
-    final kind = BuildKind.fromWire(feature.buildKind);
-    DiagLog.breadcrumb('_buildFeature: kind=$kind');
-    if (kind == BuildKind.epic) {
-      final all =
-          ref.read(featureListProvider(project.id)).valueOrNull ?? const [];
-      final unbuiltChildren = all.where((f) {
-        if (f.parentId != feature.id) return false;
-        final s = FeatureStatus.fromWire(f.status);
-        return s != FeatureStatus.shipped && s != FeatureStatus.archived;
-      }).toList()
-        ..sort((a, b) =>
-            (a.priority ?? 1 << 30).compareTo(b.priority ?? 1 << 30));
-
-      if (unbuiltChildren.isNotEmpty) {
-        // Subtasks already exist — build the first unbuilt one directly.
-        return _buildFeature(unbuiltChildren.first);
-      } else {
-        // No subtasks yet — ask to break it down.
-        if (!mounted) return;
-        final yes = await _offerBreakdown(feature);
-        if (yes == true && mounted) _architectFeature(feature);
-        return;
-      }
-    }
-
-    // Non-buildable kinds (manual, etc.) — let user override or see advice.
-    if (!kind.isDirectlyBuildable) {
-      final proceed = await _confirmBuildDespiteKind(feature, kind);
-      if (proceed != true) return;
-    }
-
-    DiagLog.breadcrumb('_buildFeature: _ensureRepoPath');
-    final repoPath = await _ensureRepoPath();
-    if (repoPath == null) return; // user cancelled the create/link prompt
-    DiagLog.breadcrumb('_buildFeature: repoPath ok');
-
-    // Pre-build guards: don't blindly re-run a build that stacks onto leftover
-    // work or recreates something already built.
-    if (!mounted) return;
-    DiagLog.breadcrumb('_buildFeature: _preBuildChecks');
-    if (!await _preBuildChecks(feature, repoPath)) return;
-    DiagLog.breadcrumb('_buildFeature: _preBuildChecks passed');
-
-    // Build brief: optional clarification before the build runs.
-    // Returns null (Cancel — abort), '' (Skip — proceed without brief),
-    // or a non-empty string (brief approved by the user).
-    if (!mounted) return;
-    DiagLog.breadcrumb('_buildFeature: showBuildBriefDialog');
-    final briefResult = await showBuildBriefDialog(
-      context: context,
-      ref: ref,
-      feature: feature,
-      projectPath: project.path,
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Prompt generation coming in Phase 2.')),
     );
-    if (!mounted) return;
-    if (briefResult == null) return; // user cancelled
-    DiagLog.breadcrumb('_buildFeature: briefResult ok (len=${briefResult.length})');
-
-    // Load spec/handoff context if a spec has been generated.
-    String? lockedSpec;
-    String? goalStatement;
-    var components = <String>[];
-    var checklist = <Map<String, dynamic>>[];
-    final version = project.specVersion;
-    if (version != null && version.isNotEmpty) {
-      final fileRepo = ref.read(projectFileRepositoryProvider);
-      try {
-        lockedSpec =
-            await fileRepo.readLockedSpec(project.path, project.name, version);
-      } catch (_) {}
-      final handoff = await ProjectFileRepository.readHandoffPackage(
-          project.path, project.name, version);
-      if (handoff != null) {
-        goalStatement = handoff['goalStatement'] as String?;
-        components =
-            ((handoff['components'] as List?) ?? const []).cast<String>();
-        checklist = ((handoff['verificationChecklist'] as List?) ?? const [])
-            .whereType<Map>()
-            .map((e) => e.cast<String, dynamic>())
-            .toList();
-      }
-    }
-
-    // briefResult: '' = skipped (use loaded goalStatement), non-empty = use it.
-    final effectiveGoal =
-        briefResult.isNotEmpty ? briefResult : goalStatement;
-
-    final brief = ImplBrief(
-      projectPath: project.path,
-      projectName: project.name,
-      repoPath: repoPath,
-      featureId: feature.id,
-      featureTitle: feature.title,
-      featureDescription: feature.description,
-      targetVersion: feature.targetVersion,
-      lockedSpec: lockedSpec,
-      goalStatement: effectiveGoal,
-      components: components,
-      checklist: checklist,
-    );
-
-    // Mark in-progress while the build runs.
-    DiagLog.breadcrumb('_buildFeature: setStatus inProgress');
-    await ref
-        .read(featureListProvider(project.id).notifier)
-        .setStatus(feature, FeatureStatus.inProgress);
-    ref.invalidate(portfolioProvider);
-
-    if (!mounted) return;
-    DiagLog.breadcrumb('_buildFeature: push ImplementationScreen');
-    await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => ImplementationScreen(brief: brief)),
-    );
-    DiagLog.breadcrumb('_buildFeature: ImplementationScreen popped');
-    if (mounted) await _handleBuildResult(feature);
-  }
-
-  /// After the build window closes, reflect a "Mark shipped" into the tracker —
-  /// set the feature shipped and ensure a release row for its version. Reads the
-  /// keepAlive run state so it works whether the window was freshly launched or
-  /// re-attached (the reattach path previously dropped this).
-  Future<void> _handleBuildResult(Feature feature) async {
-    if (!ref.read(implRunProvider(feature.id)).featureShipped) return;
-    await ref
-        .read(featureListProvider(project.id).notifier)
-        .setStatus(feature, FeatureStatus.shipped);
-    final v = feature.targetVersion?.trim();
-    if (v != null && v.isNotEmpty) {
-      await ref
-          .read(releaseListProvider(project.id).notifier)
-          .ensureForVersion(v, projectPath: project.path);
-    }
-    ref.invalidate(portfolioProvider);
   }
 
   Future<void> _scanRepo() async {
@@ -2083,7 +1483,6 @@ class _FeatureTile extends StatelessWidget {
     required this.onFocus,
     required this.onWorkOn,
     this.indent = 0,
-    this.runPhase,
   });
 
   final Feature feature;
@@ -2110,15 +1509,9 @@ class _FeatureTile extends StatelessWidget {
   /// the actions menu so the user always knows which feature is in focus.
   final VoidCallback onFocus;
 
-  /// Non-null when a Build with AI run for this feature is live (any phase);
-  /// drives the status dot on the board.
-  final RunPhase? runPhase;
-
   @override
   Widget build(BuildContext context) {
     final status = FeatureStatus.fromWire(feature.status);
-    final phase = runPhase;
-    final hasRun = phase != null && phase != RunPhase.idle;
     return GestureDetector(
       // Right-click anywhere on the row → focus it + the same actions menu.
       onSecondaryTapDown: (d) {
@@ -2137,27 +1530,19 @@ class _FeatureTile extends StatelessWidget {
             ),
           ),
         ),
-        child: _tile(context, status, phase, hasRun),
+        child: _tile(context, status),
       ),
     );
   }
 
-  Widget _tile(BuildContext context, FeatureStatus status, RunPhase? phase,
-      bool hasRun) {
+  Widget _tile(BuildContext context, FeatureStatus status) {
     return ListTile(
       dense: true,
       // Indent subtasks so they read as nested under their epic.
       contentPadding: EdgeInsets.only(left: 16.0 + indent * 22, right: 16),
-      // Single click focuses (highlights) the row; a feature with a live AI
-      // build also re-opens its build window.
-      onTap: () {
-        onFocus();
-        if (hasRun) onBuild();
-      },
+      onTap: onFocus,
       mouseCursor: SystemMouseCursors.click,
-      leading: hasRun
-          ? _RunDot(phase!)
-          : Icon(Icons.circle, size: 12, color: status.color),
+      leading: Icon(Icons.circle, size: 12, color: status.color),
       title: Row(
         children: [
           if (indent > 0) ...[
@@ -2172,10 +1557,6 @@ class _FeatureTile extends StatelessWidget {
           if (BuildKind.fromWire(feature.buildKind) != BuildKind.standard) ...[
             const SizedBox(width: 8),
             _KindTag(BuildKind.fromWire(feature.buildKind)),
-          ],
-          if (hasRun) ...[
-            const SizedBox(width: 8),
-            Icon(Icons.open_in_new, size: 12, color: phase!.dotColor),
           ],
         ],
       ),
@@ -2192,7 +1573,7 @@ class _FeatureTile extends StatelessWidget {
           ),
           IconButton(
             icon: const Icon(Icons.construction, size: 16),
-            tooltip: 'Build Mode — build with AI',
+            tooltip: 'Generate Prompt (coming soon)',
             color: const Color(0xFFE8A04C),
             visualDensity: VisualDensity.compact,
             onPressed: onBuild,
@@ -2355,65 +1736,6 @@ class _KindTag extends StatelessWidget {
       ),
       child: Text(kind.label.toLowerCase(),
           style: TextStyle(fontSize: 9.5, color: kind.color)),
-    );
-  }
-}
-
-/// The board's live indicator for a feature with a Build-with-AI run:
-/// yellow (pulsing) = the AI is actively working; blue = waiting for your
-/// approval; green = done; red = failed/stopped.
-class _RunDot extends StatefulWidget {
-  const _RunDot(this.phase);
-  final RunPhase phase;
-
-  @override
-  State<_RunDot> createState() => _RunDotState();
-}
-
-class _RunDotState extends State<_RunDot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  )..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  ({bool pulse, String tip}) get _spec => switch (widget.phase) {
-        RunPhase.awaitingApproval => (
-            pulse: false,
-            tip: 'Waiting for your approval — tap to open'
-          ),
-        RunPhase.done => (pulse: false, tip: 'Build complete — tap to open'),
-        RunPhase.failed || RunPhase.stopped => (
-            pulse: false,
-            tip: 'Build failed or stopped — tap to open'
-          ),
-        _ => (pulse: true, tip: 'AI is working… tap to watch'),
-      };
-
-  @override
-  Widget build(BuildContext context) {
-    final spec = _spec;
-    final dot = Container(
-      width: 12,
-      height: 12,
-      decoration:
-          BoxDecoration(color: widget.phase.dotColor, shape: BoxShape.circle),
-    );
-    return Tooltip(
-      message: spec.tip,
-      child: SizedBox(
-        width: 16,
-        height: 16,
-        child: Center(
-          child: spec.pulse ? FadeTransition(opacity: _c, child: dot) : dot,
-        ),
-      ),
     );
   }
 }

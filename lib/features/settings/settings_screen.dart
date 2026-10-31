@@ -82,17 +82,7 @@ class SettingsScreen extends ConsumerWidget {
               const _SectionHeader('Model Roles'),
               const _RoleCard(
                 role: LlmRole.architect,
-                description: 'Spec generation · worksheets',
-              ),
-              const SizedBox(height: 12),
-              const _RoleCard(
-                role: LlmRole.executor,
-                description: 'Build with AI · implementation',
-              ),
-              const SizedBox(height: 12),
-              const _RoleCard(
-                role: LlmRole.inspector,
-                description: 'Build brief review · output quality',
+                description: 'Spec generation · feature scanning · worksheets',
               ),
               const SizedBox(height: 24),
               const _SectionHeader('Diagnostics'),

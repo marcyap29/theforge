@@ -4,6 +4,24 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 
 ---
 
+## §PMRD — PM Redesign — Phase 1: Strip Executor — COMPLETE ✅ (v0.6.0)
+
+**Completed:** 2026-10-31
+
+- [x] Delete `lib/features/implementation/**` (9 files) — all executor code
+- [x] Delete `lib/features/run/**` (2 files) — run/preview screens
+- [x] Delete `lib/services/inspector_service.dart`
+- [x] Delete `lib/features/tracker/screens/build_advice_screen.dart` + `widgets/build_brief_dialog.dart`
+- [x] Delete 5 executor test files
+- [x] `base_view_screen.dart` — remove builder-bot loop + `_Bot`
+- [x] `settings_screen.dart` — remove Executor/Inspector role cards
+- [x] `project_tracker_screen.dart` — remove all executor wiring, `_RunDot`, dead methods
+- [x] `dart analyze lib/` clean, `flutter test` 82/82 green
+
+**Phase 2 (next):** Prompt Generator + Tracker — copy-a-prompt UI for the feature board
+
+---
+
 ## §BWAI / §UIK / §NP2 — Build with AI + design kit — COMPLETE ✅ (v0.4.0)
 
 **Completed:** 2026-09-10 · **Commits:** `71d7de4` → `027c64c`
