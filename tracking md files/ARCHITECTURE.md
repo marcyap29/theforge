@@ -1,23 +1,28 @@
 # The Forge — Architecture
 
-**Version:** 4.1.0
-**Last Updated:** 2026-10-17
+**Version:** 4.2.0
+**Last Updated:** 2026-10-31
 
 ---
 
 ## What It Is
 
-The Forge is a standalone Flutter desktop app (macOS primary). It is the project management layer for AI-assisted development — sitting above executor agents (Claude Code, Codex, Cursor) and producing the locked specs those agents build against.
+The Forge is a standalone Flutter desktop app (macOS primary). It is an AI Product Manager tool — tracking features, generating prompts for coding agents, and providing architectural oversight across a project portfolio.
 
-Three operating modes:
+**v0.6.0 pivot (PM Redesign Phase 1):** The Build-with-AI executor pipeline (`lib/features/implementation/**`, `lib/features/run/**`, `InspectorService`, `BuildAdviceScreen`, `BuildBriefDialog`) was removed. The Forge is being rebuilt as a pure PM tool — Phase 2+ adds the prompt generator, architecture view, health dashboard, and product advisor.
 
-| Mode | Purpose | Status |
-|---|---|---|
-| **Plan Mode** | Structured interview → locked spec → /goal artifact → executor handoff | ✅ Fully implemented |
-| **Watch Mode** | Token spend + git activity + CI correlation + alerts + SwarmSpace briefings | ✅ §W1–§W4 complete; §W5 next |
-| **Pull Mode** | Reads existing codebase, generates as-built spec | 🔲 Not yet started |
+Current capabilities:
 
-The three modes share one artifact: the locked spec. It is the universal language connecting everything.
+| Capability | Status |
+|---|---|
+| Portfolio Tracker (Kanban board, multi-project) | ✅ Fully implemented |
+| Feature scanning + AI recommendations | ✅ Fully implemented |
+| Goal interview (new project seed) | ✅ Fully implemented |
+| Base View (StarCraft-style project visualization) | ✅ v1 implemented |
+| Multi-file context ingestion (vision + text) | ✅ Fully implemented |
+| Watch Mode (token/git/CI monitoring) | ✅ §W1–§W4 complete |
+| Prompt Generator (copy-a-prompt per feature) | 🔲 Phase 2 — not started |
+| Architecture View | 🔲 Phase 3 — not started |
 
 ---
 
@@ -115,7 +120,6 @@ The Forge/
 │   └── services/
 │       ├── ingest_service.dart                 — IngestService: images→vision extraction, text→direct read → appends to reference_context.md
 │       ├── donor_service.dart                  — DonorService.indexDonor(): walks donor repo, scores files, writes donor_context.md + donor_meta.json
-│       ├── inspector_service.dart              — InspectorService: independent-context build brief quality check
 │       ├── llm/
 │       │   ├── llm_model_config.dart           — ModelInfo, LlmSettings, model catalogs
 │       │   ├── llm_provider.dart               — LlmProvider abstract + LlmRole enum + LlmImage (vision)

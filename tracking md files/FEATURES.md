@@ -1,6 +1,6 @@
 # The Forge — Feature Catalog
 
-**Last Updated:** 2026-10-17 (v0.5.38)
+**Last Updated:** 2026-10-31 (v0.6.0)
 
 ---
 
@@ -66,11 +66,27 @@
 
 ---
 
-## Build with AI — Implementation Agent
+## PM Redesign
+
+> **v0.6.0 — Phase 1 (2026-10-31):** Stripped the entire Build-with-AI executor pipeline. The Forge is being rebuilt as an AI Product Manager tool. Phases 2–5 add the PM surface (prompt generator, architecture view, health dashboard, release notes, product advisor).
 
 | Feature | Status | Notes |
 |---|---|---|
-| Build with AI (implementation agent) | Shipped v0.4.0 | `lib/features/implementation/**`; two-pass scout→plan, propose-approve-verify, streamed build window |
+| Phase 1 — Strip executor pipeline | Shipped v0.6.0 | Deleted `lib/features/implementation/**`, `lib/features/run/**`, `inspector_service.dart`, `build_advice_screen.dart`, `build_brief_dialog.dart` + 5 test files. Stub snackbars in place of removed build actions. |
+| Phase 2 — Prompt Generator + Tracker | Backlog | Copy-a-prompt per feature; one-tap clipboard; prompt history | 
+| Phase 3 — Architecture View | Backlog | Visual system diagram inferred from tracked features |
+| Phase 4 — Health Dashboard + ADRs + Session Starter | Backlog | Project health metrics, architectural decision records, session bootstrap |
+| Phase 5 — Release Notes + Product Advisor | Backlog | Automated release notes, AI product advisor chat |
+
+---
+
+## Build with AI — Implementation Agent
+
+> **Removed v0.6.0 (PM Redesign Phase 1).** Entries below record what was shipped before removal.
+
+| Feature | Status | Notes |
+|---|---|---|
+| Build with AI (implementation agent) | Removed v0.6.0 | Was `lib/features/implementation/**`; two-pass scout→plan, propose-approve-verify, streamed build window |
 | NO FAKE COMPLETIONS prompt rule | Shipped v0.4.49 | `ImplAgent._systemPrompt`: no stubs/simulate/TODO-as-done; empty edits + `CANNOT BUILD:` if genuinely uncodeable |
 | Behavioral-substitution guard | Shipped v0.4.59 | `CompletionGuard.detectSubstitutions` flags silent format swaps (JPEG↔PNG, MIME, audio/video containers) on the done bar |
 | Completion guard (honesty check on the diff) | Shipped v0.4.50 | `CompletionGuard.inspect` on applied edits; flags noEdits/docs-only/stub-dominated → amber done bar + Ship anyway / Mark shipped |
@@ -99,9 +115,11 @@
 
 ## Run & Preview
 
+> **Removed v0.6.0 (PM Redesign Phase 1).** Entries below record what was shipped before removal.
+
 | Feature | Status | Notes |
 |---|---|---|
-| Run & Preview window | Shipped v0.4.36 | `RunController`; detects devices, runs `flutter run -d <id>`, streams console, hot reload/restart/quit over stdin; live screenshot mirror (Simulator / ADB) |
+| Run & Preview window | Removed v0.6.0 | Was `RunController`; detects devices, runs `flutter run -d <id>`, streams console, hot reload/restart/quit over stdin; live screenshot mirror (Simulator / ADB) |
 | Auto-boot simulators/emulators | Shipped v0.4.37 | Shut-down iOS Simulators + Android AVDs listed in device picker; `RunController.start` boots chosen one before `flutter run` |
 | Scaffold at iOS 15.0 (Xcode 27) | Shipped v0.4.37 | `ios_deployment.dart` — `bumpPbxproj`/`bumpPodfile`; applied after every `flutter create` and as a pre-run safety net |
 

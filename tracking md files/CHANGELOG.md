@@ -2,6 +2,38 @@
 
 ---
 
+## v0.6.0 — 2026-10-31 — PM Redesign Phase 1: strip executor pipeline
+
+Converts The Forge from a coding agent into an AI Product Manager tool. Phase 1 removes the entire Build-with-AI executor pipeline so the app can be rebuilt cleanly around PM-first flows (prompt generator, architecture view, health dashboard) in subsequent phases.
+
+**Deleted — `lib/features/implementation/`** (9 files)
+- `data/command_runner.dart`, `data/completion_guard.dart`, `data/impl_agent.dart`, `data/impl_workspace.dart`
+- `models/run_session.dart` (`RunPhase` enum, `ImplBrief`, `AgentPlan`)
+- `providers/implementation_notifier.dart`, `providers/implementation_providers.dart` (`implActiveRunsProvider`)
+- `screens/implementation_screen.dart`, `widgets/diff_view.dart`
+
+**Deleted — `lib/features/run/`** (2 files)
+- `run_controller.dart`, `run_preview_screen.dart`
+
+**Deleted — `lib/services/inspector_service.dart`**
+
+**Deleted — executor widgets** (2 files)
+- `lib/features/tracker/screens/build_advice_screen.dart`
+- `lib/features/tracker/widgets/build_brief_dialog.dart`
+
+**Deleted — 5 executor tests**
+- `completion_guard_test.dart`, `impl_agent_test.dart`, `impl_workspace_test.dart`, `run_device_test.dart`, `build_memory_test.dart`
+
+**Modified** — `base_view_screen.dart`: removed builder-bot loop and `_Bot` widget (depended on `RunPhase` + `implActiveRunsProvider`)
+
+**Modified** — `settings_screen.dart`: Model Roles section now shows Architect only (Executor/Inspector cards removed; `LlmRole` enum values retained for data-layer compatibility)
+
+**Modified** — `project_tracker_screen.dart`: removed "Run & preview" toolbar button, all `implActiveRunsProvider` watches, `_openBuildAdvice`, `_openRunPreview`, `_buildFeature` (stubbed → snackbar), `_handleBuildResult`, 7 dead pre-build-check methods, and `_RunDot` widget
+
+`dart analyze lib/` — `No issues found!`  ·  `flutter test` — 82 passed, 0 failed
+
+---
+
 ## v0.5.40 — 2026-10-20 — Build quality: loop-detector fix + blocking lint promotion
 
 Two fixes that prevent the Build-with-AI feature from false-failing or silently shipping broken code.

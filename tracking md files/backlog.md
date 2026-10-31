@@ -82,6 +82,32 @@ Every §N that brings The Forge closer to a working interview-to-spec run unbloc
 
 ---
 
+## §PMRD — PM Redesign (The Forge → AI Product Manager Tool)
+
+The Forge is being converted from a coding-agent tool into a professional AI PM tool. Five build phases.
+
+### §PMRD-1 — Phase 1: Strip executor pipeline
+**Status:** ✅ Shipped v0.6.0 (2026-10-31)
+Deleted `lib/features/implementation/**`, `lib/features/run/**`, `InspectorService`, `BuildAdviceScreen`, `BuildBriefDialog`, and 5 test files. All executor UI references removed from `project_tracker_screen`, `base_view_screen`, `settings_screen`. `dart analyze` clean, `flutter test` 82/82 green.
+
+### §PMRD-2 — Phase 2: Prompt Generator + Tracker
+**Status:** Backlog — not started
+Copy-a-prompt UI on the feature board: one-tap clipboard, prompt template per feature type, prompt history panel.
+
+### §PMRD-3 — Phase 3: Architecture View
+**Status:** Backlog — not started
+Visual system diagram inferred from tracked features; exportable to Markdown/PNG.
+
+### §PMRD-4 — Phase 4: Health Dashboard + ADRs + Session Starter
+**Status:** Backlog — not started
+Project health metrics, architectural decision records (ADRs), session bootstrap (context doc → AI briefing).
+
+### §PMRD-5 — Phase 5: Release Notes + Product Advisor
+**Status:** Backlog — not started
+Automated release notes from shipped features; AI product advisor chat grounded in project context.
+
+---
+
 ## High Priority
 
 ### §INT-BUG — Investigate: reported "interview doesn't run" (UNCONFIRMED)
