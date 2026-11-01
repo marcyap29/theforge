@@ -27,6 +27,7 @@ import '../widgets/relocate_repo.dart';
 import '../widgets/roadmap_review_sheet.dart';
 import '../widgets/scan_review_sheet.dart';
 import '../widgets/status_chip.dart';
+import 'architecture_screen.dart';
 import 'capability_summary_screen.dart';
 import 'prompt_screen.dart';
 import 'refine_features_screen.dart';
@@ -229,6 +230,8 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
           _barMenu(Icons.auto_awesome_outlined, 'AI tools', [
             _menuEntry(Icons.auto_awesome_outlined, 'What this app can do',
                 _openCapabilitySummary),
+            _menuEntry(Icons.account_tree_outlined, 'Architecture view',
+                _openArchitecture),
             _menuEntry(Icons.radar, 'Scan repo & documents', _scanRepo),
             _menuEntry(
                 Icons.lightbulb_outline, 'Recommend features', _recommendFeatures),
@@ -868,6 +871,15 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
   void _openCapabilitySummary() {
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => CapabilitySummaryScreen(
+        project: project,
+        repoPath: _repoPath,
+      ),
+    ));
+  }
+
+  void _openArchitecture() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => ArchitectureScreen(
         project: project,
         repoPath: _repoPath,
       ),

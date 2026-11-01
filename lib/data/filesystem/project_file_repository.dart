@@ -1562,4 +1562,46 @@ class ProjectFileRepository {
       return null;
     }
   }
+
+  // ── Architecture ─────────────────────────────────────────────────────────
+
+  static Future<String?> readArchitectureDiagram(String projectPath) async {
+    try {
+      final file = File(p.join(
+          projectPath, forgeDirName, 'architecture', 'ARCHITECTURE.mmd'));
+      if (!file.existsSync()) return null;
+      return await file.readAsString();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> writeArchitectureDiagram(
+      String projectPath, String content) async {
+    final dir =
+        Directory(p.join(projectPath, forgeDirName, 'architecture'));
+    await dir.create(recursive: true);
+    await File(p.join(dir.path, 'ARCHITECTURE.mmd')).writeAsString(content);
+  }
+
+  static Future<Map<String, dynamic>?> readComponentMap(
+      String projectPath) async {
+    try {
+      final file = File(p.join(
+          projectPath, forgeDirName, 'architecture', 'component_map.json'));
+      if (!file.existsSync()) return null;
+      return jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> writeComponentMap(
+      String projectPath, Map<String, dynamic> map) async {
+    final dir =
+        Directory(p.join(projectPath, forgeDirName, 'architecture'));
+    await dir.create(recursive: true);
+    await File(p.join(dir.path, 'component_map.json'))
+        .writeAsString(jsonEncode(map));
+  }
 }

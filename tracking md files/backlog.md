@@ -95,8 +95,8 @@ Deleted `lib/features/implementation/**`, `lib/features/run/**`, `InspectorServi
 3-phase LLM pipeline (impact analysis → acceptance criteria → prompt writing). `PromptScreen` with progress steps, copyable `SelectableText` dark box, per-feature history tab. Prompts saved to `<projectPath>/Forge/prompts/<featureId>/<ts>.md`; `PromptRecords` drift table (schemaVersion 5). `promptWriter` LLM role added.
 
 ### §PMRD-3 — Phase 3: Architecture View
-**Status:** Backlog — not started
-Visual system diagram inferred from tracked features; exportable to Markdown/PNG.
+**Status:** ✅ Shipped v0.6.2 (2026-11-01)
+Live Mermaid diagram of the linked repo rendered in a WebView (`webview_flutter` + Mermaid.js CDN). 3-phase LLM pipeline: read repo → generate diagram → map components. Component map side panel (collapsible). Cached to `<projectPath>/Forge/architecture/ARCHITECTURE.mmd` + `component_map.json`. Regenerate button + copy source. Entry in AI tools menu.
 
 ### §PMRD-4 — Phase 4: Health Dashboard + ADRs + Session Starter
 **Status:** Backlog — not started

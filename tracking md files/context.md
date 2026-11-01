@@ -4,6 +4,28 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session — 2026-11-01 — v0.6.2 PM Redesign Phase 3: Architecture View
+
+**Branch:** `main`
+
+**Task:** Phase 3 of The Forge PM Redesign — live Mermaid architecture diagram rendered in a WebView, generated from the linked repo by an LLM, with component map side panel.
+
+**Completed:**
+- `LlmRole.architectureAnalyst` added to enum + defaults + Settings role card
+- `webview_flutter: ^4.14.1` added to `pubspec.yaml`; `flutter pub get` run
+- `assets/mermaid_viewer.html` — dark-themed HTML template with Mermaid.js v10 CDN; `window.renderMermaid()` injected by Flutter via `runJavaScript`
+- `pubspec.yaml` assets section added pointing to `mermaid_viewer.html`
+- `ProjectFileRepository`: 4 new static methods: `readArchitectureDiagram`, `writeArchitectureDiagram`, `readComponentMap`, `writeComponentMap`
+- NEW `lib/features/tracker/data/architecture_analyst.dart` — 3-phase LLM service (read repo → generate diagram → map components); Mermaid fence-stripping + fallback diagram
+- NEW `lib/features/tracker/providers/architecture_providers.dart` — `architectureAnalystProvider`
+- NEW `lib/features/tracker/screens/architecture_screen.dart` — WebView screen with progress steps, component map side panel, Regenerate + Copy source actions; loads cached `.mmd` on open, auto-generates if absent
+- `project_tracker_screen.dart` — "Architecture view" entry in AI tools menu; `_openArchitecture()` method; import added
+- `dart analyze lib/` clean, `flutter test` 82/82 green
+
+**Version shipped:** v0.6.2
+
+---
+
 ## Session — 2026-11-01 — v0.6.1 PM Redesign Phase 2: Prompt Generator + Tracker
 
 **Branch:** `main`

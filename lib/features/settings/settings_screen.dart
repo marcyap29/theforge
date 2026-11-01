@@ -89,6 +89,11 @@ class SettingsScreen extends ConsumerWidget {
                 role: LlmRole.promptWriter,
                 description: 'Writes Claude Code implementation prompts from feature specs.',
               ),
+              const SizedBox(height: 12),
+              const _RoleCard(
+                role: LlmRole.architectureAnalyst,
+                description: 'Generates Mermaid architecture diagrams and component maps.',
+              ),
               const SizedBox(height: 24),
               const _SectionHeader('Diagnostics'),
               const _DiagnosticsCard(),
@@ -687,6 +692,7 @@ class _RoleCard extends ConsumerWidget {
         LlmRole.executor => 'Executor',
         LlmRole.inspector => 'Inspector',
         LlmRole.promptWriter => 'Prompt Writer',
+        LlmRole.architectureAnalyst => 'Architecture Analyst',
       },
       status: configured ? '● Configured' : '○ Not configured',
       statusColor:

@@ -1,4 +1,4 @@
-enum LlmRole { architect, executor, inspector, promptWriter }
+enum LlmRole { architect, executor, inspector, promptWriter, architectureAnalyst }
 
 /// One streamed chunk. Reasoning models emit their chain-of-thought as
 /// [thinking] deltas (shown live but NOT part of the final answer) before the

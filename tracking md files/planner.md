@@ -4,6 +4,24 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 
 ---
 
+## §PMRD — PM Redesign — Phase 3: Architecture View — COMPLETE ✅ (v0.6.2)
+
+**Completed:** 2026-11-01
+
+- [x] Add `architectureAnalyst` to `LlmRole` enum + defaults + Settings card
+- [x] Add `webview_flutter` dependency + asset section in pubspec.yaml
+- [x] Create `assets/mermaid_viewer.html` — dark-themed Mermaid viewer (CDN + JS injection)
+- [x] Add 4 static file I/O methods to `ProjectFileRepository`
+- [x] Create `architecture_analyst.dart` — 3-phase LLM service
+- [x] Create `architecture_providers.dart` — Riverpod provider
+- [x] Create `architecture_screen.dart` — WebView + component map side panel
+- [x] Wire "Architecture view" into tracker's AI tools menu
+- [x] `dart analyze lib/` clean, `flutter test` 82/82 green
+
+**Phase 4 (next):** Health Dashboard + ADRs + Session Starter
+
+---
+
 ## §PMRD — PM Redesign — Phase 2: Prompt Generator + Tracker — COMPLETE ✅ (v0.6.1)
 
 **Completed:** 2026-11-01
