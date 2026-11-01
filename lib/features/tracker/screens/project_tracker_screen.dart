@@ -28,6 +28,7 @@ import '../widgets/roadmap_review_sheet.dart';
 import '../widgets/scan_review_sheet.dart';
 import '../widgets/status_chip.dart';
 import 'capability_summary_screen.dart';
+import 'prompt_screen.dart';
 import 'refine_features_screen.dart';
 import 'releases_screen.dart';
 import 'security_check_screen.dart';
@@ -845,9 +846,13 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
   }
 
   void _openBuildAdvice(Feature feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Build advice coming in Phase 2.')),
-    );
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => PromptScreen(
+        project: project,
+        feature: feature,
+        repoPath: _repoPath,
+      ),
+    ));
   }
 
   /// Opens the Security Check for the whole app/repo (secret pre-scan + LLM
@@ -879,9 +884,13 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
   }
 
   Future<void> _buildFeature(Feature feature) async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Prompt generation coming in Phase 2.')),
-    );
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => PromptScreen(
+        project: project,
+        feature: feature,
+        repoPath: _repoPath,
+      ),
+    ));
   }
 
   Future<void> _scanRepo() async {

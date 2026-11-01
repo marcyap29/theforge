@@ -4,6 +4,23 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 
 ---
 
+## §PMRD — PM Redesign — Phase 2: Prompt Generator + Tracker — COMPLETE ✅ (v0.6.1)
+
+**Completed:** 2026-11-01
+
+- [x] Add `promptWriter` to `LlmRole` enum + defaults + Settings card
+- [x] Add `PromptRecords` drift table + schemaVersion 4→5 migration
+- [x] Add `writePrompt()` + `readPromptByPath()` to `ProjectFileRepository`
+- [x] Create `prompt_generator.dart` — 3-phase LLM pipeline
+- [x] Create `prompt_providers.dart` — Riverpod providers
+- [x] Create `prompt_screen.dart` — tabbed prompt + history UI
+- [x] Wire `_buildFeature` / `_openBuildAdvice` in `project_tracker_screen.dart`
+- [x] `dart analyze lib/` clean, `flutter test` 82/82 green
+
+**Phase 3 (next):** Architecture View
+
+---
+
 ## §PMRD — PM Redesign — Phase 1: Strip Executor — COMPLETE ✅ (v0.6.0)
 
 **Completed:** 2026-10-31
@@ -17,8 +34,6 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 - [x] `settings_screen.dart` — remove Executor/Inspector role cards
 - [x] `project_tracker_screen.dart` — remove all executor wiring, `_RunDot`, dead methods
 - [x] `dart analyze lib/` clean, `flutter test` 82/82 green
-
-**Phase 2 (next):** Prompt Generator + Tracker — copy-a-prompt UI for the feature board
 
 ---
 

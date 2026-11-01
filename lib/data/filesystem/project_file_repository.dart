@@ -1535,4 +1535,31 @@ class ProjectFileRepository {
         '${dir.path}/${projectName}_LockedSpec_$minorVersion.md');
     await file.writeAsString(content);
   }
+
+  /// Saves a generated prompt to `<projectPath>/Forge/prompts/<featureId>/<timestamp>.md`.
+  /// Returns the relative path (from Forge/) stored in the DB record.
+  static Future<String> writePrompt({
+    required String projectPath,
+    required String featureId,
+    required String timestamp,
+    required String content,
+  }) async {
+    final dir = Directory(p.join(projectPath, forgeDirName, 'prompts', featureId));
+    await dir.create(recursive: true);
+    final file = File(p.join(dir.path, '$timestamp.md'));
+    await file.writeAsString(content);
+    return 'prompts/$featureId/$timestamp.md';
+  }
+
+  /// Reads a previously saved prompt by its relative path.
+  static Future<String?> readPromptByPath(
+      String projectPath, String relativePath) async {
+    try {
+      final file = File(p.join(projectPath, forgeDirName, relativePath));
+      if (!file.existsSync()) return null;
+      return await file.readAsString();
+    } catch (_) {
+      return null;
+    }
+  }
 }

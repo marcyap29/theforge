@@ -84,6 +84,11 @@ class SettingsScreen extends ConsumerWidget {
                 role: LlmRole.architect,
                 description: 'Spec generation · feature scanning · worksheets',
               ),
+              const SizedBox(height: 12),
+              const _RoleCard(
+                role: LlmRole.promptWriter,
+                description: 'Writes Claude Code implementation prompts from feature specs.',
+              ),
               const SizedBox(height: 24),
               const _SectionHeader('Diagnostics'),
               const _DiagnosticsCard(),
@@ -681,6 +686,7 @@ class _RoleCard extends ConsumerWidget {
         LlmRole.architect => 'Architect',
         LlmRole.executor => 'Executor',
         LlmRole.inspector => 'Inspector',
+        LlmRole.promptWriter => 'Prompt Writer',
       },
       status: configured ? '● Configured' : '○ Not configured',
       statusColor:

@@ -2251,6 +2251,418 @@ class ReleasesCompanion extends UpdateCompanion<Release> {
   }
 }
 
+class $PromptRecordsTable extends PromptRecords
+    with TableInfo<$PromptRecordsTable, PromptRecord> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PromptRecordsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _featureIdMeta = const VerificationMeta(
+    'featureId',
+  );
+  @override
+  late final GeneratedColumn<String> featureId = GeneratedColumn<String>(
+    'feature_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _projectIdMeta = const VerificationMeta(
+    'projectId',
+  );
+  @override
+  late final GeneratedColumn<String> projectId = GeneratedColumn<String>(
+    'project_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('generated'),
+  );
+  static const VerificationMeta _promptPathMeta = const VerificationMeta(
+    'promptPath',
+  );
+  @override
+  late final GeneratedColumn<String> promptPath = GeneratedColumn<String>(
+    'prompt_path',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    featureId,
+    projectId,
+    createdAt,
+    status,
+    promptPath,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'prompt_records';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PromptRecord> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('feature_id')) {
+      context.handle(
+        _featureIdMeta,
+        featureId.isAcceptableOrUnknown(data['feature_id']!, _featureIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_featureIdMeta);
+    }
+    if (data.containsKey('project_id')) {
+      context.handle(
+        _projectIdMeta,
+        projectId.isAcceptableOrUnknown(data['project_id']!, _projectIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_projectIdMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('prompt_path')) {
+      context.handle(
+        _promptPathMeta,
+        promptPath.isAcceptableOrUnknown(data['prompt_path']!, _promptPathMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_promptPathMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PromptRecord map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PromptRecord(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      featureId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}feature_id'],
+      )!,
+      projectId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}project_id'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      promptPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}prompt_path'],
+      )!,
+    );
+  }
+
+  @override
+  $PromptRecordsTable createAlias(String alias) {
+    return $PromptRecordsTable(attachedDatabase, alias);
+  }
+}
+
+class PromptRecord extends DataClass implements Insertable<PromptRecord> {
+  final String id;
+  final String featureId;
+  final String projectId;
+  final int createdAt;
+
+  /// One of: generated | copied
+  final String status;
+
+  /// Relative path inside the project's Forge/ dir: prompts/<featureId>/<ts>.md
+  final String promptPath;
+  const PromptRecord({
+    required this.id,
+    required this.featureId,
+    required this.projectId,
+    required this.createdAt,
+    required this.status,
+    required this.promptPath,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['feature_id'] = Variable<String>(featureId);
+    map['project_id'] = Variable<String>(projectId);
+    map['created_at'] = Variable<int>(createdAt);
+    map['status'] = Variable<String>(status);
+    map['prompt_path'] = Variable<String>(promptPath);
+    return map;
+  }
+
+  PromptRecordsCompanion toCompanion(bool nullToAbsent) {
+    return PromptRecordsCompanion(
+      id: Value(id),
+      featureId: Value(featureId),
+      projectId: Value(projectId),
+      createdAt: Value(createdAt),
+      status: Value(status),
+      promptPath: Value(promptPath),
+    );
+  }
+
+  factory PromptRecord.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PromptRecord(
+      id: serializer.fromJson<String>(json['id']),
+      featureId: serializer.fromJson<String>(json['featureId']),
+      projectId: serializer.fromJson<String>(json['projectId']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+      status: serializer.fromJson<String>(json['status']),
+      promptPath: serializer.fromJson<String>(json['promptPath']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'featureId': serializer.toJson<String>(featureId),
+      'projectId': serializer.toJson<String>(projectId),
+      'createdAt': serializer.toJson<int>(createdAt),
+      'status': serializer.toJson<String>(status),
+      'promptPath': serializer.toJson<String>(promptPath),
+    };
+  }
+
+  PromptRecord copyWith({
+    String? id,
+    String? featureId,
+    String? projectId,
+    int? createdAt,
+    String? status,
+    String? promptPath,
+  }) => PromptRecord(
+    id: id ?? this.id,
+    featureId: featureId ?? this.featureId,
+    projectId: projectId ?? this.projectId,
+    createdAt: createdAt ?? this.createdAt,
+    status: status ?? this.status,
+    promptPath: promptPath ?? this.promptPath,
+  );
+  PromptRecord copyWithCompanion(PromptRecordsCompanion data) {
+    return PromptRecord(
+      id: data.id.present ? data.id.value : this.id,
+      featureId: data.featureId.present ? data.featureId.value : this.featureId,
+      projectId: data.projectId.present ? data.projectId.value : this.projectId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      status: data.status.present ? data.status.value : this.status,
+      promptPath: data.promptPath.present
+          ? data.promptPath.value
+          : this.promptPath,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PromptRecord(')
+          ..write('id: $id, ')
+          ..write('featureId: $featureId, ')
+          ..write('projectId: $projectId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('status: $status, ')
+          ..write('promptPath: $promptPath')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, featureId, projectId, createdAt, status, promptPath);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PromptRecord &&
+          other.id == this.id &&
+          other.featureId == this.featureId &&
+          other.projectId == this.projectId &&
+          other.createdAt == this.createdAt &&
+          other.status == this.status &&
+          other.promptPath == this.promptPath);
+}
+
+class PromptRecordsCompanion extends UpdateCompanion<PromptRecord> {
+  final Value<String> id;
+  final Value<String> featureId;
+  final Value<String> projectId;
+  final Value<int> createdAt;
+  final Value<String> status;
+  final Value<String> promptPath;
+  final Value<int> rowid;
+  const PromptRecordsCompanion({
+    this.id = const Value.absent(),
+    this.featureId = const Value.absent(),
+    this.projectId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.status = const Value.absent(),
+    this.promptPath = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PromptRecordsCompanion.insert({
+    required String id,
+    required String featureId,
+    required String projectId,
+    required int createdAt,
+    this.status = const Value.absent(),
+    required String promptPath,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       featureId = Value(featureId),
+       projectId = Value(projectId),
+       createdAt = Value(createdAt),
+       promptPath = Value(promptPath);
+  static Insertable<PromptRecord> custom({
+    Expression<String>? id,
+    Expression<String>? featureId,
+    Expression<String>? projectId,
+    Expression<int>? createdAt,
+    Expression<String>? status,
+    Expression<String>? promptPath,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (featureId != null) 'feature_id': featureId,
+      if (projectId != null) 'project_id': projectId,
+      if (createdAt != null) 'created_at': createdAt,
+      if (status != null) 'status': status,
+      if (promptPath != null) 'prompt_path': promptPath,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PromptRecordsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? featureId,
+    Value<String>? projectId,
+    Value<int>? createdAt,
+    Value<String>? status,
+    Value<String>? promptPath,
+    Value<int>? rowid,
+  }) {
+    return PromptRecordsCompanion(
+      id: id ?? this.id,
+      featureId: featureId ?? this.featureId,
+      projectId: projectId ?? this.projectId,
+      createdAt: createdAt ?? this.createdAt,
+      status: status ?? this.status,
+      promptPath: promptPath ?? this.promptPath,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (featureId.present) {
+      map['feature_id'] = Variable<String>(featureId.value);
+    }
+    if (projectId.present) {
+      map['project_id'] = Variable<String>(projectId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (promptPath.present) {
+      map['prompt_path'] = Variable<String>(promptPath.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PromptRecordsCompanion(')
+          ..write('id: $id, ')
+          ..write('featureId: $featureId, ')
+          ..write('projectId: $projectId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('status: $status, ')
+          ..write('promptPath: $promptPath, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$ForgeDatabase extends GeneratedDatabase {
   _$ForgeDatabase(QueryExecutor e) : super(e);
   $ForgeDatabaseManager get managers => $ForgeDatabaseManager(this);
@@ -2260,6 +2672,7 @@ abstract class _$ForgeDatabase extends GeneratedDatabase {
     this,
   );
   late final $ReleasesTable releases = $ReleasesTable(this);
+  late final $PromptRecordsTable promptRecords = $PromptRecordsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2269,6 +2682,7 @@ abstract class _$ForgeDatabase extends GeneratedDatabase {
     features,
     projectTracking,
     releases,
+    promptRecords,
   ];
 }
 
@@ -3365,6 +3779,229 @@ typedef $$ReleasesTableProcessedTableManager =
       Release,
       PrefetchHooks Function()
     >;
+typedef $$PromptRecordsTableCreateCompanionBuilder =
+    PromptRecordsCompanion Function({
+      required String id,
+      required String featureId,
+      required String projectId,
+      required int createdAt,
+      Value<String> status,
+      required String promptPath,
+      Value<int> rowid,
+    });
+typedef $$PromptRecordsTableUpdateCompanionBuilder =
+    PromptRecordsCompanion Function({
+      Value<String> id,
+      Value<String> featureId,
+      Value<String> projectId,
+      Value<int> createdAt,
+      Value<String> status,
+      Value<String> promptPath,
+      Value<int> rowid,
+    });
+
+class $$PromptRecordsTableFilterComposer
+    extends Composer<_$ForgeDatabase, $PromptRecordsTable> {
+  $$PromptRecordsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get featureId => $composableBuilder(
+    column: $table.featureId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get promptPath => $composableBuilder(
+    column: $table.promptPath,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PromptRecordsTableOrderingComposer
+    extends Composer<_$ForgeDatabase, $PromptRecordsTable> {
+  $$PromptRecordsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get featureId => $composableBuilder(
+    column: $table.featureId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get projectId => $composableBuilder(
+    column: $table.projectId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get promptPath => $composableBuilder(
+    column: $table.promptPath,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PromptRecordsTableAnnotationComposer
+    extends Composer<_$ForgeDatabase, $PromptRecordsTable> {
+  $$PromptRecordsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get featureId =>
+      $composableBuilder(column: $table.featureId, builder: (column) => column);
+
+  GeneratedColumn<String> get projectId =>
+      $composableBuilder(column: $table.projectId, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get promptPath => $composableBuilder(
+    column: $table.promptPath,
+    builder: (column) => column,
+  );
+}
+
+class $$PromptRecordsTableTableManager
+    extends
+        RootTableManager<
+          _$ForgeDatabase,
+          $PromptRecordsTable,
+          PromptRecord,
+          $$PromptRecordsTableFilterComposer,
+          $$PromptRecordsTableOrderingComposer,
+          $$PromptRecordsTableAnnotationComposer,
+          $$PromptRecordsTableCreateCompanionBuilder,
+          $$PromptRecordsTableUpdateCompanionBuilder,
+          (
+            PromptRecord,
+            BaseReferences<_$ForgeDatabase, $PromptRecordsTable, PromptRecord>,
+          ),
+          PromptRecord,
+          PrefetchHooks Function()
+        > {
+  $$PromptRecordsTableTableManager(
+    _$ForgeDatabase db,
+    $PromptRecordsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PromptRecordsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PromptRecordsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PromptRecordsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> featureId = const Value.absent(),
+                Value<String> projectId = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String> promptPath = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PromptRecordsCompanion(
+                id: id,
+                featureId: featureId,
+                projectId: projectId,
+                createdAt: createdAt,
+                status: status,
+                promptPath: promptPath,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String featureId,
+                required String projectId,
+                required int createdAt,
+                Value<String> status = const Value.absent(),
+                required String promptPath,
+                Value<int> rowid = const Value.absent(),
+              }) => PromptRecordsCompanion.insert(
+                id: id,
+                featureId: featureId,
+                projectId: projectId,
+                createdAt: createdAt,
+                status: status,
+                promptPath: promptPath,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PromptRecordsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$ForgeDatabase,
+      $PromptRecordsTable,
+      PromptRecord,
+      $$PromptRecordsTableFilterComposer,
+      $$PromptRecordsTableOrderingComposer,
+      $$PromptRecordsTableAnnotationComposer,
+      $$PromptRecordsTableCreateCompanionBuilder,
+      $$PromptRecordsTableUpdateCompanionBuilder,
+      (
+        PromptRecord,
+        BaseReferences<_$ForgeDatabase, $PromptRecordsTable, PromptRecord>,
+      ),
+      PromptRecord,
+      PrefetchHooks Function()
+    >;
 
 class $ForgeDatabaseManager {
   final _$ForgeDatabase _db;
@@ -3377,4 +4014,6 @@ class $ForgeDatabaseManager {
       $$ProjectTrackingTableTableManager(_db, _db.projectTracking);
   $$ReleasesTableTableManager get releases =>
       $$ReleasesTableTableManager(_db, _db.releases);
+  $$PromptRecordsTableTableManager get promptRecords =>
+      $$PromptRecordsTableTableManager(_db, _db.promptRecords);
 }

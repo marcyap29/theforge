@@ -120,12 +120,29 @@ class ProjectTracking extends Table {
   Set<Column> get primaryKey => {projectId};
 }
 
-@DriftDatabase(tables: [Projects, Features, ProjectTracking, Releases])
+/// One saved Claude Code prompt generated for a feature.
+class PromptRecords extends Table {
+  TextColumn get id => text()();
+  TextColumn get featureId => text()();
+  TextColumn get projectId => text()();
+  IntColumn get createdAt => integer()();
+
+  /// One of: generated | copied
+  TextColumn get status => text().withDefault(const Constant('generated'))();
+
+  /// Relative path inside the project's Forge/ dir: prompts/<featureId>/<ts>.md
+  TextColumn get promptPath => text()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DriftDatabase(tables: [Projects, Features, ProjectTracking, Releases, PromptRecords])
 class ForgeDatabase extends _$ForgeDatabase {
   ForgeDatabase() : super(_openForgeIndex());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -146,6 +163,10 @@ class ForgeDatabase extends _$ForgeDatabase {
           if (from < 4) {
             await m.addColumn(features, features.buildKind);
             await m.addColumn(features, features.parentId);
+          }
+          // v4 -> v5: introduce prompt generation history.
+          if (from < 5) {
+            await m.createTable(promptRecords);
           }
         },
       );
@@ -236,4 +257,21 @@ class ForgeDatabase extends _$ForgeDatabase {
 
   Future<void> deleteRelease(String id) =>
       (delete(releases)..where((t) => t.id.equals(id))).go();
+
+  // --- PromptRecords ---
+
+  Future<List<PromptRecord>> getPromptRecordsForFeature(
+          String projectId, String featureId) =>
+      (select(promptRecords)
+            ..where((t) =>
+                t.projectId.equals(projectId) & t.featureId.equals(featureId))
+            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+          .get();
+
+  Future<void> insertPromptRecord(PromptRecordsCompanion entry) =>
+      into(promptRecords).insert(entry);
+
+  Future<void> updatePromptStatus(String id, String status) =>
+      (update(promptRecords)..where((t) => t.id.equals(id)))
+          .write(PromptRecordsCompanion(status: Value(status)));
 }

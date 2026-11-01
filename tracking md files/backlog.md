@@ -91,8 +91,8 @@ The Forge is being converted from a coding-agent tool into a professional AI PM 
 Deleted `lib/features/implementation/**`, `lib/features/run/**`, `InspectorService`, `BuildAdviceScreen`, `BuildBriefDialog`, and 5 test files. All executor UI references removed from `project_tracker_screen`, `base_view_screen`, `settings_screen`. `dart analyze` clean, `flutter test` 82/82 green.
 
 ### §PMRD-2 — Phase 2: Prompt Generator + Tracker
-**Status:** Backlog — not started
-Copy-a-prompt UI on the feature board: one-tap clipboard, prompt template per feature type, prompt history panel.
+**Status:** ✅ Shipped v0.6.1 (2026-11-01)
+3-phase LLM pipeline (impact analysis → acceptance criteria → prompt writing). `PromptScreen` with progress steps, copyable `SelectableText` dark box, per-feature history tab. Prompts saved to `<projectPath>/Forge/prompts/<featureId>/<ts>.md`; `PromptRecords` drift table (schemaVersion 5). `promptWriter` LLM role added.
 
 ### §PMRD-3 — Phase 3: Architecture View
 **Status:** Backlog — not started

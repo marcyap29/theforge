@@ -4,6 +4,27 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session — 2026-11-01 — v0.6.1 PM Redesign Phase 2: Prompt Generator + Tracker
+
+**Branch:** `main`
+
+**Task:** Phase 2 of The Forge PM Redesign — 3-phase LLM pipeline for Claude Code prompt generation from feature cards, with disk storage, DB history, and a copyable prompt UI.
+
+**Completed:**
+- `LlmRole.promptWriter` added to enum (`llm_provider.dart`), defaults (`llm_model_config.dart`), Settings role cards (`settings_screen.dart`)
+- `PromptRecords` drift table added to `forge_database.dart` — schemaVersion 4→5, migration, 3 new DB methods
+- `ProjectFileRepository.writePrompt()` and `readPromptByPath()` added as static methods
+- NEW `lib/features/tracker/data/prompt_generator.dart` — 3-phase pipeline (impact analysis → acceptance criteria → prompt writing) using `architect`/`promptWriter` roles; `git ls-files` fallback filesystem walk; JSON fence-stripping
+- NEW `lib/features/tracker/providers/prompt_providers.dart` — `promptGeneratorProvider`, `promptHistoryProvider`
+- NEW `lib/features/tracker/screens/prompt_screen.dart` — tabbed UI (Prompt + History); 3-step progress UI (spinner → checkmark); `SelectableText` dark box; Copy button; history list with tap-to-view dialog
+- `project_tracker_screen.dart` — `_buildFeature` and `_openBuildAdvice` now navigate to `PromptScreen`; `prompt_screen.dart` import added
+- build_runner regenerated (schemaVersion 5 `PromptRecords`)
+- `dart analyze lib/` clean, `flutter test` 82/82 green
+
+**Version shipped:** v0.6.1
+
+---
+
 ## Session — 2026-10-31 — v0.6.0 PM Redesign Phase 1: strip executor pipeline
 
 **Branch:** `worktree-phase1-strip-executor` → merged to `main`
