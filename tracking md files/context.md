@@ -4,6 +4,26 @@ Newest session first. Each block is prepended.
 
 ---
 
+## Session — 2026-11-02 — v0.6.3 Folder Ingest + Repo Changes
+
+**Branch:** `main`
+
+**Task:** Two tracker AppBar additions — ingest an entire folder into project context, and show a live "what changed" panel for the linked repo.
+
+**Completed:**
+- NEW `lib/features/tracker/widgets/repo_changes_sheet.dart` — `DraggableScrollableSheet` with two tabs:
+  - **Repo tab:** runs `git status --porcelain` on the linked repo; groups results by Staged / Added / Modified / Deleted / Renamed / Untracked with color-coded dot rows; "Clean" state when nothing changed; Refresh button
+  - **Forge docs tab:** lists all files under `<projectPath>/Forge/` sorted newest-first with relative-time stamps
+- `project_tracker_screen.dart`:
+  - `dart:io` import added; `repo_changes_sheet.dart` import added
+  - `Icons.create_new_folder_outlined` button → `_addContextFolder()`: walks the picked directory recursively, collects supported extensions (images + text/MD), caps at 50 files, passes to existing `IngestService`
+  - `Icons.sync_outlined` button → `_openRepoChanges()`: opens `RepoChangesSheet` as a modal bottom sheet
+- `dart analyze lib/` clean, `flutter test` 82/82 green
+
+**Version shipped:** v0.6.3
+
+---
+
 ## Session — 2026-11-01 — v0.6.2 PM Redesign Phase 3: Architecture View
 
 **Branch:** `main`

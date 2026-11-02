@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -24,6 +26,7 @@ import '../widgets/dedup_review_sheet.dart';
 import '../widgets/feature_edit_dialog.dart';
 import '../widgets/forge_files_panel.dart';
 import '../widgets/relocate_repo.dart';
+import '../widgets/repo_changes_sheet.dart';
 import '../widgets/roadmap_review_sheet.dart';
 import '../widgets/scan_review_sheet.dart';
 import '../widgets/status_chip.dart';
@@ -250,6 +253,16 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             icon: const Icon(Icons.attach_file_outlined),
             tooltip: 'Add context files',
             onPressed: _addContextFiles,
+          ),
+          IconButton(
+            icon: const Icon(Icons.create_new_folder_outlined),
+            tooltip: 'Ingest a folder',
+            onPressed: _addContextFolder,
+          ),
+          IconButton(
+            icon: const Icon(Icons.sync_outlined),
+            tooltip: 'Repo changes',
+            onPressed: _openRepoChanges,
           ),
           IconButton(
             icon: const Icon(Icons.folder_open_outlined),
@@ -1066,6 +1079,76 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             : 'No supported files — use PNG, JPG, HEIC, TXT, or MD';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg)),
+    );
+  }
+
+  /// Picks an entire folder and ingests all supported files within it.
+  /// Walks recursively, skips hidden entries, caps at 50 files.
+  Future<void> _addContextFolder() async {
+    final dirPath = await FilePicker.platform.getDirectoryPath();
+    if (dirPath == null || !mounted) return;
+
+    const supported = {
+      '.png', '.jpg', '.jpeg', '.heic', '.gif', '.webp',
+      '.txt', '.md', '.markdown',
+    };
+
+    final dir = Directory(dirPath);
+    final paths = <String>[];
+    await for (final entity in dir.list(recursive: true, followLinks: false)) {
+      if (entity is! File) continue;
+      final name = entity.path.split(Platform.pathSeparator).last;
+      if (name.startsWith('.')) continue;
+      final ext = '.${name.split('.').last.toLowerCase()}';
+      if (supported.contains(ext)) {
+        paths.add(entity.path);
+        if (paths.length >= 50) break;
+      }
+    }
+
+    if (!mounted) return;
+    if (paths.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No supported files found — use PNG, JPG, TXT, or MD'),
+        ),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Processing ${paths.length} files…')),
+    );
+
+    final llm = ref.read(llmServiceProvider);
+    final result = await IngestService(llm).ingestFiles(
+      filePaths: paths,
+      projectPath: project.path,
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
+
+    final msg = result.hasProcessed
+        ? '${result.processed.length} file${result.processed.length == 1 ? '' : 's'} added to project context'
+        : result.hasErrors
+            ? 'Error: ${result.errors.first}'
+            : 'No files processed';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg)),
+    );
+  }
+
+  /// Shows the repo changes sheet — git status on the linked repo + Forge doc activity.
+  void _openRepoChanges() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => RepoChangesSheet(
+        projectPath: project.path,
+        repoPath: _repoPath,
+      ),
     );
   }
 

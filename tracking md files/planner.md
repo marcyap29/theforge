@@ -4,6 +4,18 @@ Active sprint tasks only. Wipe clean when a feature ships. Preserve partial work
 
 ---
 
+## §CTX2 — Folder Ingest + Repo Changes Panel — COMPLETE ✅ (v0.6.3)
+
+**Completed:** 2026-11-02
+
+- [x] Create `repo_changes_sheet.dart` — DraggableScrollableSheet with Repo (git status) + Forge docs tabs
+- [x] Add `_addContextFolder()` — directory picker → recursive walk → IngestService
+- [x] Add `_openRepoChanges()` — opens changes sheet as modal bottom sheet
+- [x] Wire `Icons.create_new_folder_outlined` + `Icons.sync_outlined` buttons in tracker AppBar
+- [x] `dart analyze lib/` clean, `flutter test` 82/82 green
+
+---
+
 ## §PMRD — PM Redesign — Phase 3: Architecture View — COMPLETE ✅ (v0.6.2)
 
 **Completed:** 2026-11-01
