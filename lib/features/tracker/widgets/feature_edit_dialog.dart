@@ -77,15 +77,21 @@ class _FeatureEditDialogState extends State<_FeatureEditDialog> {
   void _submit() {
     final title = _title.text.trim();
     if (title.isEmpty) return;
+    final rawPriority = _priority.text.trim();
+    final priorityDigits =
+        rawPriority.replaceFirst(RegExp(r'^[Pp]'), '').trim();
+
+    final rawVersion = _version.text.trim();
+    final version = rawVersion.isEmpty ? null : rawVersion.toLowerCase();
+
     Navigator.pop(
       context,
       FeatureEditResult(
         title: title,
         description: _desc.text.trim().isEmpty ? null : _desc.text.trim(),
         status: _status,
-        priority: int.tryParse(_priority.text.trim()),
-        targetVersion:
-            _version.text.trim().isEmpty ? null : _version.text.trim(),
+        priority: int.tryParse(priorityDigits),
+        targetVersion: version,
         buildKind: _kind,
       ),
     );
@@ -165,8 +171,7 @@ class _FeatureEditDialogState extends State<_FeatureEditDialog> {
               Row(
                 children: [
                   Expanded(
-                    child: _field(_priority, 'Priority (number)',
-                        keyboardType: TextInputType.number),
+                    child: _field(_priority, 'Priority (e.g. 3 or P3)'),
                   ),
                   const SizedBox(width: 12),
                   Expanded(

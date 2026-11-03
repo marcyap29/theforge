@@ -1828,7 +1828,7 @@ class _FeatureTile extends StatelessWidget {
 
   Widget? _subtitle() {
     final bits = <String>[];
-    if (feature.targetVersion != null) bits.add(feature.targetVersion!);
+    if (feature.targetVersion != null) bits.add(feature.targetVersion!.toLowerCase());
     if (feature.priority != null) bits.add('P${feature.priority}');
     if (feature.source != 'manual') bits.add(feature.source);
     final meta = bits.join(' · ');

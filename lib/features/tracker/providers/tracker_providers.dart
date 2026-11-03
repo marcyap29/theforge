@@ -61,7 +61,7 @@ class FeatureListNotifier extends FamilyAsyncNotifier<List<Feature>, String> {
       description: description,
       status: status.wire,
       priority: priority,
-      targetVersion: targetVersion,
+      targetVersion: _normaliseVersion(targetVersion),
       source: source,
       buildKind: buildKind.wire,
       parentId: parentId,
@@ -88,7 +88,10 @@ class FeatureListNotifier extends FamilyAsyncNotifier<List<Feature>, String> {
       description: Value(description ?? feature.description),
       status: status?.wire ?? feature.status,
       priority: Value(priority ?? feature.priority),
-      targetVersion: Value(targetVersion ?? feature.targetVersion),
+      targetVersion: Value(
+          targetVersion != null
+              ? _normaliseVersion(targetVersion)
+              : feature.targetVersion),
       buildKind: buildKind?.wire ?? feature.buildKind,
       updatedAt: DateTime.now().millisecondsSinceEpoch,
     );
@@ -142,6 +145,14 @@ class FeatureListNotifier extends FamilyAsyncNotifier<List<Feature>, String> {
     final path = await _projectPath();
     await repo.replaceFeatures(_projectId, features, projectPath: path);
     ref.invalidateSelf();
+  }
+
+  /// Normalises a user-supplied version string: trims whitespace and lowercases
+  /// so "V1", "v1", "V1.0" all resolve to the same bucket.
+  static String? _normaliseVersion(String? v) {
+    if (v == null) return null;
+    final s = v.trim().toLowerCase();
+    return s.isEmpty ? null : s;
   }
 
   static List<Feature> _sorted(List<Feature> list) {

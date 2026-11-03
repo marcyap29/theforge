@@ -131,18 +131,18 @@ class ReleaseListNotifier extends FamilyAsyncNotifier<List<Release>, String> {
 Map<String, List<Feature>> groupFeaturesByVersion(List<Feature> features) {
   final map = <String, List<Feature>>{};
   for (final f in features) {
-    final v = (f.targetVersion == null || f.targetVersion!.trim().isEmpty)
-        ? 'Unversioned'
-        : f.targetVersion!.trim();
+    final raw = f.targetVersion?.trim() ?? '';
+    final v = raw.isEmpty ? 'Unversioned' : raw.toLowerCase();
     (map[v] ??= []).add(f);
   }
   return map;
 }
 
-/// Shipped features for a given version.
+/// Shipped features for a given version (case-insensitive).
 List<Feature> shippedInVersion(List<Feature> features, String version) =>
     features
         .where((f) =>
-            (f.targetVersion ?? '').trim() == version &&
+            (f.targetVersion ?? '').trim().toLowerCase() ==
+                version.toLowerCase() &&
             FeatureStatus.fromWire(f.status) == FeatureStatus.shipped)
         .toList();
