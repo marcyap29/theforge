@@ -17,7 +17,7 @@ class ForgeFilesPanel extends StatefulWidget {
 
 class _ForgeFilesPanelState extends State<ForgeFilesPanel> {
   late final String _forgePath;
-  late final Future<Map<String, List<File>>> _filesFuture;
+  late Future<Map<String, List<File>>> _filesFuture;
 
   static const _sections = [
     ('Specs', 'specs'),
@@ -34,6 +34,8 @@ class _ForgeFilesPanelState extends State<ForgeFilesPanel> {
         p.join(widget.project.path, ProjectFileRepository.forgeDirName);
     _filesFuture = _loadFiles();
   }
+
+  void _refresh() => setState(() { _filesFuture = _loadFiles(); });
 
   Future<Map<String, List<File>>> _loadFiles() async {
     final result = <String, List<File>>{};
@@ -72,6 +74,11 @@ class _ForgeFilesPanelState extends State<ForgeFilesPanel> {
                     style: TextStyle(
                         fontSize: 16, fontWeight: FontWeight.w600),
                   ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 18),
+                  tooltip: 'Refresh',
+                  onPressed: _refresh,
                 ),
                 IconButton(
                   icon: const Icon(Icons.open_in_new, size: 18),
@@ -134,8 +141,7 @@ class _ForgeFilesPanelState extends State<ForgeFilesPanel> {
                                     p.basename(f.path),
                                     style: const TextStyle(fontSize: 13),
                                   ),
-                                  onTap: () =>
-                                      Process.run('open', [f.path]),
+                                  onTap: () => _openFileInApp(context, f),
                                   onLongPress: () =>
                                       _showFileMenu(context, f),
                                 ),
@@ -148,6 +154,106 @@ class _ForgeFilesPanelState extends State<ForgeFilesPanel> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Opens a file's contents in a full-height in-app reader sheet.
+  Future<void> _openFileInApp(BuildContext context, File f) async {
+    String content;
+    try {
+      content = await f.readAsString();
+    } catch (e) {
+      content = '(Could not read file: $e)';
+    }
+    if (!context.mounted) return;
+
+    final fileName = p.basename(f.path);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (ctx, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF111113),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: Column(
+            children: [
+              // Handle
+              Container(
+                margin: const EdgeInsets.only(top: 10),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3F3F46),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 8, 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.description_outlined,
+                        size: 16, color: Color(0xFF9CA3AF)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        fileName,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFE5E5E7),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.open_in_new, size: 16),
+                      tooltip: 'Open in Finder',
+                      onPressed: () => Process.run('open', [f.path]),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                    const SizedBox(width: 12),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 16),
+                      tooltip: 'Close',
+                      onPressed: () => Navigator.pop(ctx),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                    const SizedBox(width: 4),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: Color(0xFF2C2C2E)),
+              // Content
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(16),
+                  child: SelectableText(
+                    content,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      height: 1.6,
+                      fontFamily: 'Menlo',
+                      color: Color(0xFFD1D5DB),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
