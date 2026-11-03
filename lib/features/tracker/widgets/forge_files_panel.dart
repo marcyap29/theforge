@@ -24,14 +24,6 @@ class _ForgeFilesPanelState extends State<ForgeFilesPanel> {
   late final String _forgePath;
   late Future<Map<String, List<File>>> _filesFuture;
 
-  static const _sections = [
-    ('Specs', 'specs'),
-    ('Prompts', 'prompts'),
-    ('Architecture', 'architecture'),
-    ('Ingested Docs', 'ingested'),
-    ('Audit', 'audit'),
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -42,24 +34,41 @@ class _ForgeFilesPanelState extends State<ForgeFilesPanel> {
 
   void _refresh() => setState(() { _filesFuture = _loadFiles(); });
 
+  /// Discovers every non-hidden subdirectory inside Forge/ and returns its
+  /// files. Sections reflect whatever actually exists on disk — no hardcoded
+  /// list — so the panel always matches Finder.
   Future<Map<String, List<File>>> _loadFiles() async {
     final result = <String, List<File>>{};
-    for (final (label, subdir) in _sections) {
-      final dir = Directory(p.join(_forgePath, subdir));
-      final files = <File>[];
-      if (await dir.exists()) {
-        await for (final entity in dir.list(recursive: true)) {
-          if (entity is File && !p.basename(entity.path).startsWith('.')) {
-            files.add(entity);
-          }
-        }
-        files.sort(
-            (a, b) => p.basename(a.path).compareTo(p.basename(b.path)));
+    final forgeDir = Directory(_forgePath);
+    if (!await forgeDir.exists()) return result;
+
+    final subdirs = <String>[];
+    await for (final entity in forgeDir.list()) {
+      if (entity is Directory) {
+        final name = p.basename(entity.path);
+        if (!name.startsWith('.')) subdirs.add(name);
       }
-      result[label] = files;
+    }
+    subdirs.sort();
+
+    for (final subdir in subdirs) {
+      final files = <File>[];
+      await for (final entity
+          in Directory(p.join(_forgePath, subdir)).list(recursive: true)) {
+        if (entity is File && !p.basename(entity.path).startsWith('.')) {
+          files.add(entity);
+        }
+      }
+      files.sort((a, b) => p.basename(a.path).compareTo(p.basename(b.path)));
+      result[_labelFor(subdir)] = files;
     }
     return result;
   }
+
+  static String _labelFor(String subdir) => switch (subdir) {
+        'ingested' => 'Ingested Docs',
+        _ => subdir[0].toUpperCase() + subdir.substring(1),
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -351,9 +360,12 @@ class _ForgeFilesPanelState extends State<ForgeFilesPanel> {
   IconData _sectionIcon(String label) => switch (label) {
         'Specs' => Icons.article_outlined,
         'Prompts' => Icons.psychology_outlined,
+        'Handoffs' => Icons.handshake_outlined,
+        'Worksheets' => Icons.assignment_outlined,
         'Architecture' => Icons.account_tree_outlined,
         'Ingested Docs' => Icons.upload_file_outlined,
         'Audit' => Icons.history_outlined,
+        'Tracker' => Icons.track_changes_outlined,
         _ => Icons.folder_outlined,
       };
 }
