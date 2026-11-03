@@ -7,9 +7,14 @@ import '../../../data/filesystem/project_file_repository.dart';
 import '../../../data/local_db/forge_database.dart';
 
 class ForgeFilesPanel extends StatefulWidget {
-  const ForgeFilesPanel({super.key, required this.project});
+  const ForgeFilesPanel({
+    super.key,
+    required this.project,
+    this.onGenerateSpec,
+  });
 
   final Project project;
+  final Future<void> Function()? onGenerateSpec;
 
   @override
   State<ForgeFilesPanel> createState() => _ForgeFilesPanelState();
@@ -22,8 +27,6 @@ class _ForgeFilesPanelState extends State<ForgeFilesPanel> {
   static const _sections = [
     ('Specs', 'specs'),
     ('Prompts', 'prompts'),
-    ('Handoffs', 'handoffs'),
-    ('Worksheets', 'worksheets'),
     ('Architecture', 'architecture'),
     ('Ingested Docs', 'ingested'),
     ('Audit', 'audit'),
@@ -120,16 +123,38 @@ class _ForgeFilesPanelState extends State<ForgeFilesPanel> {
                       initiallyExpanded: files.isNotEmpty,
                       children: files.isEmpty
                           ? [
-                              const ListTile(
-                                dense: true,
-                                title: Text(
-                                  'No files yet',
-                                  style: TextStyle(
-                                    color: Color(0xFF8A8A8E),
-                                    fontSize: 13,
+                              if (entry.key == 'Specs' &&
+                                  widget.onGenerateSpec != null)
+                                ListTile(
+                                  dense: true,
+                                  leading: const Icon(
+                                    Icons.auto_awesome_outlined,
+                                    size: 15,
+                                    color: Color(0xFF9CA3AF),
+                                  ),
+                                  title: const Text(
+                                    'Generate from feature board',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFFE5E5E7),
+                                    ),
+                                  ),
+                                  onTap: () async {
+                                    await widget.onGenerateSpec?.call();
+                                    _refresh();
+                                  },
+                                )
+                              else
+                                const ListTile(
+                                  dense: true,
+                                  title: Text(
+                                    'No files yet',
+                                    style: TextStyle(
+                                      color: Color(0xFF8A8A8E),
+                                      fontSize: 13,
+                                    ),
                                   ),
                                 ),
-                              ),
                             ]
                           : files
                               .map(
@@ -326,8 +351,6 @@ class _ForgeFilesPanelState extends State<ForgeFilesPanel> {
   IconData _sectionIcon(String label) => switch (label) {
         'Specs' => Icons.article_outlined,
         'Prompts' => Icons.psychology_outlined,
-        'Handoffs' => Icons.handshake_outlined,
-        'Worksheets' => Icons.assignment_outlined,
         'Architecture' => Icons.account_tree_outlined,
         'Ingested Docs' => Icons.upload_file_outlined,
         'Audit' => Icons.history_outlined,

@@ -12,7 +12,6 @@ import '../../../services/donor_service.dart';
 import '../../../services/ingest_service.dart';
 import '../../../services/llm/llm_service_provider.dart';
 import '../../chat/screens/direct_chat_screen.dart';
-import '../../game/base_view_screen.dart';
 import '../checkin/checkin_review_dialog.dart';
 import '../checkin/checkin_service.dart';
 import '../data/spec_snapshot_generator.dart';
@@ -27,7 +26,6 @@ import '../widgets/dedup_review_sheet.dart';
 import '../widgets/feature_edit_dialog.dart';
 import '../widgets/forge_files_panel.dart';
 import '../widgets/relocate_repo.dart';
-import '../widgets/repo_changes_sheet.dart';
 import '../widgets/roadmap_review_sheet.dart';
 import '../widgets/scan_review_sheet.dart';
 import '../widgets/status_chip.dart';
@@ -206,7 +204,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
 
     return Scaffold(
       key: _scaffoldKey,
-      endDrawer: ForgeFilesPanel(project: project),
+      endDrawer: ForgeFilesPanel(project: project, onGenerateSpec: _generateSnapshot),
       appBar: AppBar(
         title: Row(
           children: [
@@ -261,11 +259,6 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             onPressed: _addContextFolder,
           ),
           IconButton(
-            icon: const Icon(Icons.sync_outlined),
-            tooltip: 'Repo changes',
-            onPressed: _openRepoChanges,
-          ),
-          IconButton(
             icon: const Icon(Icons.folder_open_outlined),
             tooltip: 'Forge docs',
             onPressed: _openForgeFolder,
@@ -275,18 +268,10 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             tooltip: 'Ask anything',
             onPressed: _askAnything,
           ),
-          IconButton(
-            icon: const Icon(Icons.castle_outlined),
-            tooltip: 'Base view (game)',
-            onPressed: _openBaseView,
-          ),
           _barMenu(Icons.more_horiz, 'More', [
             _menuEntry(Icons.rocket_launch_outlined, 'Releases', _openReleases),
             _menuEntry(Icons.schedule, 'Review cadence',
                 () => _editCadence(trackingAsync.valueOrNull)),
-            const PopupMenuDivider(),
-            _menuEntry(Icons.auto_awesome_outlined, 'Snapshot spec',
-                _generateSnapshot),
           ]),
           IconButton(
             icon: const Icon(Icons.add),
@@ -963,15 +948,6 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     }
   }
 
-  /// Opens the Base View game — the project as a base, features as buildings,
-  /// active builds as bots. Read-only, so it doesn't force a repo link (the
-  /// already-loaded [_repoPath] is passed for metaphor grounding when present).
-  void _openBaseView() {
-    Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => BaseViewScreen(project: project, repoPath: _repoPath),
-    ));
-  }
-
   Future<void> _buildFeature(Feature feature) async {
     await Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => PromptScreen(
@@ -1200,19 +1176,6 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             : 'No files processed';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg)),
-    );
-  }
-
-  /// Shows the repo changes sheet — git status on the linked repo + Forge doc activity.
-  void _openRepoChanges() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => RepoChangesSheet(
-        projectPath: project.path,
-        repoPath: _repoPath,
-      ),
     );
   }
 
