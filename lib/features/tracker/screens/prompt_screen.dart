@@ -90,6 +90,16 @@ class _PromptScreenState extends ConsumerState<PromptScreen> {
       promptPath = 'prompts/${widget.feature.id}/$ts.md';
     }
 
+    // Mirror to Forge/handoffs/ so the Forge Files panel surfaces it.
+    try {
+      await ProjectFileRepository.writeHandoffFromPrompt(
+        projectPath: widget.project.path,
+        featureTitle: widget.feature.title,
+        timestamp: ts,
+        content: result.prompt,
+      );
+    } catch (_) {}
+
     final recordId = _uuid.v4();
     final now = dt.millisecondsSinceEpoch;
     final db = ref.read(forgeDatabaseProvider);

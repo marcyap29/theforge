@@ -21,8 +21,10 @@ class _ForgeFilesPanelState extends State<ForgeFilesPanel> {
 
   static const _sections = [
     ('Specs', 'specs'),
+    ('Prompts', 'prompts'),
     ('Handoffs', 'handoffs'),
     ('Worksheets', 'worksheets'),
+    ('Architecture', 'architecture'),
     ('Ingested Docs', 'ingested'),
     ('Audit', 'audit'),
   ];
@@ -323,8 +325,10 @@ class _ForgeFilesPanelState extends State<ForgeFilesPanel> {
 
   IconData _sectionIcon(String label) => switch (label) {
         'Specs' => Icons.article_outlined,
+        'Prompts' => Icons.psychology_outlined,
         'Handoffs' => Icons.handshake_outlined,
         'Worksheets' => Icons.assignment_outlined,
+        'Architecture' => Icons.account_tree_outlined,
         'Ingested Docs' => Icons.upload_file_outlined,
         'Audit' => Icons.history_outlined,
         _ => Icons.folder_outlined,

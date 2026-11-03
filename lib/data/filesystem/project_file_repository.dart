@@ -1563,6 +1563,56 @@ class ProjectFileRepository {
     }
   }
 
+  /// Saves a copy of a generated prompt into Forge/handoffs/ so the
+  /// handoffs panel section reflects the PM workflow's output.
+  static Future<void> writeHandoffFromPrompt({
+    required String projectPath,
+    required String featureTitle,
+    required String timestamp,
+    required String content,
+  }) async {
+    final dir =
+        Directory(p.join(projectPath, forgeDirName, 'handoffs'));
+    await dir.create(recursive: true);
+    final safeName = featureTitle
+        .replaceAll(RegExp(r'[^\w\s-]'), '')
+        .trim()
+        .replaceAll(RegExp(r'\s+'), '_')
+        .toLowerCase();
+    final file = File(p.join(dir.path, '${safeName}_$timestamp.md'));
+    await file.writeAsString(content);
+  }
+
+  /// Writes a lightweight spec snapshot generated from the feature board.
+  /// Overwrites any previous snapshot for this date so repeated runs stay tidy.
+  static Future<void> writeSpecSnapshot({
+    required String projectPath,
+    required String projectName,
+    required String date,
+    required String content,
+  }) async {
+    final dir = Directory(p.join(projectPath, forgeDirName, 'specs'));
+    await dir.create(recursive: true);
+    final safe = projectName
+        .replaceAll(RegExp(r'[^\w\s-]'), '')
+        .trim()
+        .replaceAll(RegExp(r'\s+'), '_');
+    final file = File(p.join(dir.path, '${safe}_Snapshot_$date.md'));
+    await file.writeAsString(content);
+  }
+
+  /// Reads the ingested reference context for a project, if it exists.
+  static Future<String?> readReferenceContext(String projectPath) async {
+    try {
+      final file = File(
+          p.join(projectPath, forgeDirName, 'ingested', 'reference_context.md'));
+      if (!file.existsSync()) return null;
+      return await file.readAsString();
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ── Architecture ─────────────────────────────────────────────────────────
 
   static Future<String?> readArchitectureDiagram(String projectPath) async {

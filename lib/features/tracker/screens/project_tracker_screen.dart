@@ -15,6 +15,7 @@ import '../../chat/screens/direct_chat_screen.dart';
 import '../../game/base_view_screen.dart';
 import '../checkin/checkin_review_dialog.dart';
 import '../checkin/checkin_service.dart';
+import '../data/spec_snapshot_generator.dart';
 import '../models/tracker_enums.dart';
 import '../providers/tracker_providers.dart';
 import '../releases/release_providers.dart';
@@ -283,6 +284,9 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
             _menuEntry(Icons.rocket_launch_outlined, 'Releases', _openReleases),
             _menuEntry(Icons.schedule, 'Review cadence',
                 () => _editCadence(trackingAsync.valueOrNull)),
+            const PopupMenuDivider(),
+            _menuEntry(Icons.auto_awesome_outlined, 'Snapshot spec',
+                _generateSnapshot),
           ]),
           IconButton(
             icon: const Icon(Icons.add),
@@ -897,6 +901,66 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
         repoPath: _repoPath,
       ),
     ));
+  }
+
+  /// Reads the feature board, calls the LLM once, and saves a lightweight
+  /// spec snapshot to Forge/specs/. Overwrites the same-day snapshot on
+  /// repeated runs so the file count stays manageable.
+  Future<void> _generateSnapshot() async {
+    final featuresAsync = ref.read(featureListProvider(project.id));
+    final features = featuresAsync.valueOrNull ?? [];
+    if (features.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Add some features first')),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Generating spec snapshot…'),
+        duration: Duration(seconds: 30),
+      ),
+    );
+
+    final llm = ref.read(llmServiceProvider);
+    try {
+      final content = await SpecSnapshotGenerator(llm).generate(
+        projectName: project.name,
+        features: features,
+        projectPath: project.path,
+        onProgress: (_) {},
+      );
+
+      final now = DateTime.now();
+      final date =
+          '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+
+      await ProjectFileRepository.writeSpecSnapshot(
+        projectPath: project.path,
+        projectName: project.name,
+        date: date,
+        content: content,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Spec snapshot saved — open Forge docs to view'),
+          duration: Duration(seconds: 4),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Snapshot failed: $e'),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
+      );
+    }
   }
 
   /// Opens the Base View game — the project as a base, features as buildings,
