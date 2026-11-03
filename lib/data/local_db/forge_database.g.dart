@@ -580,6 +580,17 @@ class $FeaturesTable extends Features with TableInfo<$FeaturesTable, Feature> {
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _priorityLabelMeta = const VerificationMeta(
+    'priorityLabel',
+  );
+  @override
+  late final GeneratedColumn<String> priorityLabel = GeneratedColumn<String>(
+    'priority_label',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _targetVersionMeta = const VerificationMeta(
     'targetVersion',
   );
@@ -654,6 +665,7 @@ class $FeaturesTable extends Features with TableInfo<$FeaturesTable, Feature> {
     description,
     status,
     priority,
+    priorityLabel,
     targetVersion,
     source,
     buildKind,
@@ -715,6 +727,15 @@ class $FeaturesTable extends Features with TableInfo<$FeaturesTable, Feature> {
       context.handle(
         _priorityMeta,
         priority.isAcceptableOrUnknown(data['priority']!, _priorityMeta),
+      );
+    }
+    if (data.containsKey('priority_label')) {
+      context.handle(
+        _priorityLabelMeta,
+        priorityLabel.isAcceptableOrUnknown(
+          data['priority_label']!,
+          _priorityLabelMeta,
+        ),
       );
     }
     if (data.containsKey('target_version')) {
@@ -793,6 +814,10 @@ class $FeaturesTable extends Features with TableInfo<$FeaturesTable, Feature> {
         DriftSqlType.int,
         data['${effectivePrefix}priority'],
       ),
+      priorityLabel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}priority_label'],
+      ),
       targetVersion: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}target_version'],
@@ -837,6 +862,9 @@ class Feature extends DataClass implements Insertable<Feature> {
 
   /// Lower = higher priority. Nullable when unranked.
   final int? priority;
+
+  /// Alphanumeric build priority label (e.g. "1", "1A"). Replaces [priority].
+  final String? priorityLabel;
   final String? targetVersion;
 
   /// Where the feature came from: manual | scan | spec | recommend | architect
@@ -858,6 +886,7 @@ class Feature extends DataClass implements Insertable<Feature> {
     this.description,
     required this.status,
     this.priority,
+    this.priorityLabel,
     this.targetVersion,
     required this.source,
     required this.buildKind,
@@ -877,6 +906,9 @@ class Feature extends DataClass implements Insertable<Feature> {
     map['status'] = Variable<String>(status);
     if (!nullToAbsent || priority != null) {
       map['priority'] = Variable<int>(priority);
+    }
+    if (!nullToAbsent || priorityLabel != null) {
+      map['priority_label'] = Variable<String>(priorityLabel);
     }
     if (!nullToAbsent || targetVersion != null) {
       map['target_version'] = Variable<String>(targetVersion);
@@ -903,6 +935,9 @@ class Feature extends DataClass implements Insertable<Feature> {
       priority: priority == null && nullToAbsent
           ? const Value.absent()
           : Value(priority),
+      priorityLabel: priorityLabel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(priorityLabel),
       targetVersion: targetVersion == null && nullToAbsent
           ? const Value.absent()
           : Value(targetVersion),
@@ -928,6 +963,7 @@ class Feature extends DataClass implements Insertable<Feature> {
       description: serializer.fromJson<String?>(json['description']),
       status: serializer.fromJson<String>(json['status']),
       priority: serializer.fromJson<int?>(json['priority']),
+      priorityLabel: serializer.fromJson<String?>(json['priorityLabel']),
       targetVersion: serializer.fromJson<String?>(json['targetVersion']),
       source: serializer.fromJson<String>(json['source']),
       buildKind: serializer.fromJson<String>(json['buildKind']),
@@ -946,6 +982,7 @@ class Feature extends DataClass implements Insertable<Feature> {
       'description': serializer.toJson<String?>(description),
       'status': serializer.toJson<String>(status),
       'priority': serializer.toJson<int?>(priority),
+      'priorityLabel': serializer.toJson<String?>(priorityLabel),
       'targetVersion': serializer.toJson<String?>(targetVersion),
       'source': serializer.toJson<String>(source),
       'buildKind': serializer.toJson<String>(buildKind),
@@ -962,6 +999,7 @@ class Feature extends DataClass implements Insertable<Feature> {
     Value<String?> description = const Value.absent(),
     String? status,
     Value<int?> priority = const Value.absent(),
+    Value<String?> priorityLabel = const Value.absent(),
     Value<String?> targetVersion = const Value.absent(),
     String? source,
     String? buildKind,
@@ -975,6 +1013,7 @@ class Feature extends DataClass implements Insertable<Feature> {
     description: description.present ? description.value : this.description,
     status: status ?? this.status,
     priority: priority.present ? priority.value : this.priority,
+    priorityLabel: priorityLabel.present ? priorityLabel.value : this.priorityLabel,
     targetVersion: targetVersion.present
         ? targetVersion.value
         : this.targetVersion,
@@ -994,6 +1033,7 @@ class Feature extends DataClass implements Insertable<Feature> {
           : this.description,
       status: data.status.present ? data.status.value : this.status,
       priority: data.priority.present ? data.priority.value : this.priority,
+      priorityLabel: data.priorityLabel.present ? data.priorityLabel.value : this.priorityLabel,
       targetVersion: data.targetVersion.present
           ? data.targetVersion.value
           : this.targetVersion,
@@ -1014,6 +1054,7 @@ class Feature extends DataClass implements Insertable<Feature> {
           ..write('description: $description, ')
           ..write('status: $status, ')
           ..write('priority: $priority, ')
+          ..write('priorityLabel: $priorityLabel, ')
           ..write('targetVersion: $targetVersion, ')
           ..write('source: $source, ')
           ..write('buildKind: $buildKind, ')
@@ -1032,6 +1073,7 @@ class Feature extends DataClass implements Insertable<Feature> {
     description,
     status,
     priority,
+    priorityLabel,
     targetVersion,
     source,
     buildKind,
@@ -1049,6 +1091,7 @@ class Feature extends DataClass implements Insertable<Feature> {
           other.description == this.description &&
           other.status == this.status &&
           other.priority == this.priority &&
+          other.priorityLabel == this.priorityLabel &&
           other.targetVersion == this.targetVersion &&
           other.source == this.source &&
           other.buildKind == this.buildKind &&
@@ -1064,6 +1107,7 @@ class FeaturesCompanion extends UpdateCompanion<Feature> {
   final Value<String?> description;
   final Value<String> status;
   final Value<int?> priority;
+  final Value<String?> priorityLabel;
   final Value<String?> targetVersion;
   final Value<String> source;
   final Value<String> buildKind;
@@ -1078,6 +1122,7 @@ class FeaturesCompanion extends UpdateCompanion<Feature> {
     this.description = const Value.absent(),
     this.status = const Value.absent(),
     this.priority = const Value.absent(),
+    this.priorityLabel = const Value.absent(),
     this.targetVersion = const Value.absent(),
     this.source = const Value.absent(),
     this.buildKind = const Value.absent(),
@@ -1093,6 +1138,7 @@ class FeaturesCompanion extends UpdateCompanion<Feature> {
     this.description = const Value.absent(),
     required String status,
     this.priority = const Value.absent(),
+    this.priorityLabel = const Value.absent(),
     this.targetVersion = const Value.absent(),
     this.source = const Value.absent(),
     this.buildKind = const Value.absent(),
@@ -1113,6 +1159,7 @@ class FeaturesCompanion extends UpdateCompanion<Feature> {
     Expression<String>? description,
     Expression<String>? status,
     Expression<int>? priority,
+    Expression<String>? priorityLabel,
     Expression<String>? targetVersion,
     Expression<String>? source,
     Expression<String>? buildKind,
@@ -1128,6 +1175,7 @@ class FeaturesCompanion extends UpdateCompanion<Feature> {
       if (description != null) 'description': description,
       if (status != null) 'status': status,
       if (priority != null) 'priority': priority,
+      if (priorityLabel != null) 'priority_label': priorityLabel,
       if (targetVersion != null) 'target_version': targetVersion,
       if (source != null) 'source': source,
       if (buildKind != null) 'build_kind': buildKind,
@@ -1145,6 +1193,7 @@ class FeaturesCompanion extends UpdateCompanion<Feature> {
     Value<String?>? description,
     Value<String>? status,
     Value<int?>? priority,
+    Value<String?>? priorityLabel,
     Value<String?>? targetVersion,
     Value<String>? source,
     Value<String>? buildKind,
@@ -1160,6 +1209,7 @@ class FeaturesCompanion extends UpdateCompanion<Feature> {
       description: description ?? this.description,
       status: status ?? this.status,
       priority: priority ?? this.priority,
+      priorityLabel: priorityLabel ?? this.priorityLabel,
       targetVersion: targetVersion ?? this.targetVersion,
       source: source ?? this.source,
       buildKind: buildKind ?? this.buildKind,
@@ -1190,6 +1240,9 @@ class FeaturesCompanion extends UpdateCompanion<Feature> {
     }
     if (priority.present) {
       map['priority'] = Variable<int>(priority.value);
+    }
+    if (priorityLabel.present) {
+      map['priority_label'] = Variable<String>(priorityLabel.value);
     }
     if (targetVersion.present) {
       map['target_version'] = Variable<String>(targetVersion.value);
@@ -1224,6 +1277,7 @@ class FeaturesCompanion extends UpdateCompanion<Feature> {
           ..write('description: $description, ')
           ..write('status: $status, ')
           ..write('priority: $priority, ')
+          ..write('priorityLabel: $priorityLabel, ')
           ..write('targetVersion: $targetVersion, ')
           ..write('source: $source, ')
           ..write('buildKind: $buildKind, ')

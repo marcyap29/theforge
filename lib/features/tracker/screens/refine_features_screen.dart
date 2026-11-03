@@ -707,7 +707,12 @@ List<Feature> buildOrderUnbuilt(List<Feature> all) {
   final out = <Feature>[];
   for (final v in versions) {
     final group = [...byVersion[v]!]
-      ..sort((a, b) => (a.priority ?? 1 << 30).compareTo(b.priority ?? 1 << 30));
+      ..sort((a, b) {
+        final pa = parsePriorityLabel(a.priorityLabel);
+        final pb = parsePriorityLabel(b.priorityLabel);
+        final nc = pa.num.compareTo(pb.num);
+        return nc != 0 ? nc : pa.suffix.compareTo(pb.suffix);
+      });
     out.addAll(group);
   }
   return out;

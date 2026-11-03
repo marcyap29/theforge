@@ -11,6 +11,17 @@ import '../models/tracker_enums.dart';
 
 const _uuid = Uuid();
 
+/// Parses an alphanumeric priority label (e.g. "1", "1A", "P2B") into a
+/// comparable record so P1 < P1A < P1B < P2 ordering works correctly.
+/// Null / unparseable labels sort to the end (large num value).
+({int num, String suffix}) parsePriorityLabel(String? label) {
+  if (label == null) return (num: 1 << 30, suffix: '');
+  final clean = label.toUpperCase().replaceFirst(RegExp(r'^P'), '');
+  final m = RegExp(r'^(\d+)([A-Z]*)$').firstMatch(clean);
+  if (m == null) return (num: 1 << 30, suffix: '');
+  return (num: int.parse(m.group(1)!), suffix: m.group(2)!);
+}
+
 final trackerRepositoryProvider = Provider<TrackerRepository>(
   (ref) => TrackerRepository(
     ref.watch(forgeDatabaseProvider),
@@ -45,7 +56,7 @@ class FeatureListNotifier extends FamilyAsyncNotifier<List<Feature>, String> {
     required String title,
     String? description,
     FeatureStatus status = FeatureStatus.planned,
-    int? priority,
+    String? priorityLabel,
     String? targetVersion,
     String source = 'manual',
     BuildKind buildKind = BuildKind.standard,
@@ -60,7 +71,8 @@ class FeatureListNotifier extends FamilyAsyncNotifier<List<Feature>, String> {
       title: title,
       description: description,
       status: status.wire,
-      priority: priority,
+      priority: null,
+      priorityLabel: priorityLabel,
       targetVersion: _normaliseVersion(targetVersion),
       source: source,
       buildKind: buildKind.wire,
@@ -77,7 +89,7 @@ class FeatureListNotifier extends FamilyAsyncNotifier<List<Feature>, String> {
     String? title,
     String? description,
     FeatureStatus? status,
-    int? priority,
+    String? priorityLabel,
     String? targetVersion,
     BuildKind? buildKind,
   }) async {
@@ -87,7 +99,7 @@ class FeatureListNotifier extends FamilyAsyncNotifier<List<Feature>, String> {
       title: title ?? feature.title,
       description: Value(description ?? feature.description),
       status: status?.wire ?? feature.status,
-      priority: Value(priority ?? feature.priority),
+      priorityLabel: Value(priorityLabel ?? feature.priorityLabel),
       targetVersion: Value(
           targetVersion != null
               ? _normaliseVersion(targetVersion)
@@ -163,9 +175,12 @@ class FeatureListNotifier extends FamilyAsyncNotifier<List<Feature>, String> {
       final oa = FeatureStatus.board.indexOf(sa);
       final ob = FeatureStatus.board.indexOf(sb);
       if (oa != ob) return oa.compareTo(ob);
-      final pa = a.priority ?? 1 << 30;
-      final pb = b.priority ?? 1 << 30;
-      if (pa != pb) return pa.compareTo(pb);
+      final pa = parsePriorityLabel(a.priorityLabel);
+      final pb = parsePriorityLabel(b.priorityLabel);
+      final nc = pa.num.compareTo(pb.num);
+      if (nc != 0) return nc;
+      final sc = pa.suffix.compareTo(pb.suffix);
+      if (sc != 0) return sc;
       return a.createdAt.compareTo(b.createdAt);
     });
     return copy;

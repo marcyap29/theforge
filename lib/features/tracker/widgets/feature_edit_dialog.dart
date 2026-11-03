@@ -9,7 +9,7 @@ class FeatureEditResult {
     required this.title,
     required this.description,
     required this.status,
-    required this.priority,
+    required this.priorityLabel,
     required this.targetVersion,
     required this.buildKind,
   });
@@ -17,7 +17,7 @@ class FeatureEditResult {
   final String title;
   final String? description;
   final FeatureStatus status;
-  final int? priority;
+  final String? priorityLabel;
   final String? targetVersion;
 
   /// How the item should be built — lets the user re-classify by hand
@@ -59,8 +59,7 @@ class _FeatureEditDialogState extends State<_FeatureEditDialog> {
     _title = TextEditingController(text: e?.title ?? '');
     _desc = TextEditingController(text: e?.description ?? '');
     _version = TextEditingController(text: e?.targetVersion ?? '');
-    _priority =
-        TextEditingController(text: e?.priority?.toString() ?? '');
+    _priority = TextEditingController(text: e?.priorityLabel ?? '');
     _status = e != null ? FeatureStatus.fromWire(e.status) : FeatureStatus.planned;
     _kind = e != null ? BuildKind.fromWire(e.buildKind) : BuildKind.standard;
   }
@@ -78,8 +77,9 @@ class _FeatureEditDialogState extends State<_FeatureEditDialog> {
     final title = _title.text.trim();
     if (title.isEmpty) return;
     final rawPriority = _priority.text.trim();
-    final priorityDigits =
-        rawPriority.replaceFirst(RegExp(r'^[Pp]'), '').trim();
+    final clean =
+        rawPriority.toUpperCase().replaceFirst(RegExp(r'^P'), '').trim();
+    final priorityLabel = clean.isEmpty ? null : clean;
 
     final rawVersion = _version.text.trim();
     final version = rawVersion.isEmpty ? null : rawVersion.toLowerCase();
@@ -90,7 +90,7 @@ class _FeatureEditDialogState extends State<_FeatureEditDialog> {
         title: title,
         description: _desc.text.trim().isEmpty ? null : _desc.text.trim(),
         status: _status,
-        priority: int.tryParse(priorityDigits),
+        priorityLabel: priorityLabel,
         targetVersion: version,
         buildKind: _kind,
       ),

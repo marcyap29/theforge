@@ -49,8 +49,12 @@ class Features extends Table {
   /// One of FeatureStatus: idea | planned | in_progress | blocked | shipped | archived
   TextColumn get status => text()();
 
-  /// Lower = higher priority. Nullable when unranked.
+  /// Legacy integer priority — no longer written; kept so old rows survive.
   IntColumn get priority => integer().nullable()();
+
+  /// Alphanumeric build priority (e.g. "1", "1A", "2B"). Replaces the old int
+  /// column. Nullable when unranked.
+  TextColumn get priorityLabel => text().nullable()();
   TextColumn get targetVersion => text().nullable()();
 
   /// Where the feature came from: manual | scan | spec | recommend | architect
@@ -142,7 +146,7 @@ class ForgeDatabase extends _$ForgeDatabase {
   ForgeDatabase() : super(_openForgeIndex());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -167,6 +171,15 @@ class ForgeDatabase extends _$ForgeDatabase {
           // v4 -> v5: introduce prompt generation history.
           if (from < 5) {
             await m.createTable(promptRecords);
+          }
+          // v5 -> v6: add text priority label (replaces int priority column).
+          // Backfill: cast existing int values so nothing is lost.
+          if (from < 6) {
+            await m.addColumn(features, features.priorityLabel);
+            await customStatement(
+              'UPDATE features SET priority_label = CAST(priority AS TEXT) '
+              'WHERE priority IS NOT NULL',
+            );
           }
         },
       );

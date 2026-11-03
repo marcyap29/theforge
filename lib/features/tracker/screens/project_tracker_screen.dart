@@ -479,26 +479,94 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
         count: rows.length,
         nextUp: isNextUp,
       ));
-      widgets.addAll(rows.map((n) => _FeatureTile(
-            feature: n.feature,
-            indent: n.depth,
-            onSetStatus: (s) => ref
-                .read(featureListProvider(project.id).notifier)
-                .setStatus(n.feature, s),
-            onEdit: () => _editFeature(n.feature),
-            onDelete: () => ref
-                .read(featureListProvider(project.id).notifier)
-                .deleteFeature(n.feature),
-            onBuild: () => _buildFeature(n.feature),
-            onAdvice: () => _openBuildAdvice(n.feature),
-            onArchitect: () => _architectFeature(n.feature),
-            onArchitectChat: () => _architectChat(n.feature),
-            onWorkOn: () => _workOnFeature(n.feature),
-            selected: n.feature.id == _focusedFeatureId,
-            onFocus: () => setState(() => _focusedFeatureId = n.feature.id),
-          )));
+      // Capture loop-locals for the closure.
+      final version = v;
+      final versionRows = rows;
+      final allFeatures = features;
+      widgets.add(ReorderableListView(
+        key: ValueKey('drag_$v'),
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        buildDefaultDragHandles: false,
+        onReorder: (old, neo) =>
+            _reorderInVersion(version, versionRows, old, neo, allFeatures),
+        children: [
+          for (int i = 0; i < rows.length; i++)
+            _FeatureTile(
+              key: ValueKey(rows[i].feature.id),
+              feature: rows[i].feature,
+              indent: rows[i].depth,
+              // Only top-level features get a drag handle.
+              dragIndex: rows[i].depth == 0 ? i : null,
+              onSetStatus: (s) => ref
+                  .read(featureListProvider(project.id).notifier)
+                  .setStatus(rows[i].feature, s),
+              onEdit: () => _editFeature(rows[i].feature),
+              onDelete: () => ref
+                  .read(featureListProvider(project.id).notifier)
+                  .deleteFeature(rows[i].feature),
+              onBuild: () => _buildFeature(rows[i].feature),
+              onAdvice: () => _openBuildAdvice(rows[i].feature),
+              onArchitect: () => _architectFeature(rows[i].feature),
+              onArchitectChat: () => _architectChat(rows[i].feature),
+              onWorkOn: () => _workOnFeature(rows[i].feature),
+              selected: rows[i].feature.id == _focusedFeatureId,
+              onFocus: () =>
+                  setState(() => _focusedFeatureId = rows[i].feature.id),
+            ),
+        ],
+      ));
     }
     return widgets;
+  }
+
+  /// Called when the user drag-reorders items inside a version group.
+  /// Renumbers ALL active top-level features globally (across every version)
+  /// so priorities stay consistent: within [version] the new order is applied;
+  /// other versions keep their current sort order.
+  Future<void> _reorderInVersion(
+    String version,
+    List<({Feature feature, int depth})> rows,
+    int oldIndex,
+    int newIndex,
+    List<Feature> allFeatures,
+  ) async {
+    if (newIndex > oldIndex) newIndex--;
+    if (oldIndex == newIndex) return;
+    if (rows[oldIndex].depth != 0) return; // subtasks stay put
+
+    final reordered = [...rows];
+    final item = reordered.removeAt(oldIndex);
+    reordered.insert(newIndex, item);
+
+    // Build the full global order across all version groups.
+    final (topLevel, _) = _splitEpics(allFeatures);
+    final active = topLevel
+        .where((f) => FeatureStatus.fromWire(f.status).isActive)
+        .toList();
+    final byVer = groupFeaturesByVersion(active);
+    final versions = byVer.keys.toList()..sort(_compareVersions);
+
+    final globalOrder = <Feature>[];
+    for (final v in versions) {
+      if (v == version) {
+        globalOrder
+            .addAll(reordered.where((n) => n.depth == 0).map((n) => n.feature));
+      } else {
+        final sorted = [...byVer[v]!]..sort(_byBuildOrder);
+        globalOrder.addAll(sorted);
+      }
+    }
+
+    // Assign sequential text priorities.
+    final notifier = ref.read(featureListProvider(project.id).notifier);
+    for (int i = 0; i < globalOrder.length; i++) {
+      final f = globalOrder[i];
+      final newLabel = (i + 1).toString();
+      if (f.priorityLabel != newLabel) {
+        await notifier.updateFeature(f, priorityLabel: newLabel);
+      }
+    }
   }
 
   /// Recently-shipped view: shipped features sorted by [updatedAt] descending
@@ -603,12 +671,15 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
     return out;
   }
 
-  /// Within a version: lowest priority number first (nulls last), then by
-  /// status (in-progress/blocked ahead of planned/idea), then title.
+  /// Within a version: lowest priority first (P1 < P1A < P1B < P2, nulls last),
+  /// then by status (in-progress/blocked ahead of planned/idea), then title.
   static int _byBuildOrder(Feature a, Feature b) {
-    final pa = a.priority ?? 1 << 30;
-    final pb = b.priority ?? 1 << 30;
-    if (pa != pb) return pa.compareTo(pb);
+    final pa = parsePriorityLabel(a.priorityLabel);
+    final pb = parsePriorityLabel(b.priorityLabel);
+    final nc = pa.num.compareTo(pb.num);
+    if (nc != 0) return nc;
+    final sc = pa.suffix.compareTo(pb.suffix);
+    if (sc != 0) return sc;
     final sa = FeatureStatus.board.indexOf(FeatureStatus.fromWire(a.status));
     final sb = FeatureStatus.board.indexOf(FeatureStatus.fromWire(b.status));
     if (sa != sb) return sa.compareTo(sb);
@@ -638,7 +709,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
           title: result.title,
           description: result.description,
           status: result.status,
-          priority: result.priority,
+          priorityLabel: result.priorityLabel,
           targetVersion: result.targetVersion,
           buildKind: result.buildKind,
         );
@@ -653,7 +724,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
           title: result.title,
           description: result.description,
           status: result.status,
-          priority: result.priority,
+          priorityLabel: result.priorityLabel,
           targetVersion: result.targetVersion,
           buildKind: result.buildKind,
         );
@@ -1321,7 +1392,7 @@ class _ProjectTrackerScreenState extends ConsumerState<ProjectTrackerScreen> {
         order += 1;
         await notifier.updateFeature(
           f,
-          priority: order,
+          priorityLabel: order.toString(),
           targetVersion: phase.version.isEmpty ? null : phase.version,
         );
         applied += 1;
@@ -1602,6 +1673,7 @@ class _ProjectStatusMenu extends StatelessWidget {
 
 class _FeatureTile extends StatelessWidget {
   const _FeatureTile({
+    super.key,
     required this.feature,
     required this.onSetStatus,
     required this.onEdit,
@@ -1614,6 +1686,7 @@ class _FeatureTile extends StatelessWidget {
     required this.onFocus,
     required this.onWorkOn,
     this.indent = 0,
+    this.dragIndex,
   });
 
   final Feature feature;
@@ -1621,6 +1694,11 @@ class _FeatureTile extends StatelessWidget {
   /// Nesting depth: 0 = an epic or standalone feature, 1+ = a subtask rendered
   /// indented directly under its epic. Drives the left inset and branch glyph.
   final int indent;
+
+  /// When non-null, shows a drag handle in the leading area and registers a
+  /// [ReorderableDragStartListener] at this list index (build-order view only).
+  final int? dragIndex;
+
   final ValueChanged<FeatureStatus> onSetStatus;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -1673,7 +1751,25 @@ class _FeatureTile extends StatelessWidget {
       contentPadding: EdgeInsets.only(left: 16.0 + indent * 22, right: 16),
       onTap: onFocus,
       mouseCursor: SystemMouseCursors.click,
-      leading: Icon(Icons.circle, size: 12, color: status.color),
+      leading: dragIndex != null
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ReorderableDragStartListener(
+                  index: dragIndex!,
+                  child: const MouseRegion(
+                    cursor: SystemMouseCursors.grab,
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4),
+                      child: Icon(Icons.drag_handle,
+                          size: 16, color: Color(0xFF3F3F46)),
+                    ),
+                  ),
+                ),
+                Icon(Icons.circle, size: 12, color: status.color),
+              ],
+            )
+          : Icon(Icons.circle, size: 12, color: status.color),
       title: Row(
         children: [
           if (indent > 0) ...[
@@ -1829,7 +1925,7 @@ class _FeatureTile extends StatelessWidget {
   Widget? _subtitle() {
     final bits = <String>[];
     if (feature.targetVersion != null) bits.add(feature.targetVersion!.toLowerCase());
-    if (feature.priority != null) bits.add('P${feature.priority}');
+    if (feature.priorityLabel != null) bits.add('P${feature.priorityLabel}');
     if (feature.source != 'manual') bits.add(feature.source);
     final meta = bits.join(' · ');
     final desc = feature.description;
